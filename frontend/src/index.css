@@ -326,3 +326,34 @@ body::-webkit-scrollbar {
     transform: translateZ(0);
   }
 }
+
+/* Price range slider thumb styles */
+.range-thumb::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #10B981;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(16,185,129,0.4);
+  cursor: pointer;
+  pointer-events: all;
+  position: relative;
+}
+.range-thumb::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #10B981;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(16,185,129,0.4);
+  cursor: pointer;
+  pointer-events: all;
+}
+.range-thumb::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.range-thumb::-moz-range-track {
+  background: transparent;
+}
