@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FiFilter, FiArrowLeft, FiGrid, FiList, FiX, FiSearch, FiTag } from "react-icons/fi";
+import { FiFilter, FiArrowLeft, FiGrid, FiX, FiSearch, FiTag } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import MobileLayout from "../components/Layout/MobileLayout";
 import ProductCard from "../../../shared/components/ProductCard";
@@ -84,6 +84,7 @@ const Brand = () => {
         [brandId, catalogVersion, remoteBrand]
     );
 
+    const PRICE_MAX = 50000;
     const [showFilters, setShowFilters] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
@@ -353,14 +354,6 @@ const Brand = () => {
                                 <div className="flex flex-col items-end gap-2 flex-shrink-0">
                                     <div className="flex items-center bg-gray-100 rounded-lg p-1">
                                         <button
-                                            onClick={() => setViewMode("list")}
-                                            className={`p-1.5 rounded transition-colors ${viewMode === "list"
-                                                ? "bg-white text-primary-600 shadow-sm"
-                                                : "text-gray-600"
-                                                }`}>
-                                            <FiList className="text-lg" />
-                                        </button>
-                                        <button
                                             onClick={() => setViewMode("grid")}
                                             className={`p-1.5 rounded transition-colors ${viewMode === "grid"
                                                 ? "bg-white text-primary-600 shadow-sm"
@@ -475,34 +468,62 @@ const Brand = () => {
 
                                                                 {/* Price Range */}
                                                                 <div>
-                                                                    <h4 className="font-semibold text-gray-700 mb-1 text-xs">
-                                                                        Price Range
-                                                                    </h4>
-                                                                    <div className="space-y-1.5">
-                                                                        <input
-                                                                            type="number"
-                                                                            placeholder="Min Price"
-                                                                            value={filters.minPrice}
-                                                                            onChange={(e) =>
-                                                                                handleFilterChange(
-                                                                                    "minPrice",
-                                                                                    e.target.value
-                                                                                )
-                                                                            }
-                                                                            className="w-full px-2 py-1.5 rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 text-xs"
-                                                                        />
-                                                                        <input
-                                                                            type="number"
-                                                                            placeholder="Max Price"
-                                                                            value={filters.maxPrice}
-                                                                            onChange={(e) =>
-                                                                                handleFilterChange(
-                                                                                    "maxPrice",
-                                                                                    e.target.value
-                                                                                )
-                                                                            }
-                                                                            className="w-full px-2 py-1.5 rounded-md border border-gray-200 bg-white focus:outline-none focus:ring-1 focus:ring-primary-500 text-xs"
-                                                                        />
+                                                                    <h4 className="font-semibold text-gray-700 mb-2 text-xs">Price Range</h4>
+                                                                    <div className="px-1">
+                                                                        {/* Min/Max labels */}
+                                                                        <div className="flex justify-between text-[10px] font-semibold text-primary-600 mb-1">
+                                                                            <span>₹{filters.minPrice || 0}</span>
+                                                                            <span>₹{filters.maxPrice || PRICE_MAX}</span>
+                                                                        </div>
+                                                                        {/* Dual-range slider wrapper */}
+                                                                        <div className="relative h-5 flex items-center">
+                                                                            {/* Track background */}
+                                                                            <div className="absolute w-full h-1.5 rounded-full bg-gray-200" />
+                                                                            {/* Filled track */}
+                                                                            <div
+                                                                                className="absolute h-1.5 rounded-full bg-primary-500"
+                                                                                style={{
+                                                                                    left: `${((Number(filters.minPrice) || 0) / PRICE_MAX) * 100}%`,
+                                                                                    right: `${100 - ((Number(filters.maxPrice) || PRICE_MAX) / PRICE_MAX) * 100}%`,
+                                                                                }}
+                                                                            />
+                                                                            {/* Min thumb */}
+                                                                            <input
+                                                                                type="range"
+                                                                                min={0}
+                                                                                max={PRICE_MAX}
+                                                                                step={100}
+                                                                                value={Number(filters.minPrice) || 0}
+                                                                                onChange={(e) => {
+                                                                                    const val = Number(e.target.value);
+                                                                                    const max = Number(filters.maxPrice) || PRICE_MAX;
+                                                                                    handleFilterChange("minPrice", val < max ? String(val) : String(max - 100));
+                                                                                }}
+                                                                                className="absolute w-full h-1.5 appearance-none bg-transparent cursor-pointer range-thumb"
+                                                                                style={{ zIndex: (Number(filters.minPrice) || 0) > PRICE_MAX - 1000 ? 5 : 3 }}
+                                                                            />
+                                                                            {/* Max thumb */}
+                                                                            <input
+                                                                                type="range"
+                                                                                min={0}
+                                                                                max={PRICE_MAX}
+                                                                                step={100}
+                                                                                value={Number(filters.maxPrice) || PRICE_MAX}
+                                                                                onChange={(e) => {
+                                                                                    const val = Number(e.target.value);
+                                                                                    const min = Number(filters.minPrice) || 0;
+                                                                                    handleFilterChange("maxPrice", val > min ? String(val) : String(min + 100));
+                                                                                }}
+                                                                                className="absolute w-full h-1.5 appearance-none bg-transparent cursor-pointer range-thumb"
+                                                                                style={{ zIndex: 4 }}
+                                                                            />
+                                                                        </div>
+                                                                        {/* Scale labels */}
+                                                                        <div className="flex justify-between text-[9px] text-gray-400 mt-1">
+                                                                            <span>₹0</span>
+                                                                            <span>₹{(PRICE_MAX / 2).toLocaleString()}</span>
+                                                                            <span>₹{PRICE_MAX.toLocaleString()}</span>
+                                                                        </div>
                                                                     </div>
                                                                 </div>
 

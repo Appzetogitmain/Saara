@@ -245,16 +245,16 @@ const MobileProfile = () => {
                       {/* Stats */}
                       <div className="flex justify-between md:justify-start items-center text-center md:text-left gap-0 md:gap-10">
                         <div className="flex flex-col md:flex-row md:gap-1">
-                          <div className="font-bold text-lg leading-tight">—</div>
+                          <div className="font-bold text-lg leading-tight">12</div>
                           <div className="text-xs md:text-base text-gray-500 md:text-black">Posts</div>
                         </div>
                         <div className="flex flex-col md:flex-row md:gap-1">
-                          <div className="font-bold text-lg leading-tight">—</div>
-                          <div className="text-xs md:text-base text-gray-500 md:text-black">Orders</div>
+                          <div className="font-bold text-lg leading-tight">10.5K</div>
+                          <div className="text-xs md:text-base text-gray-500 md:text-black">Followers</div>
                         </div>
                         <div className="flex flex-col md:flex-row md:gap-1">
-                          <div className="font-bold text-lg leading-tight">—</div>
-                          <div className="text-xs md:text-base text-gray-500 md:text-black">Wishlist</div>
+                          <div className="font-bold text-lg leading-tight">482</div>
+                          <div className="text-xs md:text-base text-gray-500 md:text-black">Following</div>
                         </div>
                       </div>
                       {/* Desktop Bio */}

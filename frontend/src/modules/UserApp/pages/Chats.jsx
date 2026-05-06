@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiMessageCircle, FiChevronRight, FiUser, FiArrowLeft, FiClock } from 'react-icons/fi';
+import { FiMessageCircle, FiChevronRight, FiUser, FiArrowLeft, FiClock, FiEdit, FiPlus, FiImage, FiVideo } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import MobileLayout from '../components/Layout/MobileLayout';
 import PageTransition from '../../../shared/components/PageTransition';
@@ -56,6 +56,9 @@ const UserChats = () => {
                                 <FiArrowLeft className="text-xl text-gray-700" />
                             </button>
                             <h1 className="text-xl font-bold text-gray-800">My Chats</h1>
+                            <button className="ml-auto p-2 bg-primary-50 text-primary-600 rounded-full hover:bg-primary-100 transition-all">
+                                <FiPlus className="text-xl" />
+                            </button>
                         </div>
                     </div>
 
@@ -114,9 +117,24 @@ const UserChats = () => {
                                     <FiMessageCircle className="text-4xl text-gray-300" />
                                 </div>
                                 <h3 className="text-lg font-bold text-gray-800 mb-1">No Conversations</h3>
-                                <p className="text-gray-500 text-sm max-w-[200px]">
+                                <p className="text-gray-500 text-sm max-w-[200px] mb-8">
                                     Your chats with sellers will appear here.
                                 </p>
+
+                                <div className="grid grid-cols-2 gap-4 w-full max-w-[300px]">
+                                    <button className="flex flex-col items-center gap-3 p-6 bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+                                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <FiImage className="text-2xl" />
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-700">Send Photo</span>
+                                    </button>
+                                    <button className="flex flex-col items-center gap-3 p-6 bg-white rounded-3xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+                                        <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                                            <FiVideo className="text-2xl" />
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-700">Send Video</span>
+                                    </button>
+                                </div>
                             </div>
                         )}
                     </div>

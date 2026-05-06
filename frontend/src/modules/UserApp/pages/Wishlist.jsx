@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FiHeart, FiArrowLeft, FiGrid, FiList } from "react-icons/fi";
+import { FiHeart, FiArrowLeft, FiGrid } from "react-icons/fi";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import MobileLayout from "../components/Layout/MobileLayout";
@@ -16,7 +16,7 @@ const MobileWishlist = () => {
   const { isAuthenticated } = useAuthStore();
   const { items, removeItem, moveToCart, clearWishlist, fetchWishlist, isLoading } = useWishlistStore();
   const { addItem } = useCartStore();
-  const [viewMode, setViewMode] = useState("list"); // 'list' or 'grid'
+  const [viewMode, setViewMode] = useState("grid"); // 'list' or 'grid'
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -71,14 +71,6 @@ const MobileWishlist = () => {
                   <div className="flex items-center gap-2">
                     {/* View Toggle Buttons */}
                     <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                      <button
-                        onClick={() => setViewMode("list")}
-                        className={`p-1.5 rounded transition-colors ${viewMode === "list"
-                          ? "bg-white text-primary-600 shadow-sm"
-                          : "text-gray-600"
-                          }`}>
-                        <FiList className="text-lg" />
-                      </button>
                       <button
                         onClick={() => setViewMode("grid")}
                         className={`p-1.5 rounded transition-colors ${viewMode === "grid"

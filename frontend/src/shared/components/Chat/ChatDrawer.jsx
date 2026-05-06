@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { FiX, FiSend, FiUser } from 'react-icons/fi';
+import { FiX, FiSend, FiUser, FiImage, FiVideo, FiPlus, FiPaperclip } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getUserChatMessages, sendUserChatMessage } from '../../../modules/UserApp/services/chatService';
 import { getSocket, joinRoom } from '../../utils/socket';
@@ -11,8 +11,9 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
     const [newMessage, setNewMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isSending, setIsSending] = useState(false);
-    const messagesEndRef = useRef(null);
     const { user } = useAuthStore();
+    const fileInputRef = useRef(null);
+    const messagesEndRef = useRef(null);
 
     useEffect(() => {
         if (isOpen && threadId) {
@@ -59,6 +60,35 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const isImage = file.type.startsWith('image/');
+        const isVideo = file.type.startsWith('video/');
+
+        if (!isImage && !isVideo) {
+            toast.error('Please select an image or video file');
+            return;
+        }
+
+        // Simulate file upload/send
+        toast.success(`Sending ${isImage ? 'image' : 'video'}...`);
+        
+        // In a real app, you'd upload the file and send the URL in a message
+        const mockMessage = {
+            id: Date.now().toString(),
+            sender: 'customer',
+            message: `[${isImage ? 'Image' : 'Video'} Attachment: ${file.name}]`,
+            time: new Date(),
+            type: isImage ? 'image' : 'video',
+            url: URL.createObjectURL(file)
+        };
+        
+        setMessages(prev => [...prev, mockMessage]);
+        e.target.value = ''; // Reset input
     };
 
     const handleSend = async () => {
@@ -118,6 +148,15 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
                                 messages.map((msg) => (
                                     <div key={msg.id} className={`flex ${msg.sender === 'customer' ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[80%] px-4 py-2 rounded-2xl ${msg.sender === 'customer' ? 'bg-primary-600 text-white rounded-tr-none' : 'bg-gray-100 text-gray-800 rounded-tl-none'}`}>
+                                            {msg.type === 'image' ? (
+                                                <div className="mb-2 rounded-lg overflow-hidden">
+                                                    <img src={msg.url} alt="attachment" className="w-full h-auto max-h-60 object-cover" />
+                                                </div>
+                                            ) : msg.type === 'video' ? (
+                                                <div className="mb-2 rounded-lg overflow-hidden">
+                                                    <video src={msg.url} controls className="w-full h-auto max-h-60" />
+                                                </div>
+                                            ) : null}
                                             <p className="text-sm">{msg.message}</p>
                                             <p className={`text-[10px] mt-1 ${msg.sender === 'customer' ? 'text-primary-100' : 'text-gray-400'}`}>
                                                 {new Date(msg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -134,7 +173,20 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
                         </div>
 
                         <div className="p-4 border-t border-gray-100 pb-8">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                onChange={handleFileChange}
+                                accept="image/*,video/*"
+                            />
                             <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-12 h-12 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center text-gray-500 hover:text-primary-600 transition-colors"
+                                >
+                                    <FiPaperclip className="text-xl" />
+                                </button>
                                 <input
                                     type="text"
                                     value={newMessage}

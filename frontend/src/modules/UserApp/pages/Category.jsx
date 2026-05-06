@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FiFilter, FiArrowLeft, FiGrid, FiList, FiX, FiSearch } from "react-icons/fi";
+import { FiFilter, FiArrowLeft, FiGrid, FiX, FiSearch } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import MobileLayout from "../components/Layout/MobileLayout";
 import ProductCard from "../../../shared/components/ProductCard";
