@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FiHeart, FiArrowLeft, FiGrid } from "react-icons/fi";
+import { FiHeart, FiArrowLeft } from "react-icons/fi";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import MobileLayout from "../components/Layout/MobileLayout";
@@ -69,17 +69,7 @@ const MobileWishlist = () => {
                 </div>
                 {items.length > 0 && (
                   <div className="flex items-center gap-2">
-                    {/* View Toggle Buttons */}
-                    <div className="flex items-center bg-gray-100 rounded-lg p-1">
-                      <button
-                        onClick={() => setViewMode("grid")}
-                        className={`p-1.5 rounded transition-colors ${viewMode === "grid"
-                          ? "bg-white text-primary-600 shadow-sm"
-                          : "text-gray-600"
-                          }`}>
-                        <FiGrid className="text-lg" />
-                      </button>
-                    </div>
+
                     <button
                       onClick={handleClearAll}
                       className="text-xs text-red-600 font-semibold px-2 py-1 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0">
