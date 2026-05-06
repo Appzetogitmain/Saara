@@ -182,7 +182,7 @@ const Support = () => {
                                 <p className="text-sm text-gray-400">Our team typically responds within 24 hours during business days.</p>
                             </div>
                         </div>
-                    </div>v>
+                    </div>
                 </div>
             </MobileLayout>
         </PageTransition>
