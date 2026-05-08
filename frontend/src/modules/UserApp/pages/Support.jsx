@@ -124,64 +124,210 @@ const Support = () => {
                     </div>
 
                     <div className="max-w-3xl mx-auto p-4">
-                        <div className="space-y-4 pt-4">
-                            <h2 className="text-lg font-bold text-gray-800 mb-6 px-2">Get in Touch</h2>
-                            
-                            {/* Mobile Phone */}
-                            <a href="tel:+919876543210" className="block">
-                                <motion.div 
-                                    whileTap={{ scale: 0.98 }}
-                                    className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer"
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                                        <FiPhone className="text-xl" />
+                        {isCreating ? (
+                            <div className="space-y-4 pt-4">
+                                <div className="flex items-center justify-between mb-6 px-2">
+                                    <h2 className="text-lg font-bold text-gray-800">Create New Ticket</h2>
+                                    <button 
+                                        onClick={() => setIsCreating(false)}
+                                        className="text-gray-500 hover:text-gray-800"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                                <form onSubmit={handleCreateTicket} className="space-y-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Subject</label>
+                                        <input 
+                                            type="text" 
+                                            value={newTicket.subject}
+                                            onChange={(e) => setNewTicket({...newTicket, subject: e.target.value})}
+                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:outline-none"
+                                            placeholder="What is the issue?"
+                                        />
                                     </div>
-                                    <div className="flex-1">
-                                        <h3 className="font-bold text-gray-800 text-sm">Mobile Phone</h3>
-                                        <p className="text-gray-500 text-sm">+91 98765 43210</p>
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Type</label>
+                                        <select 
+                                            value={newTicket.ticketTypeId}
+                                            onChange={(e) => setNewTicket({...newTicket, ticketTypeId: e.target.value})}
+                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:outline-none"
+                                        >
+                                            <option value="">Select Type</option>
+                                            {ticketTypes.map(type => (
+                                                <option key={type._id} value={type._id}>{type.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
-                                    <FiChevronRight className="text-gray-400" />
-                                </motion.div>
-                            </a>
-
-                            {/* Gmail */}
-                            <a href="mailto:support@saara.com" className="block">
-                                <motion.div 
-                                    whileTap={{ scale: 0.98 }}
-                                    className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer"
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
-                                        <FiMail className="text-xl" />
+                                    <div>
+                                        <label className="block text-sm font-semibold text-gray-700 mb-2">Message</label>
+                                        <textarea 
+                                            value={newTicket.message}
+                                            onChange={(e) => setNewTicket({...newTicket, message: e.target.value})}
+                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:outline-none h-32"
+                                            placeholder="Describe your issue in detail..."
+                                        />
                                     </div>
-                                    <div className="flex-1">
-                                        <h3 className="font-bold text-gray-800 text-sm">Gmail</h3>
-                                        <p className="text-gray-500 text-sm">support@saara.com</p>
-                                    </div>
-                                    <FiChevronRight className="text-gray-400" />
-                                </motion.div>
-                            </a>
-
-                            {/* Collaboration Request */}
-                            <a href="mailto:collab@saara.com?subject=Collaboration Request" className="block">
-                                <motion.div 
-                                    whileTap={{ scale: 0.98 }}
-                                    className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer"
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
-                                        <FiTag className="text-xl" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className="font-bold text-gray-800 text-sm">Collaboration Request</h3>
-                                        <p className="text-gray-500 text-sm">Partner with us</p>
-                                    </div>
-                                    <FiChevronRight className="text-gray-400" />
-                                </motion.div>
-                            </a>
-
-                            <div className="mt-12 text-center px-6">
-                                <p className="text-sm text-gray-400">Our team typically responds within 24 hours during business days.</p>
+                                    <button 
+                                        type="submit" 
+                                        disabled={isSending}
+                                        className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 disabled:opacity-50"
+                                    >
+                                        {isSending ? 'Sending...' : 'Submit Ticket'}
+                                    </button>
+                                </form>
                             </div>
-                        </div>
+                        ) : selectedTicket ? (
+                            <div className="space-y-4 pt-4">
+                                <div className="flex items-center justify-between mb-6 px-2">
+                                    <h2 className="text-lg font-bold text-gray-800">{selectedTicket.subject}</h2>
+                                    <button 
+                                        onClick={() => setSelectedTicket(null)}
+                                        className="text-gray-500 hover:text-gray-800"
+                                    >
+                                        Back to Tickets
+                                    </button>
+                                </div>
+                                <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(selectedTicket.status)}`}>
+                                            {selectedTicket.status}
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                            {new Date(selectedTicket.updatedAt).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="space-y-4 max-h-[400px] overflow-y-auto p-2">
+                                        {selectedTicket.messages?.map((msg, idx) => (
+                                            <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                <div className={`max-w-[80%] px-4 py-2.5 rounded-2xl ${
+                                                    msg.sender === 'user' 
+                                                    ? 'bg-blue-600 text-white' 
+                                                    : 'bg-gray-100 text-gray-900'
+                                                }`}>
+                                                    <p className="text-sm">{msg.message}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <form onSubmit={handleSendReply} className="flex gap-2">
+                                        <input 
+                                            type="text" 
+                                            value={replyMessage}
+                                            onChange={(e) => setReplyMessage(e.target.value)}
+                                            placeholder="Type a reply..."
+                                            className="flex-1 px-4 py-2 rounded-xl border border-gray-200 focus:border-blue-500 focus:outline-none"
+                                        />
+                                        <button 
+                                            type="submit" 
+                                            disabled={isSending}
+                                            className="p-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50"
+                                        >
+                                            <FiSend />
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4 pt-4">
+                                <div className="flex justify-between items-center mb-6 px-2">
+                                    <h2 className="text-lg font-bold text-gray-800">Your Tickets</h2>
+                                    <button 
+                                        onClick={() => setIsCreating(true)}
+                                        className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold hover:bg-blue-700"
+                                    >
+                                        <FiPlus /> New Ticket
+                                    </button>
+                                </div>
+
+                                {/* Tickets List */}
+                                <div className="space-y-3">
+                                    {tickets.length > 0 ? (
+                                        tickets.map(ticket => (
+                                            <div 
+                                                key={ticket._id}
+                                                onClick={() => setSelectedTicket(ticket)}
+                                                className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between cursor-pointer hover:border-blue-200 transition-colors"
+                                            >
+                                                <div className="flex-1">
+                                                    <h3 className="font-bold text-gray-800 text-sm">{ticket.subject}</h3>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(ticket.status)}`}>
+                                                            {ticket.status}
+                                                        </span>
+                                                        <span className="text-xs text-gray-500">
+                                                            {new Date(ticket.updatedAt).toLocaleDateString()}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <FiChevronRight className="text-gray-400" />
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="text-center py-6 text-gray-500 text-sm">
+                                            No tickets found. Create one if you have an issue.
+                                        </div>
+                                    )}
+                                </div>
+
+                                <h2 className="text-lg font-bold text-gray-800 mt-8 mb-6 px-2">Get in Touch</h2>
+                                
+                                {/* Mobile Phone */}
+                                <a href="tel:+919876543210" className="block">
+                                    <motion.div 
+                                        whileTap={{ scale: 0.98 }}
+                                        className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer"
+                                    >
+                                        <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                            <FiPhone className="text-xl" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-gray-800 text-sm">Mobile Phone</h3>
+                                            <p className="text-gray-500 text-sm">+91 98765 43210</p>
+                                        </div>
+                                        <FiChevronRight className="text-gray-400" />
+                                    </motion.div>
+                                </a>
+
+                                {/* Gmail */}
+                                <a href="mailto:support@saara.com" className="block">
+                                    <motion.div 
+                                        whileTap={{ scale: 0.98 }}
+                                        className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer"
+                                    >
+                                        <div className="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center">
+                                            <FiMail className="text-xl" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-gray-800 text-sm">Gmail</h3>
+                                            <p className="text-gray-500 text-sm">support@saara.com</p>
+                                        </div>
+                                        <FiChevronRight className="text-gray-400" />
+                                    </motion.div>
+                                </a>
+
+                                {/* Collaboration Request */}
+                                <a href="mailto:collab@saara.com?subject=Collaboration Request" className="block">
+                                    <motion.div 
+                                        whileTap={{ scale: 0.98 }}
+                                        className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 cursor-pointer"
+                                    >
+                                        <div className="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                                            <FiTag className="text-xl" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="font-bold text-gray-800 text-sm">Collaboration Request</h3>
+                                            <p className="text-gray-500 text-sm">Partner with us</p>
+                                        </div>
+                                        <FiChevronRight className="text-gray-400" />
+                                    </motion.div>
+                                </a>
+
+                                <div className="mt-12 text-center px-6">
+                                    <p className="text-sm text-gray-400">Our team typically responds within 24 hours during business days.</p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </MobileLayout>

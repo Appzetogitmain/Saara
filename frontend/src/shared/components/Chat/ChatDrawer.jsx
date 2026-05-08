@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { FiX, FiSend, FiUser, FiImage, FiVideo, FiPlus, FiPaperclip } from 'react-icons/fi';
+import { 
+    FiX, FiSend, FiUser, FiImage, FiVideo, 
+    FiPlus, FiPaperclip, FiPhone, FiChevronLeft,
+    FiCamera, FiMic, FiSmile
+} from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getUserChatMessages, sendUserChatMessage } from '../../../modules/UserApp/services/chatService';
 import { getSocket, joinRoom } from '../../utils/socket';
@@ -74,10 +78,8 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
             return;
         }
 
-        // Simulate file upload/send
         toast.success(`Sending ${isImage ? 'image' : 'video'}...`);
         
-        // In a real app, you'd upload the file and send the URL in a message
         const mockMessage = {
             id: Date.now().toString(),
             sender: 'customer',
@@ -88,7 +90,7 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
         };
         
         setMessages(prev => [...prev, mockMessage]);
-        e.target.value = ''; // Reset input
+        e.target.value = ''; 
     };
 
     const handleSend = async () => {
@@ -103,7 +105,6 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
         } catch (err) {
             toast.error('Failed to send message');
         } finally {
-            setIsSending(true); // Wait, should be false
             setIsSending(false);
         }
     };
@@ -117,37 +118,57 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/50 z-[60]"
+                        className="fixed inset-0 bg-black/40 z-[60]"
                     />
                     <motion.div
-                        initial={{ y: '100%' }}
-                        animate={{ y: 0 }}
-                        exit={{ y: '100%' }}
+                        initial={{ x: '100%' }}
+                        animate={{ x: 0 }}
+                        exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="fixed bottom-0 left-0 right-0 h-[80vh] bg-white rounded-t-3xl z-[70] flex flex-col shadow-2xl"
+                        className="fixed inset-0 bg-white z-[70] flex flex-col shadow-2xl"
                     >
-                        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-primary-50 rounded-t-3xl">
+                        {/* Header - Instagram Style */}
+                        <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                                    <FiUser className="text-primary-600" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-gray-800">{vendorName || 'Vendor'}</h3>
-                                    <p className="text-xs text-gray-500">Online</p>
+                                <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-full transition-colors">
+                                    <FiChevronLeft className="text-2xl text-gray-800" />
+                                </button>
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 bg-gray-100 rounded-full flex items-center justify-center border border-gray-200">
+                                        <FiUser className="text-gray-400 text-lg" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <h3 className="font-bold text-gray-900 leading-tight">{vendorName || 'Vendor'}</h3>
+                                    </div>
                                 </div>
                             </div>
-                            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                                <FiX className="text-2xl text-gray-500" />
-                            </button>
+                            <div className="flex items-center gap-6 pr-1">
+                                <button className="text-gray-800"><FiPhone size={22} /></button>
+                                <button className="text-gray-800"><FiVideo size={24} /></button>
+                            </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+                            {/* Profile Intro Section */}
+                            <div className="flex flex-col items-center justify-center py-10 text-center border-b border-gray-50 mb-6">
+                                <div className="w-20 h-20 bg-[#fff5f0] rounded-full flex items-center justify-center border border-gray-100 mb-3 shadow-sm">
+                                    <FiUser className="text-4xl text-gray-300" />
+                                </div>
+                                <h3 className="text-lg font-bold text-gray-900">{vendorName || 'Vendor'}</h3>
+                                <p className="text-xs text-gray-500 font-medium">9 followers · 0 posts</p>
+                                <p className="text-xs text-gray-400 mt-2">You've followed this account since 2026</p>
+                                <p className="text-xs text-gray-400">You both follow crmtick</p>
+                                <button className="mt-4 px-4 py-1.5 bg-gray-100 rounded-lg text-xs font-bold text-gray-700">
+                                    View Profile
+                                </button>
+                            </div>
+
                             {isLoading ? (
                                 <div className="flex items-center justify-center h-full text-gray-500">Loading...</div>
                             ) : messages.length > 0 ? (
                                 messages.map((msg) => (
                                     <div key={msg.id} className={`flex ${msg.sender === 'customer' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[80%] px-4 py-2 rounded-2xl ${msg.sender === 'customer' ? 'bg-primary-600 text-white rounded-tr-none' : 'bg-gray-100 text-gray-800 rounded-tl-none'}`}>
+                                        <div className={`max-w-[80%] px-4 py-2.5 rounded-[22px] ${msg.sender === 'customer' ? 'bg-primary-600 text-white rounded-br-md' : 'bg-gray-100 text-gray-900 rounded-bl-md'}`}>
                                             {msg.type === 'image' ? (
                                                 <div className="mb-2 rounded-lg overflow-hidden">
                                                     <img src={msg.url} alt="attachment" className="w-full h-auto max-h-60 object-cover" />
@@ -157,22 +178,19 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
                                                     <video src={msg.url} controls className="w-full h-auto max-h-60" />
                                                 </div>
                                             ) : null}
-                                            <p className="text-sm">{msg.message}</p>
+                                            <p className="text-[15px]">{msg.message}</p>
                                             <p className={`text-[10px] mt-1 ${msg.sender === 'customer' ? 'text-primary-100' : 'text-gray-400'}`}>
                                                 {new Date(msg.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </p>
                                         </div>
                                     </div>
                                 ))
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-full text-center p-8">
-                                    <p className="text-gray-500">No messages yet. Start a conversation!</p>
-                                </div>
-                            )}
+                            ) : null}
                             <div ref={messagesEndRef} />
                         </div>
 
-                        <div className="p-4 border-t border-gray-100 pb-8">
+                        {/* Footer - Instagram Style */}
+                        <div className="p-3 bg-white border-t border-gray-100 pb-8">
                             <input
                                 type="file"
                                 ref={fileInputRef}
@@ -180,28 +198,41 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
                                 onChange={handleFileChange}
                                 accept="image/*,video/*"
                             />
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3">
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-12 h-12 bg-gray-50 border border-gray-200 rounded-xl flex items-center justify-center text-gray-500 hover:text-primary-600 transition-colors"
+                                    className="w-11 h-11 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-md active:scale-95 transition-all"
                                 >
-                                    <FiPaperclip className="text-xl" />
+                                    <FiCamera className="text-xl" />
                                 </button>
-                                <input
-                                    type="text"
-                                    value={newMessage}
-                                    onChange={(e) => setNewMessage(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                                    placeholder="Type a message..."
-                                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                />
-                                <button
-                                    onClick={handleSend}
-                                    disabled={!newMessage.trim() || isSending}
-                                    className="w-12 h-12 bg-primary-600 text-white rounded-xl flex items-center justify-center disabled:opacity-50 shadow-lg"
-                                >
-                                    <FiSend className="text-xl" />
-                                </button>
+                                
+                                <div className="flex-1 flex items-center gap-2 bg-gray-100 rounded-[28px] p-1 px-4">
+                                    <input
+                                        type="text"
+                                        value={newMessage}
+                                        onChange={(e) => setNewMessage(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                                        placeholder="Message..."
+                                        className="flex-1 bg-transparent border-none outline-none py-2.5 text-[15px] text-gray-900 placeholder:text-gray-400"
+                                    />
+                                    <div className="flex items-center gap-4 pr-1">
+                                        {!newMessage.trim() ? (
+                                            <>
+                                                <FiMic className="text-gray-600 text-lg cursor-pointer hover:text-gray-900" />
+                                                <FiImage className="text-gray-600 text-lg cursor-pointer hover:text-gray-900" />
+                                                <FiSmile className="text-gray-600 text-lg cursor-pointer hover:text-gray-900" />
+                                                <FiPlus className="text-gray-600 text-lg cursor-pointer hover:text-gray-900" />
+                                            </>
+                                        ) : (
+                                            <button 
+                                                onClick={handleSend}
+                                                className="text-blue-600 font-bold text-sm px-1"
+                                            >
+                                                Send
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </motion.div>
@@ -212,3 +243,4 @@ const ChatDrawer = ({ isOpen, onClose, threadId, vendorName }) => {
 };
 
 export default ChatDrawer;
+
