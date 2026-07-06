@@ -263,7 +263,13 @@ const CategorySelector = ({
                               : "text-gray-900"
                           }`}
                           onClick={() => {
-                            handleCategorySelect(category.id);
+                            if (!hasSubcategories) {
+                              handleCategorySelect(category.id);
+                            } else {
+                              setHoveredCategoryId(
+                                hoveredCategoryId === category.id ? null : category.id
+                              );
+                            }
                           }}
                           onMouseEnter={() => {
                             if (hasSubcategories) {
@@ -341,6 +347,22 @@ const CategorySelector = ({
                   }, 200); // 0.20 seconds = 200ms
                 }}>
                 <div className="py-1 max-h-60 overflow-y-auto">
+                  {/* Option to select the parent category itself */}
+                  <motion.div
+                    onClick={() => handleCategorySelect(hoveredCategoryId)}
+                    whileHover={{
+                      backgroundColor: value === hoveredCategoryId && !subcategoryId
+                        ? "rgba(40, 116, 240, 0.1)"
+                        : "rgba(249, 250, 251, 1)",
+                    }}
+                    className={`px-4 py-2 cursor-pointer font-semibold border-b border-gray-100 transition-colors duration-150 text-xs text-left ${
+                      value === hoveredCategoryId && !subcategoryId
+                        ? "bg-primary-50 text-primary-600"
+                        : "text-gray-700 hover:text-gray-900"
+                    }`}
+                  >
+                    All {rootCategories.find(c => String(c.id) === String(hoveredCategoryId))?.name || "Category"}
+                  </motion.div>
                   {hoveredSubcategories.map((subcategory) => {
                     const isSubSelected = subcategoryId === subcategory.id;
                     return (

@@ -14,7 +14,15 @@ const CategoryTree = ({ categories, onEdit, onDelete, onAddSubcategory, level = 
   };
 
   const getChildren = (parentId) => {
-    return categories.filter((cat) => cat.parentId === parentId);
+    return categories.filter((cat) => {
+      const catParentId = cat.parentId && typeof cat.parentId === 'object'
+        ? (cat.parentId._id || cat.parentId.id)
+        : cat.parentId;
+      const targetParentId = parentId && typeof parentId === 'object'
+        ? (parentId._id || parentId.id)
+        : parentId;
+      return catParentId && String(catParentId) === String(targetParentId);
+    });
   };
 
   const renderCategory = (category) => {
@@ -230,7 +238,12 @@ const CategoryTree = ({ categories, onEdit, onDelete, onAddSubcategory, level = 
   };
 
   const rootCategories = categories
-    .filter((cat) => !cat.parentId)
+    .filter((cat) => {
+      const catParentId = cat.parentId && typeof cat.parentId === 'object'
+        ? (cat.parentId._id || cat.parentId.id)
+        : cat.parentId;
+      return !catParentId;
+    })
     .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   return (

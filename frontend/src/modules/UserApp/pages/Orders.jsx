@@ -74,64 +74,66 @@ const MobileOrders = () => {
   return (
     <PageTransition>
       <MobileLayout showBottomNav={true} showCartBar={true}>
-          <div className="w-full pb-24">
-            {/* Header */}
-            <div className="px-4 py-4 bg-white border-b border-gray-200 sticky top-1 z-30">
-              <div className="flex items-center gap-3 mb-3">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <FiArrowLeft className="text-xl text-gray-700" />
-                </button>
-                <div className="flex-1">
-                  <h1 className="text-xl font-bold text-gray-800">My Orders</h1>
-                  <p className="text-sm text-gray-600">
-                    {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowFilter(!showFilter)}
-                  className="p-2 glass-card rounded-xl hover:bg-white/80 transition-colors"
-                >
-                  <FiFilter className="text-gray-600 text-lg" />
-                </button>
+        <div className="w-full max-w-4xl mx-auto px-4 lg:px-0 py-6 pb-24">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => navigate(-1)}
+                className="w-12 h-12 bg-white border border-gray-100 hover:bg-gray-50 rounded-2xl flex items-center justify-center text-slate-700 shadow-sm transition-all"
+              >
+                <FiArrowLeft className="text-xl" />
+              </button>
+              <div>
+                <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">My Orders</h1>
+                <p className="text-xs font-semibold text-slate-400 mt-1">
+                  {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'} placed
+                </p>
               </div>
-
-              {/* Filter Options */}
-              {showFilter && (
-                <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4">
-                  {statusOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => {
-                        setSelectedStatus(option.value);
-                        setShowFilter(false);
-                      }}
-                      className={`px-4 py-2 rounded-xl font-semibold text-sm whitespace-nowrap transition-all ${selectedStatus === option.value
-                        ? 'gradient-green text-white'
-                        : 'bg-gray-100 text-gray-700'
-                        }`}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
+            <div className="flex items-center gap-3 self-start sm:self-center">
+              <button
+                onClick={() => setShowFilter(!showFilter)}
+                className={`p-2.5 rounded-xl border transition-all ${showFilter ? 'bg-emerald-50 border-emerald-200 text-emerald-600' : 'bg-white border-gray-100 text-slate-600 hover:bg-gray-50 shadow-sm'}`}
+              >
+                <FiFilter className="text-lg" />
+              </button>
+            </div>
+          </div>
 
-            {/* Orders List */}
-            <div
-              ref={elementRef}
-              className="px-4 py-4"
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-              style={{
-                transform: `translateY(${Math.min(pullDistance, 80)}px)`,
-                transition: isPulling ? 'none' : 'transform 0.3s ease-out',
-              }}
-            >
+          {/* Filter Options */}
+          {showFilter && (
+            <div className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm mb-6 flex gap-2 overflow-x-auto scrollbar-hide">
+              {statusOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => {
+                    setSelectedStatus(option.value);
+                  }}
+                  className={`px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
+                    selectedStatus === option.value
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-gray-100'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Orders List */}
+          <div
+            ref={elementRef}
+            className="w-full"
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+            style={{
+              transform: `translateY(${Math.min(pullDistance, 80)}px)`,
+              transition: isPulling ? 'none' : 'transform 0.3s ease-out',
+            }}
+          >
               {isLoading ? (
                 <div className="text-center py-12">
                   <p className="text-gray-600">Loading orders...</p>

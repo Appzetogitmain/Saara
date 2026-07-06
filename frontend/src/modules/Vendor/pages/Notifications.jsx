@@ -254,10 +254,13 @@ const Notifications = () => {
           pagination={true}
           itemsPerPage={10}
           onRowClick={(row) => {
-            if (row.data?.returnRequestId) navigate("/vendor/return-requests");
-            else if (row.data?.documentId) navigate("/vendor/documents");
-            else if (row.orderId || row.data?.orderId)
-              navigate("/vendor/orders/all-orders");
+            const returnRequestId = row.data?.returnRequestId || (typeof row.data?.get === 'function' ? row.data.get('returnRequestId') : null) || row.returnRequestId;
+            const orderId = row.orderId || row.data?.orderId || (typeof row.data?.get === 'function' ? row.data.get('orderId') : null);
+            const documentId = row.data?.documentId || (typeof row.data?.get === 'function' ? row.data.get('documentId') : null);
+
+            if (returnRequestId) navigate(`/vendor/return-requests/${returnRequestId}`);
+            else if (documentId) navigate("/vendor/documents");
+            else if (orderId) navigate("/vendor/orders/all-orders");
             if (!row.isRead) {
               handleMarkRead(row._id);
             }

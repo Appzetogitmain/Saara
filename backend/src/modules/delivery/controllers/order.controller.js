@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { sendEmail } from '../../../services/email.service.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { emitToRoom } from '../../../services/socket.service.js';
+import { autoAssignDeliveryPartner } from '../../../services/assignmentService.js';
 
 const DELIVERY_OTP_TTL_MS = 10 * 60 * 1000;
 const DELIVERY_OTP_MAX_ATTEMPTS = 5;
@@ -48,7 +49,7 @@ export const getAssignedOrders = asyncHandler(async (req, res) => {
     const { status, page, limit } = req.query;
     const filter = { deliveryBoyId: req.user.id, isDeleted: { $ne: true } };
     if (status === 'open') {
-        filter.status = { $in: ['pending', 'processing'] };
+        filter.status = { $in: ['pending', 'processing', 'ready_for_pickup'] };
     } else if (status) {
         filter.status = status;
     }
@@ -140,12 +141,16 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
         totalOrders:
             Number(countByStatus.pending || 0) +
             Number(countByStatus.processing || 0) +
+            Number(countByStatus.ready_for_pickup || 0) +
             Number(countByStatus.shipped || 0) +
             Number(countByStatus.delivered || 0) +
             Number(countByStatus.cancelled || 0) +
             Number(countByStatus.returned || 0),
         completedToday: Number(completedTodayCount || 0),
-        openOrders: Number(countByStatus.pending || 0) + Number(countByStatus.processing || 0),
+        openOrders: 
+            Number(countByStatus.pending || 0) + 
+            Number(countByStatus.processing || 0) + 
+            Number(countByStatus.ready_for_pickup || 0),
         earnings: Number(earningsStats?.[0]?.totalDeliveryFees || 0),
         recentOrders,
     };
@@ -213,7 +218,9 @@ export const getOrderDetail = asyncHandler(async (req, res) => {
         query.$or.push({ _id: req.params.id });
     }
 
-    const order = await Order.findOne(query).select('+deliveryOtpHash +deliveryOtpExpiry +deliveryOtpSentAt +deliveryOtpAttempts +deliveryOtpDebug');
+    const order = await Order.findOne(query)
+        .select('+deliveryOtpHash +deliveryOtpExpiry +deliveryOtpSentAt +deliveryOtpAttempts +deliveryOtpDebug +pickupOtpHash +pickupOtpExpiry +pickupOtpDebug')
+        .populate('vendorItems.vendorId', 'storeName phone address');
     if (!order) throw new ApiError(404, 'Order not found.');
     res.status(200).json(new ApiResponse(200, order, 'Order detail fetched.'));
 });
@@ -238,7 +245,7 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
 
     // Server-side transition guard (frontend guard already exists).
     const transitionAllowed =
-        (status === 'shipped' && ['pending', 'processing'].includes(order.status)) ||
+        (status === 'shipped' && ['pending', 'processing', 'ready_for_pickup'].includes(order.status)) ||
         (status === 'delivered' && order.status === 'shipped');
     if (!transitionAllowed) {
         throw new ApiError(409, `Cannot move order from ${order.status} to ${status}.`);
@@ -475,4 +482,78 @@ export const getDeliveryOtpForDebug = asyncHandler(async (req, res) => {
         otp,
         expiresAt: order.deliveryOtpExpiry,
     }, 'Debug OTP fetched.'));
+});
+
+// POST /api/delivery/orders/:id/accept
+export const acceptOrder = asyncHandler(async (req, res) => {
+    const query = {
+        deliveryBoyId: req.user.id,
+        isDeleted: { $ne: true },
+        $or: [{ orderId: req.params.id }],
+    };
+    if (mongoose.isValidObjectId(req.params.id)) {
+        query.$or.push({ _id: req.params.id });
+    }
+
+    const order = await Order.findOne(query);
+    if (!order) throw new ApiError(404, 'Order not found.');
+
+    if (order.deliveryAssignmentStatus !== 'assigned') {
+        throw new ApiError(409, `Cannot accept order. Assignment status is ${order.deliveryAssignmentStatus}.`);
+    }
+
+    order.deliveryAssignmentStatus = 'accepted';
+    
+    // Generate Pickup OTP for Vendor Handoff verification
+    const generatedPickupOtp = generateDeliveryOtp();
+    order.pickupOtpHash = hashDeliveryOtp(generatedPickupOtp);
+    order.pickupOtpExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes TTL
+    order.pickupOtpSentAt = new Date();
+    if (!IS_PRODUCTION) {
+        order.pickupOtpDebug = generatedPickupOtp;
+    }
+    
+    // Also transition order status to 'processing' if it's currently pending
+    if (order.status === 'pending') {
+        order.status = 'processing';
+        order.vendorItems = (order.vendorItems || []).map((vi) => {
+            const current = String(vi?.status || 'pending');
+            if (current === 'cancelled' || current === 'delivered') return vi;
+            return { ...vi.toObject(), status: 'processing' };
+        });
+    }
+
+    await order.save();
+
+    return res.status(200).json(new ApiResponse(200, order, 'Order offer accepted successfully.'));
+});
+
+// POST /api/delivery/orders/:id/reject
+export const rejectOrder = asyncHandler(async (req, res) => {
+    const query = {
+        deliveryBoyId: req.user.id,
+        isDeleted: { $ne: true },
+        $or: [{ orderId: req.params.id }],
+    };
+    if (mongoose.isValidObjectId(req.params.id)) {
+        query.$or.push({ _id: req.params.id });
+    }
+
+    const order = await Order.findOne(query);
+    if (!order) throw new ApiError(404, 'Order not found.');
+
+    if (order.deliveryAssignmentStatus !== 'assigned') {
+        throw new ApiError(409, 'No active assignment offer found to reject.');
+    }
+
+    // Push current rider to rejected list, clear current assignment, set status to pending
+    order.rejectedDeliveryBoys.push(req.user.id);
+    order.deliveryBoyId = undefined;
+    order.deliveryAssignmentStatus = 'pending';
+    await order.save();
+
+    // Re-trigger auto-assignment for the order asynchronously
+    autoAssignDeliveryPartner(order._id);
+
+    return res.status(200).json(new ApiResponse(200, null, 'Order offer rejected. Re-routing.'));
 });

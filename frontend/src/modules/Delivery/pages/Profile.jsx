@@ -115,79 +115,110 @@ const DeliveryProfile = () => {
   };
 
   const stats = [
-    { label: 'Total Deliveries', value: Number(profileMetrics.totalDeliveries || 0) },
-    { label: 'Completed Today', value: Number(profileMetrics.completedToday || 0) },
-    { label: 'Rating', value: Number(deliveryBoy?.rating || 0).toFixed(1) },
-    { label: 'Earnings', value: formatPrice(Number(profileMetrics.earnings || 0)) },
+    { 
+      label: 'Total Deliveries', 
+      value: Number(profileMetrics.totalDeliveries || 0),
+      bg: 'bg-gradient-to-br from-blue-50 to-indigo-50/30 border-blue-100',
+      color: 'text-blue-600'
+    },
+    { 
+      label: 'Completed Today', 
+      value: Number(profileMetrics.completedToday || 0),
+      bg: 'bg-gradient-to-br from-green-50 to-emerald-50/30 border-green-100',
+      color: 'text-green-600'
+    },
+    { 
+      label: 'Rating', 
+      value: `${Number(deliveryBoy?.rating || 0).toFixed(1)} ★`,
+      bg: 'bg-gradient-to-br from-yellow-50 to-amber-50/30 border-yellow-100',
+      color: 'text-yellow-600'
+    },
+    { 
+      label: 'Earnings', 
+      value: formatPrice(Number(profileMetrics.earnings || 0)),
+      bg: 'bg-gradient-to-br from-purple-50 to-violet-50/30 border-purple-100',
+      color: 'text-purple-600'
+    },
   ];
+
+  const initials = (() => {
+    const name = deliveryBoy?.name || 'Delivery Boy';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  })();
 
   return (
     <PageTransition>
-      <div className="px-4 py-6 space-y-6">
+      <div className="px-4 py-6 space-y-6 max-w-3xl mx-auto pb-24">
         {/* Profile Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-2xl p-6 text-white"
+          className="bg-gradient-to-br from-primary-600 to-primary-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden"
         >
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold">My Profile</h1>
-              {loadFailed && (
-                <button
-                  onClick={loadProfile}
-                  className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-lg font-semibold"
-                >
-                  Retry
-                </button>
-              )}
+          {/* Decorative shapes */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16" />
+          <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/5 rounded-full" />
+
+          <div className="flex items-center justify-between mb-4 relative z-10">
+            <h1 className="text-lg font-extrabold tracking-tight">My Profile</h1>
+            {loadFailed && (
+              <button
+                onClick={loadProfile}
+                className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-lg font-bold uppercase tracking-wider"
+              >
+                Retry
+              </button>
+            )}
             {!isEditing ? (
               <button
                 onClick={() => setIsEditing(true)}
-                className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30"
+                className="p-2 bg-white bg-opacity-20 rounded-xl hover:bg-opacity-30 transition-all"
               >
-                <FiEdit2 />
+                <FiEdit2 className="text-sm" />
               </button>
             ) : (
               <div className="flex gap-2">
                 <button
                   onClick={handleSave}
                   disabled={isLoading}
-                  className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30"
+                  className="p-2 bg-white bg-opacity-20 rounded-xl hover:bg-opacity-30 transition-all"
                 >
-                  <FiSave />
+                  <FiSave className="text-sm" />
                 </button>
                 <button
                   onClick={handleCancel}
-                  className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30"
+                  className="p-2 bg-white bg-opacity-20 rounded-xl hover:bg-opacity-30 transition-all"
                 >
-                  <FiX />
+                  <FiX className="text-sm" />
                 </button>
               </div>
             )}
           </div>
-          <div className="flex items-center gap-4">
-            <div className="w-20 h-20 gradient-green rounded-full flex items-center justify-center text-3xl font-bold">
-              {deliveryBoy?.name?.charAt(0) || 'D'}
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center font-black text-white text-xl shadow-sm flex-shrink-0">
+              {initials}
             </div>
             <div>
-              <p className="text-xl font-semibold">{deliveryBoy?.name || 'Delivery Boy'}</p>
-              <p className="text-primary-100 text-sm">{deliveryBoy?.email || 'email@example.com'}</p>
+              <p className="text-base font-extrabold">{deliveryBoy?.name || 'Delivery Boy'}</p>
+              <p className="text-primary-100 text-xs mt-0.5">{deliveryBoy?.email || 'email@example.com'}</p>
             </div>
           </div>
         </motion.div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {stats.map((stat, index) => (
             <motion.div
               key={stat.label}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.1 }}
-              className="bg-white rounded-xl p-4 shadow-sm"
+              className={`${stat.bg} rounded-3xl p-5 border shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden`}
             >
-              <p className="text-gray-600 text-sm mb-1">{stat.label}</p>
-              <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">{stat.label}</p>
+              <p className={`text-xl font-black font-mono leading-none ${stat.color}`}>{stat.value}</p>
             </motion.div>
           ))}
         </div>
@@ -197,13 +228,13 @@ const DeliveryProfile = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="bg-white rounded-2xl p-4 shadow-sm space-y-4"
+          className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-4"
         >
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Personal Information</h2>
+          <h2 className="text-base font-black text-slate-800 uppercase tracking-wide mb-2">Personal Information</h2>
 
           {/* Name */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <FiUser />
               Full Name
             </label>
@@ -213,16 +244,16 @@ const DeliveryProfile = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-primary-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-primary-500 focus:outline-none text-sm transition-all"
               />
             ) : (
-              <p className="px-4 py-3 bg-gray-50 rounded-xl text-gray-800">{formData.name}</p>
+              <p className="px-4 py-3 bg-slate-50/50 border border-slate-50 rounded-2xl text-slate-800 text-sm font-semibold">{formData.name}</p>
             )}
           </div>
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <FiMail />
               Email Address
             </label>
@@ -232,16 +263,16 @@ const DeliveryProfile = () => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-primary-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-primary-500 focus:outline-none text-sm transition-all"
               />
             ) : (
-              <p className="px-4 py-3 bg-gray-50 rounded-xl text-gray-800">{formData.email}</p>
+              <p className="px-4 py-3 bg-slate-50/50 border border-slate-50 rounded-2xl text-slate-800 text-sm font-semibold">{formData.email}</p>
             )}
           </div>
 
           {/* Phone */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center gap-2">
+            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
               <FiPhone />
               Phone Number
             </label>
@@ -251,10 +282,10 @@ const DeliveryProfile = () => {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-primary-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-primary-500 focus:outline-none text-sm transition-all"
               />
             ) : (
-              <p className="px-4 py-3 bg-gray-50 rounded-xl text-gray-800">{formData.phone}</p>
+              <p className="px-4 py-3 bg-slate-50/50 border border-slate-50 rounded-2xl text-slate-800 text-sm font-semibold font-mono">{formData.phone}</p>
             )}
           </div>
         </motion.div>
@@ -264,22 +295,22 @@ const DeliveryProfile = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="bg-white rounded-2xl p-4 shadow-sm space-y-4"
+          className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-4"
         >
-          <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <h2 className="text-base font-black text-slate-800 uppercase tracking-wide mb-2 flex items-center gap-2">
             <FiTruck />
             Vehicle Information
           </h2>
 
           {/* Vehicle Type */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Vehicle Type</label>
+            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">Vehicle Type</label>
             {isEditing ? (
               <select
                 name="vehicleType"
                 value={formData.vehicleType}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-primary-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-primary-500 focus:outline-none text-sm bg-white transition-all"
               >
                 <option value="Bike">Bike</option>
                 <option value="Car">Car</option>
@@ -287,23 +318,23 @@ const DeliveryProfile = () => {
                 <option value="Van">Van</option>
               </select>
             ) : (
-              <p className="px-4 py-3 bg-gray-50 rounded-xl text-gray-800">{formData.vehicleType}</p>
+              <p className="px-4 py-3 bg-slate-50/50 border border-slate-50 rounded-2xl text-slate-800 text-sm font-semibold">{formData.vehicleType}</p>
             )}
           </div>
 
           {/* Vehicle Number */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Vehicle Number</label>
+            <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">Vehicle Number</label>
             {isEditing ? (
               <input
                 type="text"
                 name="vehicleNumber"
                 value={formData.vehicleNumber}
                 onChange={handleChange}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-primary-500 focus:outline-none"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-primary-500 focus:outline-none text-sm transition-all"
               />
             ) : (
-              <p className="px-4 py-3 bg-gray-50 rounded-xl text-gray-800">{formData.vehicleNumber}</p>
+              <p className="px-4 py-3 bg-slate-50/50 border border-slate-50 rounded-2xl text-slate-800 text-sm font-semibold font-mono">{formData.vehicleNumber}</p>
             )}
           </div>
         </motion.div>
@@ -313,14 +344,14 @@ const DeliveryProfile = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="bg-white rounded-2xl p-4 shadow-sm"
+          className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm"
         >
           <button
             onClick={handleLogout}
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-red-50 text-red-600 rounded-xl font-semibold hover:bg-red-100 transition-colors"
+            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-red-50 text-red-600 rounded-2xl font-bold hover:bg-red-100 transition-colors text-sm uppercase tracking-wider"
           >
-            <FiLogOut className="text-xl" />
+            <FiLogOut className="text-lg" />
             <span>Logout</span>
           </button>
         </motion.div>
@@ -330,4 +361,3 @@ const DeliveryProfile = () => {
 };
 
 export default DeliveryProfile;
-

@@ -79,6 +79,7 @@ const Orders = () => {
       icon: FiShoppingBag,
       bgColor: 'bg-gradient-to-br from-blue-500 to-indigo-600',
       cardBg: 'bg-gradient-to-br from-blue-50 to-indigo-50',
+      path: '/admin/orders/all-orders',
     },
     {
       title: 'Pending',
@@ -86,6 +87,7 @@ const Orders = () => {
       icon: FiClock,
       bgColor: 'bg-gradient-to-br from-yellow-500 to-amber-600',
       cardBg: 'bg-gradient-to-br from-yellow-50 to-amber-50',
+      path: '/admin/orders/all-orders?status=pending',
     },
     {
       title: 'Processing',
@@ -93,6 +95,7 @@ const Orders = () => {
       icon: FiPackage,
       bgColor: 'bg-gradient-to-br from-indigo-500 to-purple-600',
       cardBg: 'bg-gradient-to-br from-indigo-50 to-purple-50',
+      path: '/admin/orders/all-orders?status=processing',
     },
     {
       title: 'Shipped',
@@ -100,6 +103,7 @@ const Orders = () => {
       icon: FiTruck,
       bgColor: 'bg-gradient-to-br from-cyan-500 to-blue-600',
       cardBg: 'bg-gradient-to-br from-cyan-50 to-blue-50',
+      path: '/admin/orders/all-orders?status=shipped',
     },
     {
       title: 'Delivered',
@@ -107,6 +111,7 @@ const Orders = () => {
       icon: FiCheckCircle,
       bgColor: 'bg-gradient-to-br from-green-500 to-emerald-600',
       cardBg: 'bg-gradient-to-br from-green-50 to-emerald-50',
+      path: '/admin/orders/all-orders?status=delivered',
     },
     {
       title: 'Cancelled',
@@ -114,6 +119,7 @@ const Orders = () => {
       icon: FiXCircle,
       bgColor: 'bg-gradient-to-br from-red-500 to-rose-600',
       cardBg: 'bg-gradient-to-br from-red-50 to-rose-50',
+      path: '/admin/orders/all-orders?status=cancelled',
     },
   ];
 
@@ -167,7 +173,8 @@ const Orders = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className={`${card.cardBg} rounded-xl p-3 sm:p-4 shadow-md border-2 border-transparent hover:shadow-lg transition-all duration-300 relative overflow-hidden`}
+              onClick={() => navigate(card.path)}
+              className={`${card.cardBg} rounded-xl p-3 sm:p-4 shadow-md border-2 border-transparent hover:border-gray-200/50 hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden`}
             >
               {/* Decorative gradient overlay */}
               <div className={`absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 ${card.bgColor} opacity-10 rounded-full -mr-12 -mt-12 sm:-mr-16 sm:-mt-16`}></div>

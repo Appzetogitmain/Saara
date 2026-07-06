@@ -80,6 +80,7 @@ import InventoryReport from "./modules/Admin/pages/reports/InventoryReport";
 // Analytics & Finance child pages
 import RevenueOverview from "./modules/Admin/pages/finance/RevenueOverview";
 import ProfitLoss from "./modules/Admin/pages/finance/ProfitLoss";
+import EscrowDashboard from "./modules/Admin/pages/finance/EscrowDashboard";
 import OrderTrends from "./modules/Admin/pages/finance/OrderTrends";
 import PaymentBreakdown from "./modules/Admin/pages/finance/PaymentBreakdown";
 import TaxReports from "./modules/Admin/pages/finance/TaxReports";
@@ -573,7 +574,6 @@ const AppRoutes = () => {
         <Route path="delivery" element={<DeliveryBoys />} />
         <Route path="delivery/delivery-boys" element={<DeliveryBoys />} />
         <Route path="delivery/cash-collection" element={<CashCollection />} />
-        <Route path="delivery/assign-delivery" element={<AssignDelivery />} />
         <Route path="vendors" element={<Vendors />} />
         <Route path="vendors/manage-vendors" element={<ManageVendors />} />
         <Route
@@ -617,6 +617,7 @@ const AppRoutes = () => {
         />
         <Route path="finance/tax-reports" element={<TaxReports />} />
         <Route path="finance/refund-reports" element={<RefundReports />} />
+        <Route path="finance/escrow-dashboard" element={<EscrowDashboard />} />
         <Route path="analytics" element={<Analytics />} />
         <Route
           path="settings"

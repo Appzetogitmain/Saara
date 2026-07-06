@@ -17,6 +17,7 @@ export const useReviewsStore = create(
   persist(
     (set, get) => ({
       reviews: {},
+      reviewsMeta: {},
       votes: {},
       isLoading: false,
       error: null,
@@ -28,9 +29,9 @@ export const useReviewsStore = create(
 
         set({ isLoading: true, error: null });
         try {
-          const { sort = 'newest', page = 1, limit = 20 } = options;
+          const { sort = 'newest', page = 1, limit = 50 } = options;
           const response = await api.get(
-            `/user/reviews/product/${productId}?sort=${encodeURIComponent(sort)}&page=${page}&limit=${limit}`
+            `/products/${productId}/reviews?sort=${encodeURIComponent(sort)}&page=${page}&limit=${limit}`
           );
           const payload = response?.data || {};
           const fetched = Array.isArray(payload?.reviews)
@@ -42,6 +43,15 @@ export const useReviewsStore = create(
               ...state.reviews,
               [productId]: fetched,
             },
+            reviewsMeta: {
+              ...state.reviewsMeta,
+              [productId]: {
+                averageRating: payload?.averageRating || 0,
+                totalReviews: payload?.totalReviews || 0,
+                distribution: payload?.distribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+                images: payload?.images || [],
+              }
+            },
             isLoading: false,
           }));
 
@@ -52,15 +62,13 @@ export const useReviewsStore = create(
         }
       },
 
-      // Add review for a product
-      addReview: async (productId, review) => {
+      addReview: async (productId, reviewData) => {
         const normalizedProductId = String(productId);
-
         if (!isMongoObjectId(normalizedProductId)) {
           set((state) => {
             const productReviews = state.reviews[normalizedProductId] || [];
             const newReview = normalizeReview({
-              ...review,
+              ...reviewData,
               id: Date.now().toString(),
             });
             return {
@@ -74,13 +82,29 @@ export const useReviewsStore = create(
         }
 
         try {
-          const response = await api.post('/user/reviews', {
-            productId: normalizedProductId,
-            orderId: review?.orderId,
-            rating: review?.rating,
-            comment: review?.comment,
-            images: review?.images || [],
-          });
+          let reqData;
+          if (reviewData instanceof FormData) {
+            reqData = reviewData;
+          } else {
+            const formData = new FormData();
+            formData.append('orderId', reviewData.orderId);
+            formData.append('rating', reviewData.rating);
+            formData.append('comment', reviewData.comment || reviewData.review || '');
+            formData.append('title', reviewData.title || '');
+            
+            if (Array.isArray(reviewData.images)) {
+              reviewData.images.forEach(img => {
+                if (img instanceof File) {
+                  formData.append('images', img);
+                } else {
+                  formData.append('reviewImages', img);
+                }
+              });
+            }
+            reqData = formData;
+          }
+
+          const response = await api.post(`/user/products/${normalizedProductId}/review`, reqData);
           const payload = response?.data;
           if (payload) {
             const added = normalizeReview(payload);
@@ -90,9 +114,58 @@ export const useReviewsStore = create(
                 [normalizedProductId]: [...(state.reviews[normalizedProductId] || []), added],
               },
             }));
+            await get().fetchReviews(productId);
           }
           return true;
-        } catch {
+        } catch (err) {
+          console.error("addReview store error:", err);
+          return false;
+        }
+      },
+
+      updateReview: async (productId, reviewData) => {
+        const normalizedProductId = String(productId);
+        try {
+          let reqData;
+          if (reviewData instanceof FormData) {
+            reqData = reviewData;
+          } else {
+            const formData = new FormData();
+            if (reviewData.rating !== undefined) formData.append('rating', reviewData.rating);
+            if (reviewData.comment !== undefined || reviewData.review !== undefined) {
+              formData.append('comment', reviewData.comment || reviewData.review || '');
+            }
+            if (reviewData.title !== undefined) formData.append('title', reviewData.title);
+            
+            if (Array.isArray(reviewData.images)) {
+              reviewData.images.forEach(img => {
+                if (img instanceof File) {
+                  formData.append('images', img);
+                } else {
+                  formData.append('reviewImages', img);
+                }
+              });
+            }
+            reqData = formData;
+          }
+
+          const response = await api.patch(`/user/products/${normalizedProductId}/review`, reqData);
+          const payload = response?.data;
+          if (payload) {
+            const updated = normalizeReview(payload);
+            set((state) => ({
+              reviews: {
+                ...state.reviews,
+                [normalizedProductId]: (state.reviews[normalizedProductId] || []).map(r => 
+                  r.userId === updated.userId || r.userId?._id === updated.userId?._id ? updated : r
+                ),
+              },
+            }));
+            await get().fetchReviews(productId);
+          }
+          return true;
+        } catch (err) {
+          console.error("updateReview store error:", err);
           return false;
         }
       },

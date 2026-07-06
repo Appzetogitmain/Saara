@@ -145,38 +145,7 @@ const OrderDetail = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isEditing ? (
-            <>
-              <button
-                onClick={handleStatusUpdate}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-              >
-                <FiCheck className="text-sm" />
-                Save
-              </button>
-              <button
-                onClick={() => {
-                  setIsEditing(false);
-                  setStatus(order.status);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-              >
-                <FiX className="text-sm" />
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <Badge variant={order.status}>{order.status}</Badge>
-              <button
-                onClick={() => setIsEditing(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm"
-              >
-                <FiEdit className="text-sm" />
-                Edit
-              </button>
-            </>
-          )}
+          <Badge variant={order.status}>{order.status}</Badge>
         </div>
       </div>
 
@@ -185,44 +154,28 @@ const OrderDetail = () => {
         <div className="lg:col-span-2 space-y-4">
           {/* Order Overview Card */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-            {isEditing ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-2">
-                  Order Status
-                </label>
-                <AnimatedSelect
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  options={statusOptions.map((option) => ({
-                    value: option,
-                    label: option.charAt(0).toUpperCase() + option.slice(1),
-                  }))}
-                />
+                <p className="text-xs text-gray-500 mb-0.5">Total</p>
+                <p className="font-bold text-gray-800 text-lg">{formatCurrency(order.total)}</p>
               </div>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Total</p>
-                  <p className="font-bold text-gray-800 text-lg">{formatCurrency(order.total)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Items</p>
-                  <p className="font-semibold text-gray-800">{itemsCount}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Payment</p>
-                  <p className="text-xs font-semibold text-gray-800 capitalize">
-                    {getPaymentMethodName(order.paymentMethod)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Payment Status</p>
-                  <Badge variant={order.paymentStatus === 'paid' ? 'delivered' : order.paymentStatus === 'pending' ? 'pending' : 'cancelled'} className="text-xs">
-                    {order.paymentStatus || (order.paymentMethod === 'cash' ? 'Pending' : 'Paid')}
-                  </Badge>
-                </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-0.5">Items</p>
+                <p className="font-semibold text-gray-800">{itemsCount}</p>
               </div>
-            )}
+              <div>
+                <p className="text-xs text-gray-500 mb-0.5">Payment</p>
+                <p className="text-xs font-semibold text-gray-800 capitalize">
+                  {getPaymentMethodName(order.paymentMethod)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-0.5">Payment Status</p>
+                <Badge variant={order.paymentStatus === 'paid' ? 'delivered' : order.paymentStatus === 'pending' ? 'pending' : 'cancelled'} className="text-xs">
+                  {order.paymentStatus || (order.paymentMethod === 'cash' ? 'Pending' : 'Paid')}
+                </Badge>
+              </div>
+            </div>
           </div>
 
           {/* Order Items */}
@@ -261,7 +214,7 @@ const OrderDetail = () => {
 
           {/* Customer & Shipping Combined Card */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className={`grid grid-cols-1 md:${order.deliveryBoyId ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
               {/* Customer Info */}
               <div>
                 <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
@@ -291,7 +244,7 @@ const OrderDetail = () => {
 
               {/* Shipping Address */}
               {order.shippingAddress && (
-                <div>
+                <div className={order.deliveryBoyId ? 'border-t md:border-t-0 md:border-r border-gray-100 md:pr-4' : ''}>
                   <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
                     <FiMapPin className="text-primary-600 text-base" />
                     Shipping Address
@@ -313,6 +266,54 @@ const OrderDetail = () => {
                     {order.shippingAddress.country && (
                       <p className="text-gray-700">{order.shippingAddress.country}</p>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Delivery Partner */}
+              {order.deliveryBoyId && (
+                <div className="border-t md:border-t-0 md:border-l border-gray-100 md:pl-4">
+                  <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
+                    <span className="inline-block p-1 bg-green-50 text-green-600 rounded">🚚</span>
+                    Delivery Partner
+                  </h2>
+                  <div className="space-y-2">
+                    <div>
+                      <p className="text-xs text-gray-500">Name</p>
+                      <p className="font-semibold text-sm text-gray-800">{order.deliveryBoyId.name}</p>
+                    </div>
+                    {order.deliveryBoyId.phone && (
+                      <div>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          <FiPhone className="text-xs" />
+                          Phone
+                        </p>
+                        <a href={`tel:${order.deliveryBoyId.phone}`} className="font-semibold text-xs text-blue-600 hover:underline">
+                          {order.deliveryBoyId.phone}
+                        </a>
+                      </div>
+                    )}
+                    {order.deliveryBoyId.vehicleNumber && (
+                      <div>
+                        <p className="text-xs text-gray-500">Vehicle Details</p>
+                        <p className="font-semibold text-xs text-gray-800">
+                          {order.deliveryBoyId.vehicleType || 'Vehicle'}: {order.deliveryBoyId.vehicleNumber}
+                        </p>
+                      </div>
+                    )}
+                    <div>
+                      {order.deliveryAssignmentStatus === 'accepted' ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                          Accepted (On the way)
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">
+                          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+                          Assigned (Pending Accept)
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

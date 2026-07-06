@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   FiSearch,
   FiEye,
@@ -373,6 +373,7 @@ const OrderActionsDropdown = ({
 
 const AllOrders = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [orders, setOrders] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -380,6 +381,14 @@ const AllOrders = () => {
     startDate: "",
     endDate: "",
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const statusParam = params.get("status");
+    if (statusParam) {
+      setSelectedStatus(statusParam.toLowerCase());
+    }
+  }, [location.search]);
   const [openDropdownId, setOpenDropdownId] = useState(null);
   const [deleteModal, setDeleteModal] = useState({
     isOpen: false,
@@ -664,6 +673,7 @@ const AllOrders = () => {
       icon: FiClock,
       bgColor: "bg-gradient-to-br from-yellow-500 to-amber-600",
       cardBg: "bg-gradient-to-br from-yellow-50 to-amber-50",
+      status: "pending",
     },
     {
       title: "Received",
@@ -671,6 +681,7 @@ const AllOrders = () => {
       icon: FiCheckCircle,
       bgColor: "bg-gradient-to-br from-blue-500 to-cyan-600",
       cardBg: "bg-gradient-to-br from-blue-50 to-cyan-50",
+      status: "received",
     },
     {
       title: "Processed",
@@ -678,6 +689,7 @@ const AllOrders = () => {
       icon: FiPackage,
       bgColor: "bg-gradient-to-br from-indigo-500 to-purple-600",
       cardBg: "bg-gradient-to-br from-indigo-50 to-purple-50",
+      status: "processing",
     },
     {
       title: "Shipped",
@@ -685,6 +697,7 @@ const AllOrders = () => {
       icon: FiTruck,
       bgColor: "bg-gradient-to-br from-blue-500 to-indigo-600",
       cardBg: "bg-gradient-to-br from-blue-50 to-indigo-50",
+      status: "shipped",
     },
     {
       title: "Delivered",
@@ -692,6 +705,7 @@ const AllOrders = () => {
       icon: FiCheckCircle,
       bgColor: "bg-gradient-to-br from-green-500 to-emerald-600",
       cardBg: "bg-gradient-to-br from-green-50 to-emerald-50",
+      status: "delivered",
     },
     {
       title: "Cancelled",
@@ -699,6 +713,7 @@ const AllOrders = () => {
       icon: FiXCircle,
       bgColor: "bg-gradient-to-br from-red-500 to-rose-600",
       cardBg: "bg-gradient-to-br from-red-50 to-rose-50",
+      status: "cancelled",
     },
     {
       title: "Returned",
@@ -706,6 +721,7 @@ const AllOrders = () => {
       icon: FiRotateCw,
       bgColor: "bg-gradient-to-br from-orange-500 to-amber-600",
       cardBg: "bg-gradient-to-br from-orange-50 to-amber-50",
+      status: "returned",
     },
     {
       title: "Total Orders",
@@ -713,6 +729,7 @@ const AllOrders = () => {
       icon: FiShoppingBag,
       bgColor: "bg-gradient-to-br from-gray-600 to-gray-800",
       cardBg: "bg-gradient-to-br from-gray-50 to-gray-100",
+      status: "all",
     },
   ];
 
@@ -736,13 +753,15 @@ const AllOrders = () => {
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3 sm:gap-4">
         {statusCards.map((card, index) => {
           const Icon = card.icon;
+          const isSelected = selectedStatus === card.status;
           return (
             <motion.div
               key={card.title}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className={`${card.cardBg} rounded-xl p-3 sm:p-4 shadow-md border-2 border-transparent hover:shadow-lg transition-all duration-300 relative overflow-hidden`}>
+              onClick={() => setSelectedStatus(card.status)}
+              className={`${card.cardBg} rounded-xl p-3 sm:p-4 shadow-md border-2 ${isSelected ? 'border-primary-500 scale-[1.02]' : 'border-transparent hover:border-gray-200'} cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-300 relative overflow-hidden`}>
               {/* Decorative gradient overlay */}
               <div
                 className={`absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 ${card.bgColor} opacity-10 rounded-full -mr-12 -mt-12 sm:-mr-16 sm:-mt-16`}></div>

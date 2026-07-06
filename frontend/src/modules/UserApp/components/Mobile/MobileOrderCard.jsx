@@ -1,15 +1,18 @@
 import { Link } from 'react-router-dom';
-import { FiPackage, FiChevronRight, FiCalendar, FiDollarSign, FiShoppingBag } from 'react-icons/fi';
+import { FiPackage, FiChevronRight, FiCalendar, FiShoppingBag } from 'react-icons/fi';
 import { formatPrice } from '../../../../shared/utils/helpers';
 import { motion } from 'framer-motion';
 import { formatVariantLabel } from '../../../../shared/utils/variant';
 
 const MobileOrderCard = ({ order }) => {
-  const variantLabels = Array.isArray(order?.items)
-    ? order.items
-      .map((item) => formatVariantLabel(item?.variant))
-      .filter(Boolean)
-    : [];
+  const orderItems = Array.isArray(order?.items) ? order.items : [];
+  const displayItems = orderItems.slice(0, 3);
+  const remainingCount = orderItems.length - 3;
+
+  const variantLabels = orderItems
+    .map((item) => formatVariantLabel(item?.variant))
+    .filter(Boolean);
+    
   const variantSummary = variantLabels.length === 1
     ? variantLabels[0]
     : variantLabels.length > 1
@@ -19,85 +22,98 @@ const MobileOrderCard = ({ order }) => {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'delivered':
-        return 'text-green-600 bg-green-50';
+        return 'text-emerald-700 bg-emerald-50 border border-emerald-100';
       case 'shipped':
-        return 'text-blue-600 bg-blue-50';
+        return 'text-blue-700 bg-blue-50 border border-blue-100';
       case 'processing':
-        return 'text-yellow-600 bg-yellow-50';
+        return 'text-amber-700 bg-amber-50 border border-amber-100';
       case 'cancelled':
-        return 'text-red-600 bg-red-50';
+        return 'text-rose-700 bg-rose-50 border border-rose-100';
       default:
-        return 'text-gray-600 bg-gray-50';
+        return 'text-slate-700 bg-slate-50 border border-slate-100';
     }
   };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-card rounded-2xl p-4 mb-4"
+      whileHover={{ y: -2 }}
+      className="bg-white border border-gray-100 rounded-3xl p-5 mb-4 shadow-sm hover:shadow-md hover:border-gray-200 transition-all duration-300"
     >
-      <Link to={`/orders/${order.id}`}>
-        <div className="flex items-start justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl gradient-green flex items-center justify-center flex-shrink-0">
-              <FiPackage className="text-white text-xl" />
-            </div>
-            <div>
-              <h3 className="font-bold text-gray-800 text-base">Order #{order.id}</h3>
-              <p className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
-                <FiCalendar className="text-xs" />
-                {new Date(order.date || order.createdAt).toLocaleDateString()}
-              </p>
-            </div>
+      <Link to={`/orders/${order.id}`} className="block">
+        {/* Header: Order ID & Date */}
+        <div className="flex items-center justify-between pb-3 border-b border-gray-50 mb-4">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase font-black text-slate-400 tracking-wider">Order ID</span>
+            <span className="text-sm font-bold text-slate-800 font-mono">#{order.id.slice(-8).toUpperCase()}</span>
           </div>
-          <FiChevronRight className="text-gray-400 text-xl" />
+          <span className="text-xs text-gray-400 font-semibold flex items-center gap-1">
+            <FiCalendar className="text-[10px]" />
+            {new Date(order.date || order.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+          </span>
         </div>
 
-        <div className="space-y-2 mb-3">
-          {/* Vendor Count */}
-          {order.vendorItems && order.vendorItems.length > 0 && (
-            <div className="flex items-center gap-2 px-2 py-1 bg-primary-50 rounded-lg mb-2">
-              <FiShoppingBag className="text-primary-600 text-xs" />
-              <span className="text-xs font-semibold text-primary-700">
-                {order.vendorItems.length} {order.vendorItems.length === 1 ? 'Vendor' : 'Vendors'}
-              </span>
+        {/* Content Area: Left Thumbnails, Right Details */}
+        <div className="flex gap-4 items-center justify-between">
+          <div className="flex-1 min-w-0">
+            {/* Vendor and Variant Badges */}
+            <div className="flex flex-wrap gap-1.5 mb-2.5">
+              {order.vendorItems && order.vendorItems.length > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-pink-50 text-pink-600 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                  <FiShoppingBag className="text-[9px]" />
+                  {order.vendorItems.length} {order.vendorItems.length === 1 ? 'Vendor' : 'Vendors'}
+                </span>
+              )}
+              {variantSummary && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold uppercase tracking-wider max-w-[150px] truncate">
+                  {variantSummary}
+                </span>
+              )}
             </div>
-          )}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Items</span>
-            <span className="text-sm font-semibold text-gray-800">
+
+            {/* Product Images Row */}
+            {orderItems.length > 0 ? (
+              <div className="flex items-center gap-2 py-1 overflow-x-auto scrollbar-hide">
+                {displayItems.map((item, idx) => (
+                  <div key={idx} className="relative w-14 h-14 rounded-2xl border border-gray-100 bg-gray-50 flex-shrink-0 overflow-hidden shadow-sm">
+                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    {idx === 2 && remainingCount > 0 && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white text-xs font-black">
+                        +{remainingCount}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="w-14 h-14 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100">
+                <FiPackage className="text-slate-400 text-xl" />
+              </div>
+            )}
+          </div>
+
+          {/* Pricing Details */}
+          <div className="text-right flex-shrink-0 pl-2">
+            <span className="text-[10px] text-gray-400 uppercase font-black tracking-wider block">Total Price</span>
+            <span className="text-lg font-black text-slate-800 font-mono block mt-0.5">
+              {formatPrice(order.total || order.amount || 0)}
+            </span>
+            <span className="text-[11px] text-gray-500 font-semibold block mt-0.5">
               {order.items?.length || 0} item{(order.items?.length || 0) !== 1 ? 's' : ''}
             </span>
           </div>
-          {variantSummary && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600">Variant</span>
-              <span className="text-xs font-semibold text-gray-700 text-right max-w-[62%] truncate">
-                {variantSummary}
-              </span>
-            </div>
-          )}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600 flex items-center gap-1">
-              <FiDollarSign className="text-xs" />
-              Total
-            </span>
-            <span className="text-base font-bold text-primary-600">
-              {formatPrice(order.total || order.amount || 0)}
-            </span>
-          </div>
         </div>
 
-        <div className="flex items-center justify-between pt-3 border-t border-gray-200">
-          <span
-            className={`px-3 py-1 rounded-lg text-xs font-semibold ${getStatusColor(
-              order.status
-            )}`}
-          >
+        {/* Footer Bar: Status & Action Link */}
+        <div className="flex items-center justify-between pt-4 mt-4 border-t border-gray-50">
+          <span className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider ${getStatusColor(order.status)}`}>
             {order.status || 'Pending'}
           </span>
-          <span className="text-xs text-gray-500">View Details</span>
+          <div className="flex items-center gap-1 text-xs text-slate-600 font-bold hover:text-slate-900 transition-colors">
+            <span>View Details</span>
+            <FiChevronRight className="text-base" />
+          </div>
         </div>
       </Link>
     </motion.div>
@@ -105,4 +121,3 @@ const MobileOrderCard = ({ order }) => {
 };
 
 export default MobileOrderCard;
-

@@ -8,7 +8,6 @@ import {
   FiFileText,
 } from "react-icons/fi";
 import { motion } from "framer-motion";
-import Badge from "../../../shared/components/Badge";
 import ExportButton from "../../Admin/components/ExportButton";
 import AnimatedSelect from "../../Admin/components/AnimatedSelect";
 import { formatPrice } from "../../../shared/utils/helpers";
@@ -79,7 +78,7 @@ const Earnings = () => {
   if (isLoading) {
     return (
       <div className="text-center py-8">
-        <p className="text-gray-500">Loading earnings data...</p>
+        <p className="text-gray-500 font-medium">Loading earnings data...</p>
       </div>
     );
   }
@@ -99,45 +98,45 @@ const Earnings = () => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6">
+      className="space-y-6 max-w-6xl mx-auto pb-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="lg:hidden">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">
             Earnings
           </h1>
-          <p className="text-gray-600">
+          <p className="text-sm text-gray-600">
             View your earnings and commission history
           </p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
-          <div className="flex overflow-x-auto scrollbar-hide -mx-1 px-1">
+      {/* Tabs Layout */}
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="border-b border-gray-100 bg-slate-50/50 px-4">
+          <div className="flex overflow-x-auto scrollbar-hide -mx-1">
             <button
               onClick={() => handleTabChange("overview")}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap text-sm ${activeTab === "overview"
-                ? "border-purple-600 text-purple-600 font-semibold"
-                : "border-transparent text-gray-600 hover:text-gray-800"
+              className={`flex items-center gap-2 px-5 py-4 border-b-2 transition-all whitespace-nowrap text-sm font-bold ${activeTab === "overview"
+                ? "border-primary-600 text-primary-600 font-extrabold"
+                : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}>
               <FiDollarSign />
               <span>Overview</span>
             </button>
             <button
               onClick={() => handleTabChange("commission")}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap text-sm ${activeTab === "commission"
-                ? "border-purple-600 text-purple-600 font-semibold"
-                : "border-transparent text-gray-600 hover:text-gray-800"
+              className={`flex items-center gap-2 px-5 py-4 border-b-2 transition-all whitespace-nowrap text-sm font-bold ${activeTab === "commission"
+                ? "border-primary-600 text-primary-600 font-extrabold"
+                : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}>
               <FiFileText />
               <span>Commission History</span>
             </button>
             <button
               onClick={() => handleTabChange("settlement")}
-              className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap text-sm ${activeTab === "settlement"
-                ? "border-purple-600 text-purple-600 font-semibold"
-                : "border-transparent text-gray-600 hover:text-gray-800"
+              className={`flex items-center gap-2 px-5 py-4 border-b-2 transition-all whitespace-nowrap text-sm font-bold ${activeTab === "settlement"
+                ? "border-primary-600 text-primary-600 font-extrabold"
+                : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}>
               <FiCheckCircle />
               <span>Settlement History</span>
@@ -145,67 +144,75 @@ const Earnings = () => {
           </div>
         </div>
 
-        <div className="p-3 sm:p-4 md:p-6">
+        <div className="p-4 sm:p-6">
           {/* Earnings Summary Cards - Show on Overview tab */}
           {activeTab === "overview" && (
-            <div className="mb-6">
+            <div className="mb-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 shadow-sm border border-green-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-green-700 font-medium">
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50/30 rounded-3xl p-6 shadow-sm border border-green-100 hover:shadow-md hover:border-green-200/80 transition-all duration-300">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs text-green-700 font-bold uppercase tracking-wider">
                       Total Earnings
                     </p>
-                    <FiDollarSign className="text-green-600" />
+                    <div className="p-2 bg-green-500/10 rounded-xl text-green-600">
+                      <FiDollarSign className="text-base" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-green-800">
+                  <p className="text-3xl font-black text-green-800 font-mono">
                     {earningsSummary
                       ? formatPrice(earningsSummary.totalEarnings)
                       : formatPrice(0)}
                   </p>
-                  <p className="text-xs text-green-600 mt-1">All time</p>
+                  <p className="text-[10px] text-green-600 mt-2 font-bold uppercase tracking-wider">All time</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl p-6 shadow-sm border border-yellow-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-yellow-700 font-medium">
+                <div className="bg-gradient-to-br from-yellow-50 to-amber-50/30 rounded-3xl p-6 shadow-sm border border-yellow-100 hover:shadow-md hover:border-yellow-200/80 transition-all duration-300">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs text-yellow-700 font-bold uppercase tracking-wider">
                       Pending
                     </p>
-                    <FiClock className="text-yellow-600" />
+                    <div className="p-2 bg-yellow-500/10 rounded-xl text-yellow-600">
+                      <FiClock className="text-base" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-yellow-800">
+                  <p className="text-3xl font-black text-yellow-800 font-mono">
                     {earningsSummary
                       ? formatPrice(earningsSummary.pendingEarnings)
                       : formatPrice(0)}
                   </p>
-                  <p className="text-xs text-yellow-600 mt-1">
+                  <p className="text-[10px] text-yellow-600 mt-2 font-bold uppercase tracking-wider">
                     Awaiting settlement
                   </p>
                 </div>
 
-                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-6 shadow-sm border border-blue-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-blue-700 font-medium">Paid</p>
-                    <FiCheckCircle className="text-blue-600" />
+                <div className="bg-gradient-to-br from-blue-50 to-cyan-50/30 rounded-3xl p-6 shadow-sm border border-blue-100 hover:shadow-md hover:border-blue-200/80 transition-all duration-300">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs text-blue-700 font-bold uppercase tracking-wider">Paid</p>
+                    <div className="p-2 bg-blue-500/10 rounded-xl text-blue-600">
+                      <FiCheckCircle className="text-base" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-blue-800">
+                  <p className="text-3xl font-black text-blue-800 font-mono">
                     {earningsSummary
                       ? formatPrice(earningsSummary.paidEarnings)
                       : formatPrice(0)}
                   </p>
-                  <p className="text-xs text-blue-600 mt-1">Settled</p>
+                  <p className="text-[10px] text-blue-600 mt-2 font-bold uppercase tracking-wider">Settled</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-6 shadow-sm border border-purple-200">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm text-purple-700 font-medium">
+                <div className="bg-gradient-to-br from-purple-50 to-indigo-50/30 rounded-3xl p-6 shadow-sm border border-purple-100 hover:shadow-md hover:border-purple-200/80 transition-all duration-300">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs text-purple-700 font-bold uppercase tracking-wider">
                       Total Orders
                     </p>
-                    <FiTrendingUp className="text-purple-600" />
+                    <div className="p-2 bg-purple-500/10 rounded-xl text-purple-600">
+                      <FiTrendingUp className="text-base" />
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold text-purple-800">
+                  <p className="text-3xl font-black text-purple-800 font-mono">
                     {earningsSummary ? earningsSummary.totalOrders : 0}
                   </p>
-                  <p className="text-xs text-purple-600 mt-1">With earnings</p>
+                  <p className="text-[10px] text-purple-600 mt-2 font-bold uppercase tracking-wider">With earnings</p>
                 </div>
               </div>
             </div>
@@ -213,29 +220,31 @@ const Earnings = () => {
 
           {/* Commission History Section */}
           {(activeTab === "overview" || activeTab === "commission") && (
-            <div className={activeTab === "overview" ? "mb-6" : ""}>
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+            <div className={activeTab === "overview" ? "mb-8" : ""}>
+              <div className="bg-white rounded-2xl p-5 md:p-6 border border-slate-100">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
                   <div>
-                    <h2 className="text-lg font-bold text-gray-800 mb-1">
+                    <h2 className="text-lg font-bold text-slate-800 mb-1">
                       Commission History
                     </h2>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-xs text-slate-400 font-semibold">
                       View all your commission records
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <AnimatedSelect
-                      value={selectedStatus}
-                      onChange={(e) => setSelectedStatus(e.target.value)}
-                      options={[
-                        { value: "all", label: "All Status" },
-                        { value: "pending", label: "Pending" },
-                        { value: "paid", label: "Paid" },
-                        { value: "cancelled", label: "Cancelled" },
-                      ]}
-                      className="min-w-[140px]"
-                    />
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <div className="flex-1 sm:flex-initial">
+                      <AnimatedSelect
+                        value={selectedStatus}
+                        onChange={(e) => setSelectedStatus(e.target.value)}
+                        options={[
+                          { value: "all", label: "All Status" },
+                          { value: "pending", label: "Pending" },
+                          { value: "paid", label: "Paid" },
+                          { value: "cancelled", label: "Cancelled" },
+                        ]}
+                        className="min-w-[130px] w-full"
+                      />
+                    </div>
                     <ExportButton
                       data={filteredCommissions}
                       headers={[
@@ -272,75 +281,94 @@ const Earnings = () => {
                 </div>
 
                 {filteredCommissions.length > 0 ? (
-                  <div className="space-y-3">
-                    {filteredCommissions.map((commission) => (
-                      <div
-                        key={commission._id ?? commission.id}
-                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-gray-800">
-                              {commission.orderDisplayId ||
-                                (typeof commission.orderId === "object"
-                                  ? commission.orderId?.orderId ||
-                                    commission.orderId?._id
-                                  : commission.orderId)}
-                            </h3>
-                            <Badge
-                              variant={
-                                (commission.effectiveStatus || commission.status) ===
-                                "paid"
-                                  ? "success"
-                                  : (commission.effectiveStatus ||
-                                      commission.status) === "pending"
-                                    ? "warning"
-                                    : "error"
-                              }>
-                              {(commission.effectiveStatus || commission.status)?.toUpperCase()}
-                            </Badge>
+                  <div className="space-y-4">
+                    {filteredCommissions.map((commission) => {
+                      const displayId = commission.orderDisplayId ||
+                        (typeof commission.orderId === "object"
+                          ? commission.orderId?.orderId || commission.orderId?._id
+                          : commission.orderId);
+
+                      const status = (commission.effectiveStatus || commission.status) ?? "pending";
+
+                      const statusConfig = {
+                        paid: {
+                          bg: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                          bar: "bg-emerald-500",
+                          label: "Paid",
+                        },
+                        pending: {
+                          bg: "bg-amber-50 text-amber-700 border-amber-200",
+                          bar: "bg-amber-500",
+                          label: "Pending",
+                        },
+                        cancelled: {
+                          bg: "bg-rose-50 text-rose-700 border-rose-200",
+                          bar: "bg-rose-500",
+                          label: "Cancelled",
+                        },
+                      };
+
+                      const currentStatus = statusConfig[status.toLowerCase()] || statusConfig.pending;
+
+                      return (
+                        <div
+                          key={commission._id ?? commission.id}
+                          className="bg-white border border-slate-100 hover:border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4 pl-6 group">
+                          {/* Accent status indicator bar on left */}
+                          <div className={`absolute top-0 bottom-0 left-0 w-1.5 ${currentStatus.bar}`} />
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-3">
+                              <span className="font-mono text-xs font-bold text-slate-500 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md truncate max-w-[200px] md:max-w-none" title={displayId}>
+                                {displayId}
+                              </span>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${currentStatus.bg}`}>
+                                {currentStatus.label}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                              <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Date</p>
+                                <p className="font-bold text-slate-700">
+                                  {new Date(commission.createdAt).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Subtotal</p>
+                                <p className="font-extrabold text-slate-800 font-mono">
+                                  {formatPrice(commission.subtotal)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Commission</p>
+                                <p className="font-extrabold text-rose-500 font-mono">
+                                  -{formatPrice(commission.commission)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Your Earnings</p>
+                                <p className="font-black text-emerald-500 font-mono">
+                                  {formatPrice(commission.vendorEarnings)}
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <p className="text-gray-600">Date</p>
-                              <p className="font-semibold text-gray-800">
-                                {new Date(
-                                  commission.createdAt
-                                ).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600">Subtotal</p>
-                              <p className="font-semibold text-gray-800">
-                                {formatPrice(commission.subtotal)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600">Commission</p>
-                              <p className="font-semibold text-red-600">
-                                -{formatPrice(commission.commission)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600">Your Earnings</p>
-                              <p className="font-semibold text-green-600">
-                                {formatPrice(commission.vendorEarnings)}
-                              </p>
-                            </div>
+
+                          <div className="flex items-center justify-end border-t border-slate-50 md:border-t-0 pt-3 md:pt-0">
+                            <button
+                              onClick={() =>
+                                navigate(
+                                  `/vendor/orders/${commission.orderRef || commission.orderId}`
+                                )
+                              }
+                              className="w-full md:w-auto px-4 py-2 bg-slate-50 hover:bg-primary-600 hover:text-white border border-gray-100 text-slate-700 hover:border-transparent rounded-xl text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5">
+                              View Order
+                            </button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() =>
-                              navigate(
-                                `/vendor/orders/${commission.orderRef || commission.orderId}`
-                              )
-                            }
-                            className="px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-                            View Order
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-12">
@@ -363,13 +391,13 @@ const Earnings = () => {
           {(activeTab === "overview" || activeTab === "settlement") &&
             settlements.length > 0 && (
               <div>
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+                <div className="bg-white rounded-2xl p-5 md:p-6 border border-slate-100">
                   <div className="flex items-center justify-between mb-6">
                     <div>
-                      <h2 className="text-lg font-bold text-gray-800 mb-1">
+                      <h2 className="text-lg font-bold text-slate-800 mb-1">
                         Settlement History
                       </h2>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-xs text-slate-400 font-semibold">
                         View your payment settlements
                       </p>
                     </div>
@@ -402,60 +430,62 @@ const Earnings = () => {
                     />
                   </div>
 
-                  <div className="space-y-3">
-                    {settlements.map((settlement) => (
-                      <div
-                        key={settlement._id || settlement.id}
-                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="font-semibold text-gray-800">
-                              {settlement._id || settlement.id}
-                            </h3>
-                            <Badge
-                              variant={
-                                settlement.status === "failed"
-                                  ? "error"
-                                  : "success"
-                              }
-                            >
-                              {String(settlement.status || "completed").toUpperCase()}
-                            </Badge>
-                          </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                            <div>
-                              <p className="text-gray-600">Date Paid</p>
-                              <p className="font-semibold text-gray-800">
-                                {new Date(
-                                  settlement.createdAt
-                                ).toLocaleDateString()}
-                              </p>
+                  <div className="space-y-4">
+                    {settlements.map((settlement) => {
+                      const isFailed = settlement.status === "failed";
+                      return (
+                        <div
+                          key={settlement._id || settlement.id}
+                          className="bg-white border border-slate-100 hover:border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4 pl-6 group">
+                          {/* Accent status indicator bar on left */}
+                          <div className={`absolute top-0 bottom-0 left-0 w-1.5 ${isFailed ? "bg-rose-500" : "bg-emerald-500"}`} />
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-3">
+                              <span className="font-mono text-xs font-bold text-slate-500 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md truncate max-w-[200px]" title={settlement._id || settlement.id}>
+                                {settlement._id || settlement.id}
+                              </span>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                isFailed
+                                  ? "bg-rose-50 text-rose-700 border-rose-200"
+                                  : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              }`}>
+                                {String(settlement.status || "completed").toUpperCase()}
+                              </span>
                             </div>
-                            <div>
-                              <p className="text-gray-600">Amount</p>
-                              <p className="font-semibold text-green-600">
-                                {formatPrice(settlement.amount)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-gray-600">Payment Method</p>
-                              <p className="font-semibold text-gray-800 capitalize">
-                                {settlement.paymentMethod?.replace("_", " ") ||
-                                  "N/A"}
-                              </p>
-                            </div>
-                            {settlement.transactionId && (
+
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                               <div>
-                                <p className="text-gray-600">Transaction ID</p>
-                                <p className="font-semibold text-gray-800 text-xs">
-                                  {settlement.transactionId}
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Date Paid</p>
+                                <p className="font-bold text-slate-700">
+                                  {new Date(settlement.createdAt).toLocaleDateString()}
                                 </p>
                               </div>
-                            )}
+                              <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Amount</p>
+                                <p className="font-black text-emerald-500 font-mono">
+                                  {formatPrice(settlement.amount)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Payment Method</p>
+                                <p className="font-bold text-slate-700 capitalize">
+                                  {settlement.paymentMethod?.replace("_", " ") || "N/A"}
+                                </p>
+                              </div>
+                              {settlement.transactionId && (
+                                <div>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Transaction ID</p>
+                                  <p className="font-bold text-slate-600 font-mono text-xs truncate max-w-[150px]" title={settlement.transactionId}>
+                                    {settlement.transactionId}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>

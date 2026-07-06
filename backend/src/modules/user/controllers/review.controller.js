@@ -5,6 +5,7 @@ import Review from '../../../models/Review.model.js';
 import Product from '../../../models/Product.model.js';
 import Order from '../../../models/Order.model.js';
 import mongoose from 'mongoose';
+import { uploadLocalFileToCloudinaryAndCleanup } from '../../../services/upload.service.js';
 
 // Helper to update product aggregates
 const updateProductRating = async (productId) => {
@@ -61,7 +62,11 @@ export const getProductReviews = asyncHandler(async (req, res) => {
 
 // POST /api/user/reviews
 export const addReview = asyncHandler(async (req, res) => {
-    const { productId, orderId, rating, comment, images } = req.body;
+    const productId = req.params.productId || req.body.productId;
+    const { orderId, rating, comment, title, images } = req.body;
+
+    if (!productId) throw new ApiError(400, 'Product ID is required.');
+    if (!orderId) throw new ApiError(400, 'Order ID is required.');
 
     // Spam Protection & Verification
     const order = await Order.findOne({ 
@@ -73,11 +78,21 @@ export const addReview = asyncHandler(async (req, res) => {
     
     if (!order) throw new ApiError(403, 'You can only review products you have purchased and received.');
 
+    // Check if returned or refunded
+    const { ReturnRequest } = await import('../../../models/ReturnRequest.model.js');
+    const returnReq = await ReturnRequest.findOne({
+        orderId,
+        'items.productId': productId,
+        status: { $in: ['picked_up', 'delivered_to_vendor', 'replacement_preparing', 'replacement_ready', 'replacement_assigned', 'out_for_delivery', 'completed'] }
+    });
+    if (returnReq) {
+        throw new ApiError(400, 'Reviews are blocked for returned or refunded products.');
+    }
+
     const existing = await Review.findOne({ productId, userId: req.user.id });
     if (existing) throw new ApiError(409, 'You have already reviewed this product.');
 
-    // Spam protection
-    const sanitizedComment = String(comment || '')
+    const sanitizedComment = String(comment || req.body.review || '')
         .replace(/[<>]/g, '')          // strip HTML tags
         .trim();
 
@@ -89,21 +104,91 @@ export const addReview = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Comment must be at least 10 characters.');
     }
 
+    // Process new images
+    const reviewImages = [];
+    if (Array.isArray(req.files) && req.files.length > 0) {
+        for (const file of req.files) {
+            const uploaded = await uploadLocalFileToCloudinaryAndCleanup(file.path, 'reviews');
+            if (uploaded) {
+                reviewImages.push(uploaded.url);
+            }
+        }
+    } else if (Array.isArray(images)) {
+        reviewImages.push(...images);
+    } else if (Array.isArray(req.body.reviewImages)) {
+        reviewImages.push(...req.body.reviewImages);
+    }
+
+    // Fetch product to resolve vendorId
+    const productObj = await Product.findById(productId).select('vendorId').lean();
+
     const review = await Review.create({ 
         productId, 
         userId: req.user.id, 
+        vendorId: productObj?.vendorId || null,
         orderId, 
-        rating, 
+        rating: Number(rating || 5), 
+        title: String(title || '').trim(),
         comment: sanitizedComment, 
-        images, 
+        images: reviewImages, 
         isVerifiedPurchase: true,
-        isApproved: true // Auto-approving for now, can be toggled by admin settings later
+        isApproved: true
     });
 
     // Update product aggregates
     await updateProductRating(productId);
 
     res.status(201).json(new ApiResponse(201, review, 'Review submitted successfully.'));
+});
+
+// PATCH /api/user/products/:productId/review
+export const updateReview = asyncHandler(async (req, res) => {
+    const productId = req.params.productId;
+    const userId = req.user.id;
+
+    const reviewDoc = await Review.findOne({ productId, userId });
+    if (!reviewDoc) throw new ApiError(404, 'Review not found.');
+
+    const { rating, comment, title, images } = req.body;
+
+    if (rating !== undefined) {
+        reviewDoc.rating = Number(rating);
+    }
+    if (title !== undefined) {
+        reviewDoc.title = String(title).trim();
+    }
+    if (comment !== undefined || req.body.review !== undefined) {
+        const commentContent = comment !== undefined ? comment : req.body.review;
+        const sanitized = String(commentContent || '')
+            .replace(/[<>]/g, '')
+            .trim();
+        const URL_PATTERN = /https?:\/\/|www\.\S+/i;
+        if (URL_PATTERN.test(sanitized)) {
+            throw new ApiError(400, 'Reviews cannot contain URLs.');
+        }
+        reviewDoc.comment = sanitized;
+    }
+
+    // Process new images
+    const reviewImages = [];
+    if (Array.isArray(req.files) && req.files.length > 0) {
+        for (const file of req.files) {
+            const uploaded = await uploadLocalFileToCloudinaryAndCleanup(file.path, 'reviews');
+            if (uploaded) {
+                reviewImages.push(uploaded.url);
+            }
+        }
+        reviewDoc.images = reviewImages;
+    } else if (images !== undefined) {
+        reviewDoc.images = Array.isArray(images) ? images : [];
+    } else if (req.body.reviewImages !== undefined) {
+        reviewDoc.images = Array.isArray(req.body.reviewImages) ? req.body.reviewImages : [];
+    }
+
+    await reviewDoc.save();
+    await updateProductRating(productId);
+
+    res.status(200).json(new ApiResponse(200, reviewDoc, 'Review updated successfully.'));
 });
 
 // POST /api/user/reviews/:id/vote

@@ -4,6 +4,7 @@ import connectDB from "./config/db.js";
 import { validateEnv } from "./config/env.js";
 import { createServer } from "http";
 import { initSocket } from "./services/socket.service.js";
+import { initAssignmentScheduler } from "./services/assignmentService.js";
 
 const PORT = process.env.PORT || 5000;
 const httpServer = createServer(app);
@@ -15,6 +16,14 @@ const startServer = async () => {
   try {
     validateEnv();
     await connectDB();
+    initAssignmentScheduler();
+    
+    // Auto-release escrow scanner (run on startup and every 24 hours)
+    const { releaseEscrowPayments } = await import("./cron/escrowCron.js");
+    releaseEscrowPayments().catch(err => console.error("Escrow release scan error:", err));
+    setInterval(() => {
+      releaseEscrowPayments().catch(err => console.error("Escrow release scan error:", err));
+    }, 24 * 60 * 60 * 1000);
     
     httpServer.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
@@ -28,3 +37,5 @@ const startServer = async () => {
 };
 
 startServer();
+
+// Server initialized

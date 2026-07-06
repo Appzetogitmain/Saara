@@ -232,7 +232,7 @@ const AllOrders = () => {
                 { value: 'all', label: 'All Status' },
                 { value: 'pending', label: 'Pending' },
                 { value: 'processing', label: 'Processing' },
-                { value: 'shipped', label: 'Shipped' },
+                { value: 'ready_for_pickup', label: 'Ready for Pickup' },
                 { value: 'delivered', label: 'Delivered' },
                 { value: 'cancelled', label: 'Cancelled' },
               ]}

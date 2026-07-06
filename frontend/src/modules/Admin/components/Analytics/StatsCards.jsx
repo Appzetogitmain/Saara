@@ -1,9 +1,11 @@
 import { FiShoppingBag, FiPackage, FiUsers } from 'react-icons/fi';
 import { IndianRupee } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '../../../../shared/utils/helpers';
 
 const StatsCards = ({ stats }) => {
+  const navigate = useNavigate();
   const cards = [
     {
       title: 'Total Revenue',
@@ -14,6 +16,7 @@ const StatsCards = ({ stats }) => {
       bgColor: 'bg-gradient-to-br from-green-500 to-emerald-600',
       cardBg: 'bg-gradient-to-br from-green-50 to-emerald-50',
       iconBg: 'bg-white/20',
+      path: '/admin/orders',
     },
     {
       title: 'Total Orders',
@@ -24,6 +27,7 @@ const StatsCards = ({ stats }) => {
       bgColor: 'bg-gradient-to-br from-blue-500 to-indigo-600',
       cardBg: 'bg-gradient-to-br from-blue-50 to-indigo-50',
       iconBg: 'bg-white/20',
+      path: '/admin/orders',
     },
     {
       title: 'Total Products',
@@ -34,6 +38,7 @@ const StatsCards = ({ stats }) => {
       bgColor: 'bg-gradient-to-br from-purple-500 to-violet-600',
       cardBg: 'bg-gradient-to-br from-purple-50 to-violet-50',
       iconBg: 'bg-white/20',
+      path: '/admin/products',
     },
     {
       title: 'Total Customers',
@@ -44,6 +49,7 @@ const StatsCards = ({ stats }) => {
       bgColor: 'bg-gradient-to-br from-orange-500 to-amber-600',
       cardBg: 'bg-gradient-to-br from-orange-50 to-amber-50',
       iconBg: 'bg-white/20',
+      path: '/admin/customers',
     },
   ];
 
@@ -60,7 +66,8 @@ const StatsCards = ({ stats }) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className={`${card.cardBg} rounded-xl p-4 sm:p-6 shadow-md border-2 border-transparent hover:shadow-lg transition-all duration-300 relative overflow-hidden`}
+            onClick={() => navigate(card.path)}
+            className={`${card.cardBg} rounded-xl p-4 sm:p-6 shadow-md border-2 border-transparent hover:shadow-lg hover:border-gray-200/50 hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden`}
           >
             {/* Decorative gradient overlay */}
             <div className={`absolute top-0 right-0 w-32 h-32 ${card.bgColor} opacity-10 rounded-full -mr-16 -mt-16`}></div>

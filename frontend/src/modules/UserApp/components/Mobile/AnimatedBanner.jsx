@@ -133,7 +133,7 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
 
   return (
     <div className={`${showPadding ? "px-4 py-3" : ""} ${className}`}>
-      <div className="relative w-full h-32 rounded-2xl overflow-hidden shadow-xl">
+      <div className="relative w-full h-32 md:h-44 rounded-3xl overflow-hidden shadow-xl">
         <AnimatePresence mode="wait">
           {resolvedBanners.map((banner, index) => {
             if (index !== currentBanner) return null;
@@ -142,27 +142,27 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
             return (
               <motion.div
                 key={banner.id}
-                initial={{ opacity: 0, scale: 1.1, x: "100%" }}
+                initial={{ opacity: 0, scale: 1.05, x: "100%" }}
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 exit={{ opacity: 0, scale: 0.95, x: "-100%" }}
                 transition={{
-                  duration: 0.5,
+                  duration: 0.55,
                   ease: [0.25, 0.1, 0.25, 1],
                 }}
                 style={{ willChange: "transform, opacity" }}
-                className={`absolute inset-0 bg-gradient-to-br ${banner.gradient} p-3 relative`}>
+                className={`absolute inset-0 bg-gradient-to-br ${banner.gradient} p-4 md:p-6 flex flex-col justify-center select-none`}>
                 {/* 3D Depth Parallax Background */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
                   {/* Layer 1: Background (Blurred Product) */}
                   <motion.div
                     initial={{ opacity: 0, scale: 1.5, rotate: -5, x: 50 }}
-                    animate={{ opacity: 0.2, scale: 1.8, rotate: 0, x: 0 }}
+                    animate={{ opacity: 0.15, scale: 1.8, rotate: 0, x: 0 }}
                     transition={{ duration: 10, repeat: Infinity, repeatType: "reverse" }}
                     className="absolute right-[-10%] top-[-10%] w-[120%] h-[120%]"
                   >
                     <img
                       src={banner.heroImage}
-                      className="w-full h-full object-contain blur-2xl opacity-40 brightness-150"
+                      className="w-full h-full object-contain blur-2xl opacity-30 brightness-150"
                       alt=""
                     />
                   </motion.div>
@@ -195,27 +195,27 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
                   ))}
 
                   {/* Layer 3: Foreground (Sharp Hero Product) */}
-                  <div className={`absolute right-[5%] top-1/2 -translate-y-1/2 w-32 h-32 flex items-center justify-center ${banner.id === 2 ? 'pb-6' : ''}`}>
+                  <div className="absolute right-[5%] top-1/2 -translate-y-1/2 w-24 h-24 md:w-36 md:h-36 flex items-center justify-center pointer-events-none select-none z-10 rounded-2xl overflow-hidden">
                     <motion.div
-                      initial={{ opacity: 0, x: 100, scale: 0.5, rotate: 10 }}
+                      initial={{ opacity: 0, x: 80, scale: 0.7, rotate: 8 }}
                       animate={{ opacity: 1, x: 0, scale: 1.1, rotate: 0 }}
                       transition={{
                         type: "spring",
-                        stiffness: 80,
-                        damping: 12,
+                        stiffness: 90,
+                        damping: 14,
                         delay: 0.2
                       }}
+                      className="w-full h-full flex items-center justify-center"
                     >
                       <motion.img
                         src={banner.heroImage}
                         alt="Hero Product"
-                        className="w-full h-full object-contain drop-shadow-[0_20px_30px_rgba(0,0,0,0.5)]"
+                        className="w-full h-full object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.3)] rounded-2xl"
                         animate={{
-                          y: [0, -5, 0],
-                          rotate: [0, 2, -2, 0]
+                          y: [0, -6, 0],
                         }}
                         transition={{
-                          duration: 4,
+                          duration: 4.5,
                           repeat: Infinity,
                           ease: "easeInOut"
                         }}
@@ -229,69 +229,60 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
                   type="button"
                   onClick={() => handleBannerClick(banner.link)}
                   disabled={!banner.link}
-                  className="relative z-10 h-full flex pt-2 justify-between group">
-                  <div className="flex-1">
+                  className="relative z-10 h-full flex items-center justify-between text-left group w-full pointer-events-auto">
+                  <div className="flex-1 flex flex-col justify-center h-full space-y-1 md:space-y-2 max-w-[60%]">
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.2 }}
-                      className="flex items-center gap-2 mb-0">
+                      className="flex items-center gap-1.5 md:gap-2 mb-0.5">
                       <motion.div
                         animate={{
-                          scale: [1, 1.2, 1],
-                          rotate: [0, 10, -10, 0],
+                          scale: [1, 1.15, 1],
+                          rotate: [0, 8, -8, 0],
                         }}
                         transition={{
-                          duration: 2,
+                          duration: 2.5,
                           repeat: Infinity,
                           ease: "easeInOut",
                         }}>
-                        <Icon className="text-white text-lg drop-shadow-lg" />
+                        <Icon className="text-white text-sm md:text-lg drop-shadow-md" />
                       </motion.div>
-                      <motion.span
-                        className="text-white/90 text-xs font-medium"
-                        animate={{
-                          opacity: [0.9, 1, 0.9],
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                        }}>
+                      <span className="text-white/95 text-[10px] md:text-sm font-extrabold uppercase tracking-wider drop-shadow-sm">
                         {banner.subtitle}
-                      </motion.span>
+                      </span>
                     </motion.div>
 
                     <motion.h3
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.3 }}
-                      className="text-white text-xl font-extrabold mb-0 drop-shadow-lg relative inline-block">
+                      className="text-white text-base md:text-2xl lg:text-3xl font-black leading-none tracking-tight drop-shadow-md">
                       {banner.title}
                     </motion.h3>
 
-                    <motion.p
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4 }}
-                      className="text-white/90 text-xs mb-1">
-                      {banner.description}
-                    </motion.p>
+                    {banner.description && banner.description !== banner.title && banner.description !== banner.discount && (
+                      <motion.p
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+                        className="text-white/80 text-[10px] md:text-sm font-semibold max-w-sm line-clamp-1 leading-relaxed">
+                        {banner.description}
+                      </motion.p>
+                    )}
 
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
+                      initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.5, type: "spring" }}
-                      style={{
-                        willChange: "transform",
-                        transform: "translateZ(0)",
-                      }}
-                      className="inline-flex items-center gap-2 bg-white/25 px-3 py-1.5 rounded-full relative overflow-hidden"
+                      className="inline-flex items-center gap-1.5 bg-white text-gray-900 px-3.5 py-1.5 md:px-5 md:py-2.5 rounded-xl font-black text-[10px] md:text-xs hover:bg-gray-100 transition-all shadow-md self-start mt-2 border border-gray-100/10 select-none group-hover:translate-x-1"
                       whileTap={{ scale: 0.95 }}>
-                      <span className="text-white font-bold text-sm relative z-10">
-                        {banner.discount}
+                      <span>
+                        {String(banner.discount).length > 15 || String(banner.discount) === String(banner.description)
+                          ? "Shop Now"
+                          : banner.discount}
                       </span>
-                      <FiArrowRight className="text-white text-sm relative z-10" />
+                      <FiArrowRight className="text-gray-900 text-xs md:text-sm" />
                     </motion.div>
                   </div>
                 </button>

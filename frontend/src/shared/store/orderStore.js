@@ -153,9 +153,6 @@ export const useOrderStore = create(
       },
 
       fetchOrderById: async (orderId) => {
-        const existing = get().orders.find((order) => String(order.id) === String(orderId));
-        if (existing) return existing;
-
         try {
           const response = await api.get(`/user/orders/${orderId}`);
           const payload = response?.data ?? response;
@@ -174,9 +171,6 @@ export const useOrderStore = create(
       },
 
       fetchPublicTrackingOrder: async (orderId) => {
-        const existing = get().orders.find((order) => String(order.id) === String(orderId));
-        if (existing) return existing;
-
         try {
           const response = await api.get(`/orders/track/${orderId}`);
           const payload = response?.data ?? response;
@@ -272,12 +266,20 @@ export const useOrderStore = create(
       },
 
       requestReturn: async (orderId, payload = {}) => {
-        const body = {
-          reason: String(payload?.reason || '').trim(),
-          ...(payload?.vendorId ? { vendorId: payload.vendorId } : {}),
-          ...(Array.isArray(payload?.items) ? { items: payload.items } : {}),
-          ...(Array.isArray(payload?.images) ? { images: payload.images } : {}),
-        };
+        let body;
+        if (payload instanceof FormData) {
+          body = payload;
+        } else {
+          body = {
+            requestType: payload?.requestType || 'return',
+            exchangeDetails: payload?.exchangeDetails,
+            returnReason: payload?.returnReason || payload?.reason,
+            customReason: payload?.customReason,
+            ...(payload?.vendorId ? { vendorId: payload.vendorId } : {}),
+            ...(Array.isArray(payload?.items) ? { items: payload.items } : {}),
+            ...(Array.isArray(payload?.images) ? { images: payload.images } : {}),
+          };
+        }
 
         const response = await api.post(`/user/orders/${orderId}/returns`, body);
         const data = response?.data ?? response;

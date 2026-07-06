@@ -13,7 +13,9 @@ import mongoose from 'mongoose';
 import { createNotification } from '../../../services/notification.service.js';
 import { calculateVendorShippingForGroups } from '../../../services/vendorShipping.service.js';
 import { sendOrderConfirmationEmail } from '../../../services/email.service.js';
-import { emitToRoom } from '../../../services/socket.service.js';
+import { uploadLocalFileToCloudinaryAndCleanup } from '../../../services/upload.service.js';
+import crypto from 'crypto';
+
 
 const normalizeVariantPart = (value) => String(value || '').trim().toLowerCase();
 const normalizeAxisName = (value) =>
@@ -239,6 +241,9 @@ export const placeOrder = asyncHandler(async (req, res) => {
             'commissionRate storeName shippingEnabled defaultShippingRate freeShippingThreshold'
         );
         if (!product) throw new ApiError(404, `Product not found: ${item.productId}`);
+        if (!product.vendorId) {
+            throw new ApiError(400, `The vendor for product ${product.name} is inactive or does not exist.`);
+        }
         if (product.stock === 'out_of_stock') throw new ApiError(400, `${product.name} is out of stock.`);
         if (product.stockQuantity < item.quantity) throw new ApiError(400, `Only ${product.stockQuantity} units of ${product.name} available.`);
 
@@ -391,7 +396,12 @@ export const placeOrder = asyncHandler(async (req, res) => {
 
             // 7. Deduct stock atomically to prevent oversell under concurrent checkout.
             for (const item of enrichedItems) {
-                const variantPath = item.variantKey ? `variants.stockMap.${item.variantKey}` : null;
+                const product = await Product.findById(item.productId).session(session);
+                const hasVariantStock = item.variantKey && product?.variants?.stockMap && (
+                    (product.variants.stockMap instanceof Map && product.variants.stockMap.has(item.variantKey)) ||
+                    (typeof product.variants.stockMap === 'object' && product.variants.stockMap[item.variantKey] !== undefined)
+                );
+                const variantPath = hasVariantStock ? `variants.stockMap.${item.variantKey}` : null;
                 const baseFilter = {
                     _id: item.productId,
                     stock: { $ne: 'out_of_stock' },
@@ -400,6 +410,14 @@ export const placeOrder = asyncHandler(async (req, res) => {
                 if (variantPath) {
                     baseFilter[variantPath] = { $gte: Number(item.quantity || 0) };
                 }
+                console.log("DEBUG STOCK CHECK:", {
+                    name: item.name,
+                    productId: item.productId,
+                    variantKey: item.variantKey,
+                    variantPath,
+                    baseFilter,
+                    updatePayload: { $inc: { stockQuantity: -Number(item.quantity || 0), ...(variantPath ? { [variantPath]: -Number(item.quantity || 0) } : {}) } }
+                });
 
                 const updatePayload = { $inc: { stockQuantity: -Number(item.quantity || 0) } };
                 if (variantPath) {
@@ -509,11 +527,12 @@ export const placeOrder = asyncHandler(async (req, res) => {
 
         if (userId) {
             createNotification({
-                userId,
+                recipientId: userId,
+                recipientType: 'user',
                 title: 'Order Placed!',
                 message: `Your order ${order.orderId} has been placed successfully.`,
                 type: 'order',
-                link: `/orders/${order.orderId}`,
+                data: { link: `/orders/${order.orderId}` },
             }).catch((err) => console.error('[Order Notification] Failed to create:', err.message));
         }
 
@@ -539,9 +558,14 @@ export const getUserOrders = asyncHandler(async (req, res) => {
 
 // GET /api/user/orders/:id
 export const getOrderDetail = asyncHandler(async (req, res) => {
-    const order = await Order.findOne({ orderId: req.params.id, userId: req.user.id });
+    const order = await Order.findOne({ orderId: req.params.id, userId: req.user.id }).select('+deliveryOtpDebug');
     if (!order) throw new ApiError(404, 'Order not found.');
-    res.status(200).json(new ApiResponse(200, order, 'Order detail fetched.'));
+
+    const returnRequests = await ReturnRequest.find({ orderId: order._id }).populate('vendorId', 'storeName email');
+    const orderObject = order.toObject();
+    orderObject.returnRequests = returnRequests || [];
+
+    res.status(200).json(new ApiResponse(200, orderObject, 'Order detail fetched.'));
 });
 
 // PATCH /api/user/orders/:id/cancel
@@ -659,7 +683,17 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Selected vendor has no items in this order.');
     }
 
-    const requestedItems = Array.isArray(req.body.items) ? req.body.items : [];
+    let requestedItems = [];
+    if (req.body.itemsJson) {
+        try {
+            requestedItems = JSON.parse(req.body.itemsJson);
+        } catch (err) {
+            throw new ApiError(400, 'Invalid itemsJson payload format.');
+        }
+    } else if (Array.isArray(req.body.items)) {
+        requestedItems = req.body.items;
+    }
+
     let normalizedItems = [];
 
     if (requestedItems.length > 0) {
@@ -680,15 +714,18 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
                 productId: orderItem.productId,
                 name: orderItem.name,
                 quantity: requestedQty,
-                reason: String(inputItem?.reason || req.body.reason || '').trim(),
+                reason: String(inputItem?.reason || req.body.returnReason || '').trim(),
             };
         });
     } else {
+        if (req.body.itemsJson || Array.isArray(req.body.items)) {
+            throw new ApiError(400, 'Please select at least one item to return/exchange.');
+        }
         normalizedItems = vendorScopedItems.map((item) => ({
             productId: item.productId,
             name: item.name,
             quantity: Number(item.quantity || 1),
-            reason: String(req.body.reason || '').trim(),
+            reason: String(req.body.returnReason || '').trim(),
         }));
     }
 
@@ -696,10 +733,80 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
         orderId: order._id,
         userId: req.user.id,
         vendorId,
-        status: { $in: ['pending', 'approved', 'processing'] },
+        status: { $in: ['pending', 'approved', 'pickup_pending', 'pickup_assigned', 'picked_up', 'delivered_to_vendor'] },
     });
     if (existingOpen) {
         throw new ApiError(409, 'An active return request already exists for this vendor in the selected order.');
+    }
+
+    // 1. Upload files in req.files to Cloudinary
+    const evidenceImages = [];
+    if (Array.isArray(req.files) && req.files.length > 0) {
+        for (const file of req.files) {
+            const uploaded = await uploadLocalFileToCloudinaryAndCleanup(file.path, 'returns');
+            if (uploaded) {
+                evidenceImages.push({
+                    url: uploaded.url,
+                    public_id: uploaded.publicId || uploaded.public_id || ''
+                });
+            }
+        }
+    }
+
+    const returnReason = req.body.returnReason;
+    const customReason = String(req.body.customReason || '').trim();
+
+    // 2. Validate conditionally mandatory image uploads
+    const evidenceRequiredReasons = [
+        "Product Damaged",
+        "Wrong Product Received",
+        "Missing Parts or Accessories",
+        "Product Not Matching Description",
+        "Defective Product"
+    ];
+    if (evidenceRequiredReasons.includes(returnReason) && evidenceImages.length === 0) {
+        throw new ApiError(400, `Evidence images are required for reason: ${returnReason}`);
+    }
+
+    const requestType = req.body.requestType === 'exchange' ? 'exchange' : 'return';
+    let exchangeDetails = undefined;
+
+    // 3. Exchange validations
+    if (requestType === 'exchange') {
+        const size = String(req.body.exchangeDetails?.requestedVariant?.size || '').trim();
+        const color = String(req.body.exchangeDetails?.requestedVariant?.color || '').trim();
+        if (!size && !color) {
+            throw new ApiError(400, 'Requested size or color variant selection is required for exchange.');
+        }
+
+        // Validate requested variants exist and have stock
+        for (const item of normalizedItems) {
+            const product = await Product.findById(item.productId);
+            if (!product) throw new ApiError(404, `Product not found: ${item.productId}`);
+
+            const mockOrderItem = {
+                productId: item.productId,
+                variant: { size, color }
+            };
+            const variantKey = resolveOrderItemVariantKey(product, mockOrderItem);
+            if (!variantKey) {
+                throw new ApiError(400, `The variant Size: ${size}, Color: ${color} is not available for product ${product.name}.`);
+            }
+
+            const getStockFromMap = (stockMap, key) => {
+                if (!stockMap) return 0;
+                if (typeof stockMap.get === 'function') return Number(stockMap.get(key) || 0);
+                return Number(stockMap[key] || 0);
+            };
+            const stock = getStockFromMap(product.variants?.stockMap, variantKey);
+            if (stock < item.quantity) {
+                throw new ApiError(400, `The requested variant Size: ${size}, Color: ${color} is currently out of stock for product ${product.name}.`);
+            }
+
+            exchangeDetails = {
+                requestedVariant: { size, color, variantKey }
+            };
+        }
     }
 
     const refundAmount = normalizedItems.reduce((sum, item) => {
@@ -708,16 +815,59 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
         return sum + unitPrice * Number(item.quantity || 0);
     }, 0);
 
+    if (returnReason === "Other") {
+        if (!customReason) {
+            throw new ApiError(400, "Custom reason is required when 'Other' is selected.");
+        }
+        if (customReason.length < 10 || customReason.length > 500) {
+            throw new ApiError(400, "Custom reason must be between 10 and 500 characters.");
+        }
+    }
+
+    if (requestType === 'return' && order.paymentMethod === 'cod') {
+        const refundMethod = req.body.refundMethod;
+        if (!refundMethod || !['bank', 'upi'].includes(refundMethod)) {
+            throw new ApiError(400, 'Refund method is required for Cash on Delivery returns.');
+        }
+
+        order.refundMethod = refundMethod;
+        if (refundMethod === 'bank') {
+            const details = req.body.bankDetails || {};
+            if (!details.accountHolder || !details.accountNumber || !details.ifsc || !details.bankName) {
+                throw new ApiError(400, 'All bank details (accountHolder, accountNumber, ifsc, bankName) are required.');
+            }
+            order.bankDetails = {
+                accountHolder: details.accountHolder,
+                accountNumber: details.accountNumber,
+                ifsc: details.ifsc,
+                bankName: details.bankName
+            };
+            order.upiId = undefined;
+        } else {
+            const upiId = req.body.upiId;
+            if (!upiId || !upiId.includes('@')) {
+                throw new ApiError(400, 'A valid UPI ID is required.');
+            }
+            order.upiId = upiId;
+            order.bankDetails = undefined;
+        }
+        await order.save();
+    }
+
     const request = await ReturnRequest.create({
         orderId: order._id,
         userId: req.user.id,
         vendorId,
         items: normalizedItems,
-        reason: String(req.body.reason || '').trim(),
+        requestType,
+        exchangeDetails,
+        evidenceImages,
+        returnReason,
+        customReason,
         status: 'pending',
         refundAmount: Number(refundAmount.toFixed(2)),
         refundStatus: 'pending',
-        images: Array.isArray(req.body.images) ? req.body.images : [],
+        images: evidenceImages.map(img => img.url),
     });
 
     const admins = await Admin.find({ isActive: true }).select('_id').lean();
@@ -793,4 +943,36 @@ export const getUserReturnRequestById = asyncHandler(async (req, res) => {
         .populate('vendorId', 'storeName email');
     if (!request) throw new ApiError(404, 'Return request not found.');
     res.status(200).json(new ApiResponse(200, normalizeReturnRequest(request), 'Return request fetched.'));
+});
+
+// POST /api/user/returns/:id/regenerate-otp
+export const regenerateReturnPickupOtp = asyncHandler(async (req, res) => {
+    const returnRequest = await ReturnRequest.findOne({
+        _id: req.params.id,
+        userId: req.user.id
+    }).populate('orderId', 'orderId');
+
+    if (!returnRequest) throw new ApiError(404, 'Return request not found.');
+
+    const activeStatuses = ['approved', 'pickup_pending', 'pickup_assigned'];
+    if (!activeStatuses.includes(returnRequest.status)) {
+        throw new ApiError(400, `Cannot regenerate OTP. Return request is in status: ${returnRequest.status}`);
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const hash = crypto.createHash('sha256').update(otp).digest('hex');
+
+    returnRequest.returnPickupOtpHash = hash;
+    returnRequest.returnPickupOtpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+    returnRequest.returnPickupOtpAttempts = 0;
+    returnRequest.returnPickupOtpVerified = false;
+    returnRequest.returnPickupOtpDebug = otp;
+
+    await returnRequest.save();
+
+    return res.status(200).json(new ApiResponse(200, {
+        otpDebug: otp,
+        expiresAt: returnRequest.returnPickupOtpExpiresAt,
+        returnRequest: normalizeReturnRequest(returnRequest)
+    }, 'OTP regenerated successfully.'));
 });

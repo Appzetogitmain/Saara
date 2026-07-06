@@ -38,6 +38,10 @@ const vendorSchema = new mongoose.Schema(
             state: String,
             zipCode: String,
             country: String,
+            location: {
+                type: { type: String, default: 'Point' },
+                coordinates: [Number] // [lng, lat]
+            }
         },
         bankDetails: {
             accountName: { type: String, select: false },
@@ -59,6 +63,10 @@ const vendorSchema = new mongoose.Schema(
         refreshTokenHash: { type: String, select: false },
         refreshTokenExpiresAt: { type: Date, select: false },
         joinDate: { type: Date, default: Date.now },
+        walletBalance: { type: Number, default: 0 },
+        onHoldBalance: { type: Number, default: 0 },
+        pendingWithdrawal: { type: Number, default: 0 },
+        totalWithdrawn: { type: Number, default: 0 },
     },
     { timestamps: true }
 );

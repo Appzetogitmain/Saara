@@ -11,6 +11,34 @@ const connectDB = async () => {
       socketTimeoutMS: 45000,
     });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
+
+    // Self-healing migration: Fix malformed currentLocation fields on DeliveryBoy
+    await conn.connection.db.collection('deliveryboys').updateMany(
+        {
+            $or: [
+                { 'currentLocation.coordinates': { $exists: false } },
+                { 'currentLocation.coordinates': { $size: 0 } },
+                { 'currentLocation': null },
+                { 'currentLocation.type': { $exists: true }, 'currentLocation.coordinates': { $exists: false } }
+            ]
+        },
+        { $set: { currentLocation: { type: 'Point', coordinates: [72.8777, 19.0760] } } }
+    );
+
+    // Self-healing migration: Fix malformed address.location fields on Vendor
+    await conn.connection.db.collection('vendors').updateMany(
+        {
+            $or: [
+                { 'address.location.coordinates': { $exists: false } },
+                { 'address.location.coordinates': { $size: 0 } },
+                { 'address.location': null },
+                { 'address.location.type': { $exists: true }, 'address.location.coordinates': { $exists: false } }
+            ]
+        },
+        { $set: { 'address.location': { type: 'Point', coordinates: [72.8777, 19.0760] } } }
+    );
+
+    console.log(`✅ Self-healing coordinates migration complete.`);
   } catch (error) {
     console.error(`MongoDB connection error: ${error.message}`);
     process.exit(1);

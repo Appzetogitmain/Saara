@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { FiArrowLeft, FiFilter, FiX, FiSearch } from "react-icons/fi";
+import { FiArrowLeft, FiFilter, FiX, FiSearch, FiLayers } from "react-icons/fi";
 import MobileLayout from "../components/Layout/MobileLayout";
 import { categories as fallbackCategories } from "../../../data/categories";
 import { getCatalogProducts } from "../data/catalogData";
@@ -142,12 +142,8 @@ const MobileCategories = () => {
 
   // Reset selected subcategory when category changes
   useEffect(() => {
-    if (subcategories.length > 0) {
-      setSelectedSubcategory(subcategories[0].id);
-    } else {
-      setSelectedSubcategory(null);
-    }
-  }, [selectedCategoryId, subcategories]);
+    setSelectedSubcategory(null);
+  }, [selectedCategoryId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -455,12 +451,60 @@ const MobileCategories = () => {
               <div className="p-1 md:p-6">
                 <AnimatedBanner showPadding={false} className="mb-2" />
                 {/* Top Header */}
-                <div className="flex items-center gap-4 mb-6 px-1">
+                <div className="flex items-center gap-4 mb-4 px-1">
                   <h2 className="text-sm font-bold text-gray-800 whitespace-nowrap uppercase tracking-wide">
                     Top Categories For You
                   </h2>
                   <div className="flex-1 border-t border-dotted border-gray-300"></div>
                 </div>
+
+                {/* Subcategory Scroll Bar */}
+                {subcategories.length > 0 && (
+                  <div 
+                    className="flex items-center gap-3 overflow-x-auto py-3 px-1 mb-5 border-b border-gray-100"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSubcategory(null)}
+                      className={`flex items-center gap-2.5 px-6 py-2.5 rounded-full text-xs md:text-sm font-black tracking-wider uppercase whitespace-nowrap transition-all duration-200 hover:scale-105 active:scale-95 border ${
+                        selectedSubcategory === null
+                          ? "bg-gradient-to-r from-primary-500 to-primary-600 text-white border-primary-600 shadow-md shadow-primary-500/20 scale-105"
+                          : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-300"
+                      }`}
+                    >
+                      <FiLayers className={`text-base ${selectedSubcategory === null ? "text-white" : "text-primary-500"}`} />
+                      All Products
+                    </button>
+                    {subcategories.map((sub) => {
+                      const isSelected = normalizeId(sub.id) === normalizeId(selectedSubcategory);
+                      return (
+                        <button
+                          key={sub.id}
+                          type="button"
+                          onClick={() => setSelectedSubcategory(sub.id)}
+                          className={`flex items-center gap-2.5 px-6 py-2.5 rounded-full text-xs md:text-sm font-black tracking-wider uppercase whitespace-nowrap transition-all duration-200 hover:scale-105 active:scale-95 border ${
+                            isSelected
+                              ? "bg-gradient-to-r from-primary-500 to-primary-600 text-white border-primary-600 shadow-md shadow-primary-500/20 scale-105"
+                              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-300"
+                          }`}
+                        >
+                          <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-50 flex-shrink-0 border border-gray-200/60 shadow-sm">
+                             <LazyImage
+                               src={sub.image}
+                               alt={sub.name}
+                               className="w-full h-full object-cover"
+                               placeholderWidth={28}
+                               placeholderHeight={28}
+                               placeholderText={sub.name}
+                             />
+                           </div>
+                           {sub.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
 
 

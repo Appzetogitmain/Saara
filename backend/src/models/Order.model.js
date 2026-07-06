@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 
 const orderItemSchema = new mongoose.Schema({
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', index: true },
@@ -21,7 +22,7 @@ const vendorItemGroupSchema = new mongoose.Schema({
     discount: Number,
     status: {
         type: String,
-        enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+        enum: ['pending', 'processing', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled'],
         default: 'pending',
     },
 });
@@ -51,7 +52,7 @@ const orderSchema = new mongoose.Schema(
         },
         status: {
             type: String,
-            enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'],
+            enum: ['pending', 'processing', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled', 'returned'],
             default: 'pending',
             index: true,
         },
@@ -68,13 +69,27 @@ const orderSchema = new mongoose.Schema(
         idempotencyScope: { type: String, sparse: true },
         trackingNumber: { type: String, unique: true, sparse: true },
         deliveryBoyId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryBoy', index: true },
+        deliveryAssignmentStatus: {
+            type: String,
+            enum: ['pending', 'assigned', 'accepted', 'manual_override', 'failed'],
+            default: 'pending',
+            index: true,
+        },
+        rejectedDeliveryBoys: [{ type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryBoy' }],
         deliveryOtpHash: { type: String, select: false },
         deliveryOtpExpiry: { type: Date, select: false },
         deliveryOtpSentAt: { type: Date, select: false },
         deliveryOtpDebug: { type: String, select: false },
         deliveryOtpVerifiedAt: Date,
         deliveryOtpAttempts: { type: Number, default: 0, select: false },
+        pickupOtpHash: { type: String, select: false },
+        pickupOtpExpiry: { type: Date, select: false },
+        pickupOtpSentAt: { type: Date, select: false },
+        pickupOtpDebug: { type: String, select: false },
         estimatedDelivery: Date,
+        processingAt: Date,
+        readyForPickupAt: Date,
+        shippedAt: Date,
         deliveredAt: Date,
         isCashSettled: { type: Boolean, default: false },
         settledAt: Date,
@@ -85,6 +100,23 @@ const orderSchema = new mongoose.Schema(
         deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
         deliveryPriority: { type: Number, default: 0, index: true },
         deliverySequence: { type: Number, default: 0 },
+        escrowStatus: {
+            type: String,
+            enum: ["held", "release_pending", "released", "refund_processing", "refunded"],
+            default: "held"
+        },
+        escrowReleaseDate: { type: Date, default: null },
+        refundMethod: {
+            type: String,
+            enum: ["bank", "upi"]
+        },
+        bankDetails: {
+            accountHolder: String,
+            accountNumber: String,
+            ifsc: String,
+            bankName: String
+        },
+        upiId: String,
     },
     { timestamps: true }
 );
@@ -105,6 +137,41 @@ orderSchema.index(
 orderSchema.index({ isDeleted: 1, createdAt: -1 });
 orderSchema.index({ isDeleted: 1, status: 1, createdAt: -1 });
 orderSchema.index({ 'vendorItems.vendorId': 1, createdAt: -1 });
+
+orderSchema.pre('save', function (next) {
+    if (this.isModified('status')) {
+        const now = new Date();
+        if (this.status === 'processing' && !this.processingAt) {
+            this.processingAt = now;
+        } else if (this.status === 'ready_for_pickup' && !this.readyForPickupAt) {
+            this.readyForPickupAt = now;
+        } else if (this.status === 'shipped') {
+            if (!this.shippedAt) {
+                this.shippedAt = now;
+            }
+            if (!this.deliveryOtpHash) {
+                const otp = String(Math.floor(100000 + Math.random() * 900000));
+                const secret = process.env.JWT_SECRET || 'fallback-secret-key';
+                const hash = crypto.createHash('sha256').update(`${otp}:${secret}`).digest('hex');
+                
+                this.deliveryOtpHash = hash;
+                this.deliveryOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes TTL
+                this.deliveryOtpSentAt = now;
+                this.deliveryOtpAttempts = 0;
+                
+                const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+                if (!isProduction) {
+                    this.deliveryOtpDebug = otp;
+                }
+            }
+        } else if (this.status === 'delivered' && !this.deliveredAt) {
+            this.deliveredAt = now;
+        } else if (this.status === 'cancelled' && !this.cancelledAt) {
+            this.cancelledAt = now;
+        }
+    }
+    next();
+});
 
 const Order = mongoose.model('Order', orderSchema);
 export { Order };

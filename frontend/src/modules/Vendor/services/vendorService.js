@@ -168,6 +168,14 @@ export const updateVendorOrderStatus = (orderId, status) =>
     api.patch(`/vendor/orders/${orderId}/status`, { status });
 
 /**
+ * Verify pickup OTP from delivery rider
+ * @param {string} orderId
+ * @param {string} otp
+ */
+export const verifyVendorPickup = (orderId, otp) =>
+    api.post(`/vendor/orders/${orderId}/verify-pickup`, { otp });
+
+/**
  * Get customers for the authenticated vendor
  * @param {{ search?: string }} params
  */
@@ -349,6 +357,14 @@ export const getVendorReturnRequestById = (id) =>
  */
 export const updateVendorReturnRequestStatus = (id, payload) =>
     api.patch(`/vendor/return-requests/${id}/status`, payload);
+
+/**
+ * Verify handoff OTP from delivery partner
+ * @param {string} id
+ * @param {string} otp
+ */
+export const verifyVendorHandoffOtp = (id, otp) =>
+    api.post(`/vendor/return-requests/${id}/verify-handoff-otp`, { otp });
 
 /**
  * Get paginated product reviews for the authenticated vendor

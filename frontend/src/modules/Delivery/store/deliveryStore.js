@@ -22,7 +22,7 @@ const normalizeDeliveryBoy = (raw) => {
 const mapBackendStatusToUI = (status) => {
   if (status === 'shipped') return 'in-transit';
   if (status === 'delivered') return 'completed';
-  if (status === 'pending' || status === 'processing') return 'pending';
+  if (status === 'pending' || status === 'processing' || status === 'ready_for_pickup') return 'pending';
   return status || 'pending';
 };
 
@@ -87,6 +87,8 @@ export const useDeliveryAuthStore = create(
       isLoadingOrder: false,
       isUpdatingOrderStatus: false,
       isUpdatingStatus: false,
+      returnPickups: [],
+      isLoadingReturns: false,
 
       // Delivery boy login action
       register: async (registrationData) => {
@@ -384,16 +386,44 @@ export const useDeliveryAuthStore = create(
       },
 
       acceptOrder: async (id) => {
-        const state = get();
-        const current =
-          state.orders.find((order) => String(order.id) === String(id)) ||
-          (state.selectedOrder && String(state.selectedOrder.id) === String(id)
-            ? state.selectedOrder
-            : null);
-        if (current && current.status !== 'pending') {
-          return current;
+        set({ isUpdatingOrderStatus: true });
+        try {
+          const response = await api.post(`/delivery/orders/${id}/accept`);
+          const payload = response?.data ?? response;
+          const normalized = normalizeOrder(payload);
+          set((state) => ({
+            orders: state.orders.map((order) => (String(order.id) === String(id) ? normalized : order)),
+            selectedOrder:
+              state.selectedOrder && String(state.selectedOrder.id) === String(id)
+                ? normalized
+                : state.selectedOrder,
+            isUpdatingOrderStatus: false,
+          }));
+          return normalized;
+        } catch (error) {
+          set({ isUpdatingOrderStatus: false });
+          throw error;
         }
-        return get().updateOrderStatus(id, 'shipped');
+      },
+
+      rejectOrder: async (id) => {
+        set({ isUpdatingOrderStatus: true });
+        try {
+          const response = await api.post(`/delivery/orders/${id}/reject`);
+          const payload = response?.data ?? response;
+          set((state) => ({
+            orders: state.orders.filter((order) => String(order.id) !== String(id)),
+            selectedOrder:
+              state.selectedOrder && String(state.selectedOrder.id) === String(id)
+                ? null
+                : state.selectedOrder,
+            isUpdatingOrderStatus: false,
+          }));
+          return true;
+        } catch (error) {
+          set({ isUpdatingOrderStatus: false });
+          throw error;
+        }
       },
 
       completeOrder: async (id, otp) => {
@@ -412,6 +442,97 @@ export const useDeliveryAuthStore = create(
       resendDeliveryOtp: async (id) => {
         await api.post(`/delivery/orders/${id}/resend-delivery-otp`);
         return true;
+      },
+
+      fetchReturnPickups: async (options = {}) => {
+        set({ isLoadingReturns: true });
+        try {
+          const { status } = options || {};
+          const params = {};
+          if (status) params.status = status;
+
+          const response = await api.get('/delivery/returns', { params });
+          const payload = response?.data ?? response;
+          const list = Array.isArray(payload) ? payload : (Array.isArray(payload?.data) ? payload.data : []);
+          set({ returnPickups: list, isLoadingReturns: false });
+          return list;
+        } catch (error) {
+          set({ isLoadingReturns: false });
+          throw error;
+        }
+      },
+
+      acceptReturnPickup: async (id) => {
+        set({ isUpdatingOrderStatus: true });
+        try {
+          const response = await api.post(`/delivery/returns/${id}/accept`);
+          const payload = response?.data ?? response;
+          const updated = payload?.data ?? payload;
+          set((state) => ({
+            returnPickups: state.returnPickups.map((ret) => (String(ret._id) === String(id) ? updated : ret)),
+            isUpdatingOrderStatus: false,
+          }));
+          return updated;
+        } catch (error) {
+          set({ isUpdatingOrderStatus: false });
+          throw error;
+        }
+      },
+
+      rejectReturnPickup: async (id) => {
+        set({ isUpdatingOrderStatus: true });
+        try {
+          await api.post(`/delivery/returns/${id}/reject`);
+          set((state) => ({
+            returnPickups: state.returnPickups.filter((ret) => String(ret._id) !== String(id)),
+            isUpdatingOrderStatus: false,
+          }));
+          return true;
+        } catch (error) {
+          set({ isUpdatingOrderStatus: false });
+          throw error;
+        }
+      },
+
+      updateReturnPickupStatus: async (id, status, formData = null) => {
+        set({ isUpdatingOrderStatus: true });
+        try {
+          let response;
+          if (formData) {
+            if (!formData.has('status')) formData.append('status', status);
+            response = await api.patch(`/delivery/returns/${id}/status`, formData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
+          } else {
+            response = await api.patch(`/delivery/returns/${id}/status`, { status });
+          }
+          const payload = response?.data ?? response;
+          const updated = payload?.data ?? payload;
+          set((state) => ({
+            returnPickups: state.returnPickups.map((ret) => (String(ret._id) === String(id) ? { ...ret, ...updated } : ret)),
+            isUpdatingOrderStatus: false,
+          }));
+          return updated;
+        } catch (error) {
+          set({ isUpdatingOrderStatus: false });
+          throw error;
+        }
+      },
+
+      verifyReturnPickupOtp: async (id, otp) => {
+        set({ isUpdatingOrderStatus: true });
+        try {
+          const response = await api.post(`/delivery/returns/${id}/verify-otp`, { otp: String(otp).trim() });
+          const payload = response?.data ?? response;
+          set((state) => ({
+            returnPickups: state.returnPickups.map((ret) => (String(ret._id) === String(id) ? { ...ret, returnPickupOtpVerified: true } : ret)),
+            isUpdatingOrderStatus: false,
+          }));
+          return payload;
+        } catch (error) {
+          set({ isUpdatingOrderStatus: false });
+          throw error;
+        }
       },
 
       // Initialize delivery auth state from localStorage

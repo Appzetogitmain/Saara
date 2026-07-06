@@ -382,6 +382,71 @@ const getProductDetail = asyncHandler(async (req, res) => {
 // GET /api/products/:id
 router.get('/products/:id', detailCache, getProductDetail);
 
+// GET /api/products/:productId/reviews
+router.get('/products/:productId/reviews', asyncHandler(async (req, res) => {
+    const { sort = 'newest', page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+    const productId = req.params.productId;
+
+    const sortMap = {
+        newest: { createdAt: -1 },
+        oldest: { createdAt: 1 },
+        'highest-rating': { rating: -1 },
+        'lowest-rating': { rating: 1 },
+    };
+
+    const { Review } = await import('../models/Review.model.js');
+    const { default: mongoose } = await import('mongoose');
+
+    const reviews = await Review.find({ productId, isApproved: true, isHidden: false })
+        .populate('userId', 'name avatar')
+        .sort(sortMap[sort] || { createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit, 10))
+        .lean();
+
+    const total = await Review.countDocuments({ productId, isApproved: true, isHidden: false });
+
+    const stats = await Review.aggregate([
+        { $match: { productId: new mongoose.Types.ObjectId(productId), isApproved: true, isHidden: false } },
+        {
+            $group: {
+                _id: '$rating',
+                count: { $sum: 1 }
+            }
+        }
+    ]);
+
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    let sum = 0;
+    let totalRatings = 0;
+    stats.forEach(s => {
+        distribution[s._id] = s.count;
+        sum += s._id * s.count;
+        totalRatings += s.count;
+    });
+
+    const averageRating = totalRatings > 0 ? parseFloat((sum / totalRatings).toFixed(1)) : 0;
+
+    const allImages = [];
+    reviews.forEach(r => {
+        if (Array.isArray(r.images)) {
+            allImages.push(...r.images);
+        }
+    });
+
+    res.status(200).json(new ApiResponse(200, {
+        reviews,
+        total,
+        averageRating,
+        totalReviews: total,
+        distribution,
+        images: allImages.slice(0, 30),
+        page: parseInt(page, 10),
+        pages: Math.ceil(total / parseInt(limit, 10))
+    }, 'Product reviews fetched.'));
+}));
+
 // GET /api/categories (public)
 router.get('/categories/all', catalogCache, asyncHandler(async (req, res) => {
     const categories = await Category.find({ isActive: true })
@@ -565,7 +630,7 @@ router.get('/campaigns/:slug', detailCache, asyncHandler(async (req, res) => {
 // GET /api/orders/track/:id
 router.get('/orders/track/:id', detailCache, asyncHandler(async (req, res) => {
     const { default: Order } = await import('../models/Order.model.js');
-    const order = await Order.findOne({ orderId: req.params.id }).select('orderId status trackingNumber estimatedDelivery deliveredAt').lean();
+    const order = await Order.findOne({ orderId: req.params.id }).select('orderId status trackingNumber estimatedDelivery deliveredAt readyForPickupAt processingAt shippedAt deliveryOtpDebug').lean();
     if (!order) throw new ApiError(404, 'Order not found.');
     res.status(200).json(new ApiResponse(200, order, 'Order tracking.'));
 }));

@@ -1,11 +1,13 @@
 import asyncHandler from '../../../utils/asyncHandler.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
+import crypto from 'crypto';
 import ApiError from '../../../utils/ApiError.js';
 import Order from '../../../models/Order.model.js';
 import Commission from '../../../models/Commission.model.js';
 import Settlement from '../../../models/Settlement.model.js';
 import mongoose from 'mongoose';
 import { createNotification } from '../../../services/notification.service.js';
+import { autoAssignDeliveryPartner } from '../../../services/assignmentService.js';
 
 const deriveTopLevelOrderStatus = (vendorItems = [], fallback = 'pending') => {
     const statuses = (vendorItems || [])
@@ -17,6 +19,7 @@ const deriveTopLevelOrderStatus = (vendorItems = [], fallback = 'pending') => {
     if (statuses.every((s) => s === 'cancelled')) return 'cancelled';
     if (statuses.every((s) => s === 'delivered')) return 'delivered';
     if (statuses.includes('shipped')) return 'shipped';
+    if (statuses.includes('ready_for_pickup')) return 'ready_for_pickup';
     if (statuses.includes('processing')) return 'processing';
     if (statuses.includes('pending')) return 'pending';
 
@@ -50,7 +53,7 @@ export const getVendorOrderById = asyncHandler(async (req, res) => {
     const order = await Order.findOne({
         $or: idFilter,
         'vendorItems.vendorId': req.user.id,
-    });
+    }).populate('deliveryBoyId', 'name email phone vehicleType vehicleNumber status');
     if (!order) throw new ApiError(404, 'Order not found.');
 
     res.status(200).json(new ApiResponse(200, order, 'Order fetched.'));
@@ -59,11 +62,12 @@ export const getVendorOrderById = asyncHandler(async (req, res) => {
 // PATCH /api/vendor/orders/:id/status
 export const updateOrderStatus = asyncHandler(async (req, res) => {
     const { status } = req.body;
-    const allowed = ['pending', 'processing', 'shipped', 'cancelled'];
+    const allowed = ['pending', 'processing', 'ready_for_pickup', 'shipped', 'cancelled'];
     if (!allowed.includes(status)) throw new ApiError(400, `Status must be one of: ${allowed.join(', ')}`);
     const transitionMap = {
         pending: ['pending', 'processing', 'cancelled'],
-        processing: ['processing', 'shipped', 'cancelled'],
+        processing: ['processing', 'ready_for_pickup', 'cancelled'],
+        ready_for_pickup: ['ready_for_pickup', 'shipped'],
         shipped: ['shipped'],
         cancelled: ['cancelled'],
     };
@@ -94,6 +98,11 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     );
     order.status = deriveTopLevelOrderStatus(order.vendorItems, order.status);
     await order.save();
+
+    if (status === 'ready_for_pickup') {
+        // Trigger auto-assignment service in the background
+        autoAssignDeliveryPartner(order._id);
+    }
 
     const notificationTasks = [];
     if (order.userId) {
@@ -229,4 +238,108 @@ export const getEarnings = asyncHandler(async (req, res) => {
             'Earnings fetched.'
         )
     );
+});
+
+// POST /api/vendor/orders/:id/verify-pickup
+export const verifyPickup = asyncHandler(async (req, res) => {
+    const { otp } = req.body;
+    const normalizedOtp = String(otp || '').trim();
+    if (!/^\d{6}$/.test(normalizedOtp)) {
+        throw new ApiError(400, 'Please enter a valid 6-digit Pickup OTP.');
+    }
+
+    const { id } = req.params;
+    const idFilter = [{ orderId: id }];
+    if (mongoose.Types.ObjectId.isValid(id)) {
+        idFilter.push({ _id: id });
+    }
+
+    const order = await Order.findOne({
+        $or: idFilter,
+        'vendorItems.vendorId': req.user.id,
+    }).select('+pickupOtpHash +pickupOtpExpiry +pickupOtpDebug +deliveryOtpHash +deliveryOtpExpiry +deliveryOtpSentAt +deliveryOtpAttempts +deliveryOtpDebug');
+
+    if (!order) throw new ApiError(404, 'Order not found.');
+
+    const vendorItem = order.vendorItems.find((vi) => String(vi.vendorId) === String(req.user.id));
+    if (!vendorItem) throw new ApiError(404, 'Vendor order item not found.');
+
+    if (vendorItem.status !== 'ready_for_pickup') {
+        throw new ApiError(409, `Pickup verification is only allowed when order is Ready for Pickup. Current status is ${vendorItem.status}.`);
+    }
+
+    if (order.deliveryAssignmentStatus !== 'accepted') {
+        throw new ApiError(409, `No active accepted delivery partner for this order. Current status is ${order.deliveryAssignmentStatus}.`);
+    }
+
+    if (!order.pickupOtpHash || !order.pickupOtpExpiry) {
+        throw new ApiError(400, 'Pickup OTP was not generated. Please re-assign or re-accept the delivery offer.');
+    }
+
+    if (order.pickupOtpExpiry < new Date()) {
+        throw new ApiError(400, 'Pickup OTP has expired. Please ask the delivery boy to resend it.');
+    }
+
+    // Verify OTP
+    const secret = process.env.JWT_SECRET;
+    if (!secret) throw new Error('JWT_SECRET is not configured.');
+    const hashedInput = crypto.createHash('sha256').update(`${normalizedOtp}:${secret}`).digest('hex');
+
+    if (order.pickupOtpHash !== hashedInput) {
+        throw new ApiError(400, 'Invalid Pickup OTP.');
+    }
+
+    // OTP Verified! Advance status to shipped
+    vendorItem.status = 'shipped';
+    
+    // Update top level status
+    order.vendorItems = order.vendorItems.map((vi) =>
+        vi.vendorId.toString() === req.user.id ? { ...vi.toObject(), status: 'shipped' } : vi
+    );
+    
+    order.status = 'shipped';
+    
+    // Clear pickup OTP fields
+    order.pickupOtpHash = undefined;
+    order.pickupOtpExpiry = undefined;
+    order.pickupOtpDebug = undefined;
+
+    await order.save();
+
+    // Trigger notification tasks
+    const notificationTasks = [];
+    if (order.userId) {
+        notificationTasks.push(
+            createNotification({
+                recipientId: order.userId,
+                recipientType: 'user',
+                title: 'Order item status updated',
+                message: `An item in your order ${order.orderId || order._id} is now shipped.`,
+                type: 'order',
+                data: {
+                    orderId: String(order.orderId || order._id),
+                    status: 'shipped',
+                    scope: 'vendor_item',
+                },
+            })
+        );
+    }
+
+    notificationTasks.push(
+        createNotification({
+            recipientId: req.user.id,
+            recipientType: 'vendor',
+            title: 'Package picked up successfully',
+            message: `Order ${order.orderId || order._id} has been handed over to the courier.`,
+            type: 'order',
+            data: {
+                orderId: String(order.orderId || order._id),
+                status: 'shipped',
+            },
+        })
+    );
+
+    await Promise.allSettled(notificationTasks);
+
+    res.status(200).json(new ApiResponse(200, order, 'Pickup OTP verified successfully. Package marked as shipped.'));
 });

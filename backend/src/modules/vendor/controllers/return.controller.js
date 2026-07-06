@@ -1,13 +1,89 @@
+import mongoose from 'mongoose';
 import asyncHandler from '../../../utils/asyncHandler.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
 import ApiError from '../../../utils/ApiError.js';
 import ReturnRequest from '../../../models/ReturnRequest.model.js';
+import crypto from 'crypto';
 import Order from '../../../models/Order.model.js';
 import Product from '../../../models/Product.model.js';
 import Commission from '../../../models/Commission.model.js';
 import User from '../../../models/User.model.js';
 import Admin from '../../../models/Admin.model.js';
 import { createNotification } from '../../../services/notification.service.js';
+import { autoAssignReturnPickupPartner, autoAssignExchangeReplacementPartner } from '../../../services/assignmentService.js';
+
+const normalizeVariantPart = (value) => String(value || '').trim().toLowerCase();
+const normalizeAxisName = (value) =>
+    String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+
+const toVariantStockEntries = (stockMap) => {
+    if (!stockMap) return [];
+    if (typeof stockMap.entries === 'function') return [...stockMap.entries()];
+    return Object.entries(stockMap);
+};
+
+const toVariantPriceEntries = (prices) => {
+    if (!prices) return [];
+    if (typeof prices.entries === 'function') return [...prices.entries()];
+    return Object.entries(prices);
+};
+
+const createDynamicVariantKey = (selection = {}) => {
+    const keys = Object.keys(selection).sort();
+    if (!keys.length) return null;
+    return keys.map((k) => `${k}:${selection[k]}`).join('|');
+};
+
+const resolveOrderItemVariantKey = (product, orderItem) => {
+    const explicitKey = String(orderItem?.variantKey || '').trim();
+    if (explicitKey) return explicitKey;
+
+    const stockEntries = toVariantStockEntries(product?.variants?.stockMap).map(([k]) => String(k).trim());
+    const priceEntries = toVariantPriceEntries(product?.variants?.prices).map(([k]) => String(k).trim());
+    const existingKeys = [...new Set([...stockEntries, ...priceEntries])];
+    if (!existingKeys.length) return null;
+
+    const dynamicSelection = Object.entries(orderItem?.variant || {}).reduce((acc, [axis, value]) => {
+        const axisKey = normalizeAxisName(axis);
+        const selectedValue = String(value || '').trim();
+        if (axisKey && selectedValue) acc[axisKey] = selectedValue;
+        return acc;
+    }, {});
+    const dynamicKey = createDynamicVariantKey(dynamicSelection);
+    if (dynamicKey) {
+        const exactDynamic = existingKeys.find((key) => key === dynamicKey);
+        if (exactDynamic) return exactDynamic;
+        const normalizedDynamic = existingKeys.find(
+            (key) => normalizeVariantPart(key) === normalizeVariantPart(dynamicKey)
+        );
+        if (normalizedDynamic) return normalizedDynamic;
+    }
+
+    const size = normalizeVariantPart(orderItem?.variant?.size);
+    const color = normalizeVariantPart(orderItem?.variant?.color);
+    if (!size && !color) return null;
+
+    const candidates = [
+        `${size}|${color}`,
+        `${size}-${color}`,
+        `${size}_${color}`,
+        `${size}:${color}`,
+        size && !color ? size : null,
+        color && !size ? color : null,
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+        const exact = existingKeys.find((key) => key === candidate);
+        if (exact) return exact;
+        const normalized = existingKeys.find((key) => normalizeVariantPart(key) === normalizeVariantPart(candidate));
+        if (normalized) return normalized;
+    }
+    return null;
+};
+
 
 const enrichReturnItems = (request) => {
     const orderItems = Array.isArray(request?.orderId?.items) ? request.orderId.items : [];
@@ -140,14 +216,34 @@ export const getVendorReturnRequestById = asyncHandler(async (req, res) => {
 // PATCH /api/vendor/return-requests/:id/status
 export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => {
     const { status, refundStatus, rejectionReason } = req.body;
-    const allowedStatuses = ['pending', 'approved', 'processing', 'rejected', 'completed'];
+    const allowedStatuses = [
+        'pending',
+        'approved',
+        'pickup_pending',
+        'pickup_assigned',
+        'picked_up',
+        'delivered_to_vendor',
+        'replacement_preparing',
+        'replacement_ready',
+        'replacement_assigned',
+        'out_for_delivery',
+        'completed',
+        'rejected'
+    ];
     const allowedRefundStatuses = ['pending', 'processed', 'failed'];
     const statusTransitions = {
         pending: ['approved', 'rejected'],
-        approved: ['processing', 'completed'],
-        processing: ['completed'],
-        rejected: [],
+        approved: ['pickup_pending'],
+        pickup_pending: ['pickup_assigned'],
+        pickup_assigned: ['picked_up'],
+        picked_up: ['delivered_to_vendor'],
+        delivered_to_vendor: ['completed', 'replacement_preparing', 'rejected'],
+        replacement_preparing: ['replacement_ready'],
+        replacement_ready: ['replacement_assigned'],
+        replacement_assigned: ['out_for_delivery'],
+        out_for_delivery: ['completed'],
         completed: [],
+        rejected: [],
     };
     const refundTransitions = {
         pending: ['processed', 'failed'],
@@ -173,13 +269,14 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
         .populate('orderId', 'orderId total items vendorItems status paymentStatus');
     if (!request) throw new ApiError(404, 'Return request not found.');
 
-    const nextStatus = status || request.status;
-    const nextRefundStatus = refundStatus || request.refundStatus;
+    const isApproving = status === 'approved';
+    let nextStatus = isApproving ? 'pickup_pending' : (status || request.status);
+    let nextRefundStatus = isApproving ? 'pending' : (status === 'completed' ? 'processed' : (refundStatus || request.refundStatus));
     const nextRejectionReason = rejectionReason !== undefined
         ? String(rejectionReason || '').trim()
         : String(request.rejectionReason || '');
-    const statusUnchanged = !status || status === request.status;
-    const refundUnchanged = !refundStatus || refundStatus === request.refundStatus;
+    const statusUnchanged = nextStatus === request.status;
+    const refundUnchanged = nextRefundStatus === request.refundStatus;
     const rejectionReasonUnchanged =
         rejectionReason === undefined || nextRejectionReason === String(request.rejectionReason || '');
 
@@ -204,14 +301,82 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
         }
     }
 
-    request.status = nextStatus;
-    if (refundStatus) request.refundStatus = nextRefundStatus;
-    if (rejectionReason !== undefined) request.rejectionReason = nextRejectionReason;
-    if (status !== 'rejected' && request.rejectionReason) request.rejectionReason = '';
-    await request.save();
+    // --- BUSINESS LOGIC ON STATUS TRANSITIONS ---
 
-    // Keep lifecycle effects consistent when vendor processes returns.
-    if (status === 'approved' || status === 'completed') {
+    if (isApproving) {
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const hash = crypto.createHash('sha256').update(otp).digest('hex');
+        request.returnPickupOtpHash = hash;
+        request.returnPickupOtpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+        request.returnPickupOtpAttempts = 0;
+        request.returnPickupOtpVerified = false;
+        request.returnPickupOtpDebug = otp;
+    }
+
+    if (status === 'rejected') {
+        nextRefundStatus = 'failed';
+        if (request.status !== 'pending' && request.requestType === 'exchange') {
+            const variantKey = request.exchangeDetails?.requestedVariant?.variantKey;
+            for (const item of request.items || []) {
+                const product = await Product.findById(item.productId);
+                if (!product) continue;
+
+                if (variantKey) {
+                    const getStockFromMap = (stockMap, key) => {
+                        if (!stockMap) return 0;
+                        if (typeof stockMap.get === 'function') return Number(stockMap.get(key) || 0);
+                        return Number(stockMap[key] || 0);
+                    };
+                    const currentStock = getStockFromMap(product.variants?.stockMap, variantKey);
+                    product.variants?.stockMap?.set(variantKey, currentStock + item.quantity);
+                    product.stockQuantity = product.stockQuantity + item.quantity;
+
+                    if (product.stockQuantity <= 0) product.stock = 'out_of_stock';
+                    else if (product.stockQuantity <= product.lowStockThreshold) product.stock = 'low_stock';
+                    else product.stock = 'in_stock';
+
+                    await product.save();
+                }
+            }
+        }
+    }
+
+    // 1. STOCK RESERVATION ON VENDOR APPROVAL (EXCHANGE FLOW)
+    if (isApproving && request.requestType === 'exchange') {
+        const size = request.exchangeDetails?.requestedVariant?.size;
+        const color = request.exchangeDetails?.requestedVariant?.color;
+        const variantKey = request.exchangeDetails?.requestedVariant?.variantKey;
+
+        for (const item of request.items || []) {
+            const product = await Product.findById(item.productId);
+            if (!product) continue;
+
+            if (variantKey) {
+                const getStockFromMap = (stockMap, key) => {
+                    if (!stockMap) return 0;
+                    if (typeof stockMap.get === 'function') return Number(stockMap.get(key) || 0);
+                    return Number(stockMap[key] || 0);
+                };
+                const currentStock = getStockFromMap(product.variants?.stockMap, variantKey);
+                if (currentStock < item.quantity) {
+                    throw new ApiError(400, `Cannot approve exchange. Replacement variant (Size: ${size}, Color: ${color}) is out of stock.`);
+                }
+
+                // Reserve/Decrement Stock immediately
+                product.variants?.stockMap?.set(variantKey, currentStock - item.quantity);
+                product.stockQuantity = Math.max(0, product.stockQuantity - item.quantity);
+
+                if (product.stockQuantity <= 0) product.stock = 'out_of_stock';
+                else if (product.stockQuantity <= product.lowStockThreshold) product.stock = 'low_stock';
+                else product.stock = 'in_stock';
+
+                await product.save();
+            }
+        }
+    }
+
+    // 2. PRODUCT RECEIPT CONFIRMATION (STOCK RESTORE & REFUND BRANCHING)
+    if (status === 'completed' || status === 'replacement_preparing') {
         const linkedOrderId = request.orderId?._id || request.orderId;
         if (linkedOrderId) {
             const order = await Order.findById(linkedOrderId);
@@ -222,39 +387,114 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                 ];
                 const isSingleVendorOrder = uniqueVendorIds.length <= 1;
 
-                if (status === 'approved' && isSingleVendorOrder && !['cancelled', 'returned'].includes(order.status)) {
-                    order.status = 'returned';
-                    await order.save();
-                }
-                if (status === 'completed') {
-                    const stockRestores = (request.items || []).map(async (item) => {
-                        const qty = Number(item?.quantity || 0);
-                        if (!item?.productId || qty <= 0) return;
-                        const product = await Product.findById(item.productId);
-                        if (!product) return;
-                        product.stockQuantity += qty;
-                        if (product.stockQuantity <= 0) product.stock = 'out_of_stock';
-                        else if (product.stockQuantity <= product.lowStockThreshold) product.stock = 'low_stock';
-                        else product.stock = 'in_stock';
-                        await product.save();
-                    });
-                    await Promise.all(stockRestores);
+                // Restore stock of returned (old) variant
+                const stockRestores = (request.items || []).map(async (item) => {
+                    const qty = Number(item?.quantity || 0);
+                    if (!item?.productId || qty <= 0) return;
 
-                    // Reverse this vendor's commission on completed return.
-                    await Commission.updateMany(
-                        {
+                    const product = await Product.findById(item.productId);
+                    if (!product) return;
+
+                    const orderItem = order.items.find(it => String(it.productId) === String(product._id));
+                    const oldVariantKey = resolveOrderItemVariantKey(product, orderItem);
+
+                    if (oldVariantKey) {
+                        const getStockFromMap = (stockMap, key) => {
+                            if (!stockMap) return 0;
+                            if (typeof stockMap.get === 'function') return Number(stockMap.get(key) || 0);
+                            return Number(stockMap[key] || 0);
+                        };
+                        const currentVarStock = getStockFromMap(product.variants?.stockMap, oldVariantKey);
+                        product.variants?.stockMap?.set(oldVariantKey, currentVarStock + qty);
+                    }
+
+                    product.stockQuantity += qty;
+                    if (product.stockQuantity <= 0) product.stock = 'out_of_stock';
+                    else if (product.stockQuantity <= product.lowStockThreshold) product.stock = 'low_stock';
+                    else product.stock = 'in_stock';
+
+                    await product.save();
+                });
+                await Promise.all(stockRestores);
+
+                // For completed Returns (issue refunds, reverse commissions)
+                if (status === 'completed') {
+                    // Find all completed return requests for this order and vendor (excluding current request which is not saved as completed yet)
+                    const vendorCompletedReturns = await ReturnRequest.find({
+                        orderId: order._id,
+                        vendorId: req.user.id,
+                        status: 'completed',
+                        _id: { $ne: request._id }
+                    });
+
+                    const returnedQuantities = {};
+                    const allReturns = [...vendorCompletedReturns, request];
+                    for (const ret of allReturns) {
+                        if (Array.isArray(ret.items)) {
+                            for (const retItem of ret.items) {
+                                const pid = String(retItem.productId || retItem.id || '');
+                                if (!returnedQuantities[pid]) returnedQuantities[pid] = 0;
+                                returnedQuantities[pid] += Number(retItem.quantity || 0);
+                            }
+                        }
+                    }
+
+                    const orderItems = Array.isArray(order.items) ? order.items : [];
+                    const vendorItems = orderItems.filter(item => String(item.vendorId) === String(req.user.id));
+                    
+                    let keptSubtotal = 0;
+                    let totalItemsCount = 0;
+                    let returnedItemsCount = 0;
+
+                    for (const item of vendorItems) {
+                        const pid = String(item.productId || item.id || '');
+                        const purchasedQty = Number(item.quantity || 0);
+                        const retQty = Number(returnedQuantities[pid] || 0);
+                        const keptQty = Math.max(0, purchasedQty - retQty);
+                        
+                        keptSubtotal += item.price * keptQty;
+                        totalItemsCount += purchasedQty;
+                        returnedItemsCount += retQty;
+                    }
+
+                    if (returnedItemsCount >= totalItemsCount || keptSubtotal <= 0) {
+                        // Cancel the commission completely since all items are returned
+                        await Commission.updateMany(
+                            {
+                                orderId: order._id,
+                                vendorId: req.user.id,
+                                status: { $ne: 'cancelled' },
+                            },
+                            {
+                                $set: {
+                                    status: 'cancelled',
+                                    paidAt: null,
+                                    settlementId: null,
+                                },
+                            }
+                        );
+                    } else {
+                        // Partial return: recalculate subtotal and commission for kept items
+                        const comm = await Commission.findOne({
                             orderId: order._id,
                             vendorId: req.user.id,
-                            status: { $ne: 'cancelled' },
-                        },
-                        {
-                            $set: {
-                                status: 'cancelled',
-                                paidAt: null,
-                                settlementId: null,
-                            },
+                            status: { $ne: 'cancelled' }
+                        });
+                        if (comm) {
+                            comm.subtotal = keptSubtotal;
+                            comm.commission = parseFloat(((keptSubtotal * comm.commissionRate) / 100).toFixed(2));
+                            comm.vendorEarnings = parseFloat((keptSubtotal - comm.commission).toFixed(2));
+                            await comm.save();
                         }
-                    );
+                    }
+
+                    // Reduce vendor onHoldBalance
+                    const Vendor = mongoose.model('Vendor');
+                    const vendor = await Vendor.findById(req.user.id);
+                    if (vendor) {
+                        vendor.onHoldBalance = Math.max(0, (vendor.onHoldBalance || 0) - (request.refundAmount || 0));
+                        await vendor.save();
+                    }
 
                     // Mark full order returned/refunded only when every vendor in this order completed returns.
                     const completedReturns = await ReturnRequest.find({
@@ -267,14 +507,17 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                     const completedVendorSet = new Set(
                         completedReturns.map((entry) => String(entry?.vendorId || '')).filter(Boolean)
                     );
+                    completedVendorSet.add(String(req.user.id));
+
                     const allVendorsCompleted =
                         uniqueVendorIds.length > 0 && uniqueVendorIds.every((vendorId) => completedVendorSet.has(vendorId));
 
-                    if (allVendorsCompleted) {
+                    if (allVendorsCompleted || isSingleVendorOrder) {
                         if (order.status !== 'cancelled') {
                             order.status = 'returned';
                         }
                         order.paymentStatus = 'refunded';
+                        order.escrowStatus = 'refunded';
                         await order.save();
                     }
                 }
@@ -282,12 +525,27 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
         }
     }
 
+    request.status = nextStatus;
+    request.refundStatus = nextRefundStatus;
+    if (rejectionReason !== undefined) request.rejectionReason = nextRejectionReason;
+    if (status !== 'rejected' && request.rejectionReason) request.rejectionReason = '';
+    await request.save();
+
+    // 3. AUTO-ASSIGN LOGISTICS DISPATCH TRIGGERS
+    if (isApproving) {
+        autoAssignReturnPickupPartner(request._id);
+    }
+
+    if (status === 'replacement_ready') {
+        autoAssignExchangeReplacementPartner(request._id);
+    }
+
     const notificationTasks = [
         createNotification({
             recipientId: req.user.id,
             recipientType: 'vendor',
             title: 'Return request updated',
-            message: `Return request for order ${request.orderId?.orderId || request.orderId} updated.`,
+            message: `Return request for order ${request.orderId?.orderId || request.orderId} updated to ${request.status}.`,
             type: 'order',
             data: {
                 returnRequestId: String(request._id),
@@ -343,5 +601,63 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
             normalizeReturnRequest(request),
             'Return request status updated.'
         )
+    );
+});
+
+// POST /api/vendor/return-requests/:id/verify-handoff-otp
+export const verifyHandoffOtp = asyncHandler(async (req, res) => {
+    const { otp } = req.body;
+    if (!otp) throw new ApiError(400, 'Handoff OTP is required.');
+
+    const request = await ReturnRequest.findOne({
+        _id: req.params.id,
+        vendorId: req.user.id
+    }).populate('orderId', 'orderId');
+
+    if (!request) throw new ApiError(404, 'Return request not found.');
+
+    if (request.status !== 'picked_up') {
+        throw new ApiError(400, `Cannot verify handoff OTP. Return request is in status: ${request.status}`);
+    }
+
+    if (request.vendorHandoffOtpAttempts >= 5) {
+        throw new ApiError(400, 'Verification locked. Maximum verification attempts reached (5).');
+    }
+
+    if (!request.vendorHandoffOtpExpiresAt || Date.now() > new Date(request.vendorHandoffOtpExpiresAt)) {
+        throw new ApiError(400, 'Handoff OTP has expired.');
+    }
+
+    const hashedInput = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+    if (hashedInput !== request.vendorHandoffOtpHash) {
+        request.vendorHandoffOtpAttempts += 1;
+        await request.save();
+        const remaining = 5 - request.vendorHandoffOtpAttempts;
+        throw new ApiError(400, `Incorrect OTP. ${remaining} attempts remaining.`);
+    }
+
+    request.vendorHandoffOtpVerified = true;
+    request.vendorHandoffOtpAttempts = 0;
+    request.status = 'delivered_to_vendor';
+    await request.save();
+
+    // Trigger notification tasks
+    const notificationTasks = [];
+    if (request.userId) {
+        notificationTasks.push(
+            createNotification({
+                recipientId: request.userId,
+                recipientType: 'user',
+                title: 'Returned items delivered to vendor',
+                message: `Rider has delivered the returned items for order ${request.orderId?.orderId || ''} to the vendor. Awaiting inspection.`,
+                type: 'order',
+                data: { returnRequestId: String(request._id), status: 'delivered_to_vendor' }
+            })
+        );
+    }
+    await Promise.allSettled(notificationTasks);
+
+    return res.status(200).json(
+        new ApiResponse(200, normalizeReturnRequest(request), 'Handoff OTP verified successfully. Return marked as delivered to vendor.')
     );
 });

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import MobileHeader from './MobileHeader';
 import DesktopHeader from './DesktopHeader';
+import DesktopFooter from './DesktopFooter';
 import MobileBottomNav from './MobileBottomNav';
 import MobileCartBar from './MobileCartBar';
 import CartDrawer from '../../../../shared/components/Cart/CartDrawer';
@@ -39,20 +40,30 @@ const MobileLayout = ({ children, showBottomNav = true, showCartBar = true, show
     };
   }, []);
 
+  const isDesktopHeaderVisible = !isAuthPage && !isCheckoutPage && !isAddressesPage;
+  const mainStyle = shouldShowHeader ? { paddingTop: `${headerHeight}px` } : {};
+
+  const shouldHideFooter = isAuthPage ||
+    location.pathname === '/signup' ||
+    location.pathname.startsWith('/reels') ||
+    location.pathname === '/explore' ||
+    location.pathname === '/profile';
+
   return (
-    <>
-      {!isAuthPage && !isCheckoutPage && !isAddressesPage && <DesktopHeader />}
+    <div className="min-h-screen flex flex-col">
+      {isDesktopHeaderVisible && <DesktopHeader />}
       {shouldShowHeader && <MobileHeader />}
       <main
-        className={`min-h-screen w-full overflow-x-hidden md:container md:mx-auto md:px-12 lg:px-24 xl:px-40 ${shouldShowBottomNav ? 'pb-20' : ''} ${showCartBar ? 'pb-24' : ''}`}
-        style={{ paddingTop: shouldShowHeader ? `${headerHeight}px` : '0px' }}
+        className={`flex-grow w-full overflow-x-hidden max-w-[1440px] mx-auto px-0 md:px-8 lg:px-12 ${shouldShowBottomNav ? 'pb-20' : ''} ${showCartBar ? 'pb-24' : ''}`}
+        style={mainStyle}
       >
         {children}
       </main>
+      {!shouldHideFooter && <DesktopFooter />}
       {showCartBar && <MobileCartBar />}
       {shouldShowBottomNav && <MobileBottomNav />}
       <CartDrawer />
-    </>
+    </div>
   );
 };
 

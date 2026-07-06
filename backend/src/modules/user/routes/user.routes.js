@@ -12,7 +12,7 @@ import { authenticate } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
 import { authLimiter, otpLimiter, otpVerifyLimiter } from '../../../middlewares/rateLimiter.js';
 import { validate } from '../../../middlewares/validate.js';
-import { uploadSingle } from '../../../middlewares/upload.js';
+import { uploadSingle, uploadMultiple } from '../../../middlewares/upload.js';
 import {
     registerSchema,
     loginSchema,
@@ -67,15 +67,18 @@ router.get('/reviews/product/:productId', reviewController.getProductReviews);
 router.post('/reviews', ...customerAuth, reviewController.addReview);
 router.post('/reviews/:id/vote', ...customerAuth, reviewController.voteReview);
 router.delete('/reviews/:id', ...customerAuth, reviewController.deleteReview);
+router.post('/products/:productId/review', ...customerAuth, uploadMultiple('images', 5), reviewController.addReview);
+router.patch('/products/:productId/review', ...customerAuth, uploadMultiple('images', 5), reviewController.updateReview);
 
 // Order routes
 router.post('/orders', ...customerAuth, validate(placeOrderSchema), orderController.placeOrder);
 router.get('/orders', ...customerAuth, orderController.getUserOrders);
 router.get('/orders/:id', ...customerAuth, orderController.getOrderDetail);
 router.patch('/orders/:id/cancel', ...customerAuth, orderController.cancelOrder);
-router.post('/orders/:id/returns', ...customerAuth, validate(createReturnRequestSchema), orderController.createReturnRequest);
+router.post('/orders/:id/returns', ...customerAuth, uploadMultiple('images', 5), validate(createReturnRequestSchema), orderController.createReturnRequest);
 router.get('/returns', ...customerAuth, orderController.getUserReturnRequests);
 router.get('/returns/:id', ...customerAuth, orderController.getUserReturnRequestById);
+router.post('/returns/:id/regenerate-otp', ...customerAuth, orderController.regenerateReturnPickupOtp);
 
 // Notification routes (protected)
 router.get('/notifications', ...customerAuth, notificationController.getUserNotifications);

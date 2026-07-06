@@ -33,8 +33,13 @@ const DeliveryNotifications = () => {
   const handleNotificationClick = (notification) => {
     const data = notification?.data || {};
     const orderId = String(data?.orderId || "").trim();
+    const returnRequestId = String(data?.returnRequestId || "").trim();
     if (orderId) {
       navigate(`/delivery/orders/${orderId}`);
+      return;
+    }
+    if (returnRequestId) {
+      navigate('/delivery/orders?tab=pickups');
       return;
     }
   };
@@ -101,7 +106,7 @@ const DeliveryNotifications = () => {
                     ? "bg-white border-gray-200"
                     : "bg-blue-50 border-blue-200"
                 } ${
-                  notification?.data?.orderId ? "cursor-pointer hover:shadow-md transition-shadow" : ""
+                  notification?.data?.orderId || notification?.data?.returnRequestId ? "cursor-pointer hover:shadow-md transition-shadow" : ""
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">

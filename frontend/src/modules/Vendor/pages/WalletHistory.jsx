@@ -3,370 +3,353 @@ import {
   FiDollarSign,
   FiClock,
   FiCheckCircle,
+  FiAlertCircle,
+  FiBriefcase,
+  FiArrowUpRight,
+  FiGrid
 } from "react-icons/fi";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Badge from "../../../shared/components/Badge";
-import ExportButton from "../../Admin/components/ExportButton";
-import AnimatedSelect from "../../Admin/components/AnimatedSelect";
 import { formatPrice } from "../../../shared/utils/helpers";
 import { useVendorAuthStore } from "../store/vendorAuthStore";
-import { getVendorEarnings } from "../services/vendorService";
+import api from "../../../shared/utils/api";
+import toast from "react-hot-toast";
 
 const WalletHistory = () => {
   const { vendor } = useVendorAuthStore();
-
+  const [stats, setStats] = useState(null);
   const [transactions, setTransactions] = useState([]);
-  const [filterType, setFilterType] = useState("all");
-  const [dateRange, setDateRange] = useState({ start: "", end: "" });
-  const [walletSummary, setWalletSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Withdrawal Form States
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [isSubmittingWithdraw, setIsSubmittingWithdraw] = useState(false);
+  const [bankDetails, setBankDetails] = useState({
+    accountHolder: vendor?.bankDetails?.accountName || "",
+    accountNumber: vendor?.bankDetails?.accountNumber || "",
+    ifsc: vendor?.bankDetails?.ifscCode || "",
+    bankName: vendor?.bankDetails?.bankName || ""
+  });
 
   const vendorId = vendor?.id || vendor?._id;
 
-  useEffect(() => {
+  const fetchWalletData = async () => {
     if (!vendorId) return;
+    setIsLoading(true);
+    try {
+      const [statsRes, historyRes] = await Promise.all([
+        api.get("/vendor/wallet/stats"),
+        api.get("/vendor/wallet/history")
+      ]);
+      setStats(statsRes.data || statsRes);
+      setTransactions(historyRes.data?.transactions || historyRes.transactions || []);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to load wallet stats.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    const fetchWallet = async () => {
-      setIsLoading(true);
-      try {
-        const res = await getVendorEarnings();
-        const data = res?.data ?? res;
-        const commissions = Array.isArray(data?.commissions) ? data.commissions : [];
-        const settlements = Array.isArray(data?.settlements) ? data.settlements : [];
+  useEffect(() => {
+    fetchWalletData();
+  }, [vendorId]);
 
-        const allTransactions = [
-          ...commissions.map((c) => ({
-            id: c._id || c.id,
-            type: "earning",
-            orderId: c.orderDisplayId || c.orderRef || c.orderId,
-            amount: c.vendorEarnings,
-            commission: c.commission,
-            status: c.effectiveStatus || c.status,
-            date: c.createdAt,
-            description: `Earning from Order ${c.orderDisplayId || c.orderRef || c.orderId}`,
-            paymentMethod: null,
-            transactionId: null,
-          })),
-          ...settlements.map((s) => ({
-            id: s._id || s.id,
-            type: "settlement",
-            orderId: null,
-            amount: s.amount,
-            commission: 0,
-            status: s.status === "failed" ? "failed" : "paid",
-            date: s.createdAt,
-            description: "Settlement Payment",
-            paymentMethod: s.paymentMethod,
-            transactionId: s.transactionId,
-          })),
-        ].sort((a, b) => new Date(b.date) - new Date(a.date));
-
-        setTransactions(allTransactions);
-        setWalletSummary(data?.summary || null);
-      } catch {
-        setTransactions([]);
-        setWalletSummary(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchWallet();
-  }, [
-    vendorId,
-  ]);
-
-  const filteredTransactions = useMemo(() => {
-    let filtered = transactions;
-
-    // Filter by type
-    if (filterType !== "all") {
-      filtered = filtered.filter((t) => t.type === filterType);
+  const handleWithdrawSubmit = async (e) => {
+    e.preventDefault();
+    const amountNum = parseFloat(withdrawAmount);
+    if (!amountNum || amountNum <= 0) {
+      toast.error("Please enter a valid amount.");
+      return;
+    }
+    if (amountNum > (stats?.walletBalance || 0)) {
+      toast.error("Insufficient available balance.");
+      return;
+    }
+    if (!bankDetails.accountNumber || !bankDetails.accountHolder || !bankDetails.ifsc || !bankDetails.bankName) {
+      toast.error("Please fill all bank account details.");
+      return;
     }
 
-    // Filter by status
-    if (filterType === "earning") {
-      // For earnings, we can filter by status (pending/paid)
-      // This is handled by the filterType already
+    setIsSubmittingWithdraw(true);
+    try {
+      await api.post("/vendor/wallet/withdraw", {
+        amount: amountNum,
+        bankDetails
+      });
+      toast.success("Withdrawal request submitted successfully!");
+      setShowWithdrawModal(false);
+      setWithdrawAmount("");
+      fetchWalletData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Failed to request withdrawal.");
+    } finally {
+      setIsSubmittingWithdraw(false);
     }
-
-    // Filter by date range
-    if (dateRange.start) {
-      filtered = filtered.filter(
-        (t) => new Date(t.date) >= new Date(dateRange.start)
-      );
-    }
-    if (dateRange.end) {
-      filtered = filtered.filter(
-        (t) => new Date(t.date) <= new Date(dateRange.end)
-      );
-    }
-
-    return filtered;
-  }, [transactions, filterType, dateRange]);
-
-  // Calculate wallet balance
-  const walletBalance = useMemo(() => {
-    if (!walletSummary) return 0;
-    return walletSummary.totalEarnings;
-  }, [walletSummary]);
-
-  const availableBalance = useMemo(() => {
-    if (!walletSummary) return 0;
-    return walletSummary.paidEarnings;
-  }, [walletSummary]);
-
-  const pendingBalance = useMemo(() => {
-    if (!walletSummary) return 0;
-    return walletSummary.pendingEarnings;
-  }, [walletSummary]);
-
-  if (!vendorId) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Please log in to view wallet history</p>
-      </div>
-    );
-  }
-
-  const columns = [
-    {
-      key: "date",
-      label: "Date",
-      sortable: true,
-      render: (value) => new Date(value).toLocaleDateString(),
-    },
-    {
-      key: "description",
-      label: "Description",
-      sortable: true,
-    },
-    {
-      key: "type",
-      label: "Type",
-      sortable: true,
-      render: (value) => (
-        <Badge variant={value === "earning" ? "info" : "success"}>
-          {value === "earning" ? "Earning" : "Settlement"}
-        </Badge>
-      ),
-    },
-    {
-      key: "amount",
-      label: "Amount",
-      sortable: true,
-      render: (value) => (
-        <span className="font-semibold text-green-600">
-          {formatPrice(value)}
-        </span>
-      ),
-    },
-    {
-      key: "status",
-      label: "Status",
-      sortable: true,
-      render: (value) => (
-        <Badge
-          variant={
-            value === "paid"
-              ? "success"
-              : value === "pending"
-                ? "warning"
-                : "error"
-          }>
-          {value?.toUpperCase() || "N/A"}
-        </Badge>
-      ),
-    },
-    {
-      key: "paymentMethod",
-      label: "Payment Method",
-      sortable: false,
-      render: (value) => (
-        <span className="text-sm text-gray-600 capitalize">
-          {value ? value.replace("_", " ") : "N/A"}
-        </span>
-      ),
-    },
-  ];
+  };
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6">
+      className="space-y-6 max-w-5xl mx-auto pb-24 px-4"
+    >
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="lg:hidden">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-            Wallet History
+        <div>
+          <h1 className="text-2xl font-black text-slate-800 uppercase tracking-wider">
+            Vendor Wallet & Payouts
           </h1>
-          <p className="text-sm sm:text-base text-gray-600">
-            View your earnings and payment history
+          <p className="text-xs text-slate-400 font-bold mt-0.5 uppercase tracking-wide">
+            Manage your escrow release timeline and request payout withdrawals
           </p>
         </div>
+        <button
+          onClick={() => {
+            setBankDetails({
+              accountHolder: vendor?.bankDetails?.accountName || bankDetails.accountHolder || "",
+              accountNumber: vendor?.bankDetails?.accountNumber || bankDetails.accountNumber || "",
+              ifsc: vendor?.bankDetails?.ifscCode || bankDetails.ifsc || "",
+              bankName: vendor?.bankDetails?.bankName || bankDetails.bankName || ""
+            });
+            setShowWithdrawModal(true);
+          }}
+          disabled={!stats?.walletBalance || stats.walletBalance <= 0}
+          className="px-5 py-2.5 bg-[#024d3e] hover:bg-[#01352a] text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Withdraw Funds
+        </button>
       </div>
 
-      {/* Wallet Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-blue-100">Total Earnings</p>
-            <FiDollarSign className="text-2xl text-blue-200" />
+      {/* Main Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-2 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Available Balance</span>
+            <FiCheckCircle className="text-emerald-500 text-sm" />
           </div>
-          <p className="text-3xl font-bold">{formatPrice(walletBalance)}</p>
-          <p className="text-sm text-blue-100 mt-2">All time earnings</p>
+          <p className="text-2xl font-black text-emerald-600 font-mono">{formatPrice(stats?.walletBalance || 0)}</p>
+          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Ready for withdrawal</span>
         </div>
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-green-100">Available Balance</p>
-            <FiCheckCircle className="text-2xl text-green-200" />
+
+        <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-2 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">On Hold Escrow</span>
+            <FiClock className="text-amber-500 text-sm" />
           </div>
-          <p className="text-3xl font-bold">{formatPrice(availableBalance)}</p>
-          <p className="text-sm text-green-100 mt-2">Paid and available</p>
+          <p className="text-2xl font-black text-amber-600 font-mono">{formatPrice(stats?.onHoldBalance || 0)}</p>
+          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Delivered (7-day hold)</span>
         </div>
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-orange-100">Pending Balance</p>
-            <FiClock className="text-2xl text-orange-200" />
+
+        <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-2 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">In Progress Payouts</span>
+            <FiBriefcase className="text-purple-500 text-sm" />
           </div>
-          <p className="text-3xl font-bold">{formatPrice(pendingBalance)}</p>
-          <p className="text-sm text-orange-100 mt-2">Awaiting settlement</p>
+          <p className="text-2xl font-black text-purple-600 font-mono">{formatPrice(stats?.pendingWithdrawal || 0)}</p>
+          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">Withdrawals processing</span>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-sm space-y-2 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Withdrawn</span>
+            <FiDollarSign className="text-blue-500 text-sm" />
+          </div>
+          <p className="text-2xl font-black text-blue-600 font-mono">{formatPrice(stats?.totalWithdrawn || 0)}</p>
+          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">All-time completions</span>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200">
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
-          <AnimatedSelect
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            options={[
-              { value: "all", label: "All Transactions" },
-              { value: "earning", label: "Earnings Only" },
-              { value: "settlement", label: "Settlements Only" },
-            ]}
-            className="w-full sm:w-auto min-w-[180px]"
-          />
-          <div className="flex flex-col sm:flex-row gap-2 flex-1">
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={(e) =>
-                setDateRange({ ...dateRange, start: e.target.value })
-              }
-              placeholder="Start Date"
-              className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={(e) =>
-                setDateRange({ ...dateRange, end: e.target.value })
-              }
-              placeholder="End Date"
-              className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-          <ExportButton
-            data={filteredTransactions}
-            headers={[
-              {
-                label: "Date",
-                accessor: (row) => new Date(row.date).toLocaleDateString(),
-              },
-              { label: "Description", accessor: (row) => row.description },
-              { label: "Type", accessor: (row) => row.type },
-              { label: "Amount", accessor: (row) => formatPrice(row.amount) },
-              { label: "Status", accessor: (row) => row.status },
-              {
-                label: "Payment Method",
-                accessor: (row) => row.paymentMethod || "N/A",
-              },
-            ]}
-            filename="vendor-wallet-history"
-          />
-        </div>
-
-        {/* Transactions Table */}
-        {isLoading ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Loading wallet history...</p>
-          </div>
-        ) : filteredTransactions.length > 0 ? (
-          <div className="space-y-3">
-            {filteredTransactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-gray-800">
-                      {transaction.description}
-                    </h3>
-                    <Badge
-                      variant={
-                        transaction.type === "earning" ? "info" : "success"
-                      }>
-                      {transaction.type === "earning"
-                        ? "Earning"
-                        : "Settlement"}
-                    </Badge>
-                    {transaction.orderId && (
-                      <span className="text-sm text-gray-500">
-                        Order: {transaction.orderId}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left column: expected releases timeline & recent releases */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Expected releases */}
+          <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-sm space-y-4">
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
+              ⌛ Escrow Payout Schedule
+            </h3>
+            <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+              {stats?.expectedReleases && stats.expectedReleases.length > 0 ? (
+                stats.expectedReleases.map((rel, idx) => (
+                  <div key={idx} className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-bold text-slate-800 block">Order #{rel.orderId}</span>
+                      <span className="text-[10px] text-amber-600 font-bold uppercase tracking-wider">
+                        Releases in {rel.daysRemaining} days
                       </span>
-                    )}
+                    </div>
+                    <span className="font-bold text-slate-700 font-mono">
+                      {formatPrice(rel.amount)}
+                    </span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-gray-600">Date</p>
-                      <p className="font-semibold text-gray-800">
-                        {new Date(transaction.date).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Amount</p>
-                      <p className="font-semibold text-green-600">
-                        {formatPrice(transaction.amount)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-600">Status</p>
-                      <Badge
-                        variant={
-                          transaction.status === "paid"
-                            ? "success"
-                            : transaction.status === "pending"
-                              ? "warning"
-                              : "error"
-                        }>
-                        {transaction.status?.toUpperCase() || "N/A"}
-                      </Badge>
-                    </div>
-                    {transaction.paymentMethod && (
-                      <div>
-                        <p className="text-gray-600">Payment Method</p>
-                        <p className="font-semibold text-gray-800 capitalize">
-                          {transaction.paymentMethod.replace("_", " ")}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                  {transaction.transactionId && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Transaction ID: {transaction.transactionId}
-                    </p>
-                  )}
+                ))
+              ) : (
+                <div className="text-center py-6 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                  No upcoming payouts scheduled.
                 </div>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-gray-500">No transactions found</p>
+
+          {/* Recent releases */}
+          <div className="bg-white border border-slate-150 rounded-3xl p-5 shadow-sm space-y-4">
+            <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
+              🎉 Recent Escrow Releases (30d)
+            </h3>
+            <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+              {stats?.recentReleases && stats.recentReleases.length > 0 ? (
+                stats.recentReleases.map((rel, idx) => (
+                  <div key={idx} className="p-3 bg-emerald-50/40 border border-emerald-100 rounded-2xl flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-bold text-slate-800 block">Order #{rel.orderId}</span>
+                      <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-wider">
+                        Released: {new Date(rel.releasedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <span className="font-bold text-emerald-700 font-mono">
+                      + {formatPrice(rel.amount)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                  No payout releases in last 30 days.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right column: Withdrawal transaction logs */}
+        <div className="lg:col-span-2 bg-white border border-slate-150 rounded-3xl p-6 shadow-sm space-y-5">
+          <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1">
+            📜 Withdrawal & Payout History
+          </h3>
+
+          <div className="space-y-4">
+            {transactions.length > 0 ? (
+              transactions.map((tx) => {
+                const statusColors = {
+                  pending: "bg-amber-50 text-amber-700 border-amber-100",
+                  approved: "bg-indigo-50 text-indigo-700 border-indigo-100",
+                  processing: "bg-blue-50 text-blue-700 border-blue-100",
+                  completed: "bg-emerald-50 text-emerald-700 border-emerald-100",
+                  rejected: "bg-rose-50 text-rose-700 border-rose-100"
+                };
+
+                return (
+                  <div
+                    key={tx.id}
+                    className="p-4 border border-slate-100 rounded-2xl flex items-center justify-between text-xs hover:border-slate-200 transition-colors"
+                  >
+                    <div className="space-y-1">
+                      <span className="font-bold text-slate-850 block">{tx.description}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Requested: {new Date(tx.date).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="text-right space-y-1.5">
+                      <span className="font-bold text-slate-800 font-mono block">
+                        {formatPrice(tx.amount)}
+                      </span>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${statusColors[tx.status] || "bg-slate-50"}`}>
+                        {tx.status}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-12 text-slate-400 text-xs font-bold uppercase tracking-wider">
+                No withdrawal records found.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Withdrawal Form Modal */}
+      <AnimatePresence>
+        {showWithdrawModal && (
+          <div className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-md rounded-2xl p-6 space-y-4 shadow-xl"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 className="font-black text-slate-800 uppercase text-sm tracking-wider">Request Payout</h3>
+                <button
+                  onClick={() => setShowWithdrawModal(false)}
+                  className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center hover:bg-slate-100 text-slate-400"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+                    Withdrawal Amount (Available: {formatPrice(stats?.walletBalance || 0)})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="Enter amount (Rs.)"
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#024d3e] focus:outline-none text-sm font-semibold font-mono"
+                  />
+                </div>
+
+                <div className="border-t border-slate-100 pt-3 space-y-3">
+                  <span className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                    Bank Account Details
+                  </span>
+                  
+                  <input
+                    type="text"
+                    placeholder="Account Holder Name"
+                    value={bankDetails.accountHolder}
+                    onChange={(e) => setBankDetails({ ...bankDetails, accountHolder: e.target.value })}
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:outline-none text-xs font-semibold"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Bank Name"
+                    value={bankDetails.bankName}
+                    onChange={(e) => setBankDetails({ ...bankDetails, bankName: e.target.value })}
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:outline-none text-xs font-semibold"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Account Number"
+                    value={bankDetails.accountNumber}
+                    onChange={(e) => setBankDetails({ ...bankDetails, accountNumber: e.target.value })}
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:outline-none text-xs font-semibold font-mono"
+                  />
+                  <input
+                    type="text"
+                    placeholder="IFSC Code"
+                    value={bankDetails.ifsc}
+                    onChange={(e) => setBankDetails({ ...bankDetails, ifsc: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-1.5 border border-slate-200 rounded-xl focus:outline-none text-xs font-semibold font-mono"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingWithdraw}
+                  className="w-full py-3 bg-[#024d3e] hover:bg-[#01352a] text-white rounded-xl font-bold uppercase text-xs tracking-wider shadow-sm transition-all"
+                >
+                  {isSubmittingWithdraw ? "Requesting Payout..." : "Submit Payout Request"}
+                </button>
+              </form>
+            </motion.div>
           </div>
         )}
-      </div>
+      </AnimatePresence>
     </motion.div>
   );
 };

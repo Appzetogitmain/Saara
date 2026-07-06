@@ -1,33 +1,51 @@
 import React from 'react';
-import { FiBox, FiRotateCcw, FiShield, FiTruck } from 'react-icons/fi';
+import { FiTruck, FiShield, FiRotateCcw, FiPhoneCall } from 'react-icons/fi';
 
 const TrustBar = () => {
   const trustItems = [
-    { title: 'Variety of Products', sub: 'Different Categories', icon: FiBox },
-    { title: 'Easy Returns', sub: 'In 15 Days', icon: FiRotateCcw },
-    { title: '100% Authentic', sub: 'Products', icon: FiShield },
-    { title: 'Fast Delivery', sub: '19000+ Locations', icon: FiTruck },
+    { 
+      title: 'Free Delivery', 
+      sub: 'On orders above ₹499', 
+      icon: FiTruck,
+      bg: 'bg-indigo-50',
+      color: 'text-indigo-600'
+    },
+    { 
+      title: 'Secure Payment', 
+      sub: '100% secure payments', 
+      icon: FiShield,
+      bg: 'bg-indigo-50',
+      color: 'text-indigo-600'
+    },
+    { 
+      title: 'Easy Returns', 
+      sub: 'Within 7 days', 
+      icon: FiRotateCcw,
+      bg: 'bg-indigo-50',
+      color: 'text-indigo-600'
+    },
+    { 
+      title: '24/7 Support', 
+      sub: "We're here to help", 
+      icon: FiPhoneCall,
+      bg: 'bg-indigo-50',
+      color: 'text-indigo-600'
+    },
   ];
 
   return (
-    <div className="py-8 bg-white border-t border-gray-100">
-      <div className="px-2 grid grid-cols-4 gap-1">
+    <div className="py-6 px-4">
+      <div className="bg-white rounded-3xl p-5 md:p-6 border border-gray-100 shadow-sm grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 lg:gap-8">
         {trustItems.map((item, index) => (
-          <div key={index} className="flex flex-col items-center text-center gap-2">
-            <div className="w-16 h-16 rounded-full border border-purple-100 flex items-center justify-center bg-purple-50/50 relative">
-              <div className="w-12 h-12 rounded-full border-2 border-dashed border-purple-200 flex items-center justify-center">
-                <item.icon className="text-2xl text-purple-600" />
-              </div>
-              {/* Purple Accent from screenshot reimagined */}
-              <div className="absolute bottom-1 right-2 bg-purple-600 rounded-full p-1 border-2 border-white shadow-sm">
-                <div className="w-1 h-1 rounded-full bg-white" />
-              </div>
+          <div key={index} className="flex items-center gap-2.5 md:gap-4 px-1 last:border-r-0 lg:border-r border-gray-100/80">
+            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center shrink-0 ${item.bg}`}>
+              <item.icon className={`text-lg md:text-xl lg:text-2xl ${item.color}`} />
             </div>
-            <div className="space-y-0.5 px-1">
-              <p className="text-[10px] font-bold text-gray-800 leading-tight h-7 flex items-center justify-center">
+            <div className="text-left">
+              <p className="text-xs md:text-sm lg:text-base font-black text-gray-800 leading-tight">
                 {item.title}
               </p>
-              <p className="text-[9px] text-gray-400 font-medium leading-tight">
+              <p className="text-[10px] md:text-xs text-gray-500 font-semibold mt-0.5 leading-tight">
                 {item.sub}
               </p>
             </div>

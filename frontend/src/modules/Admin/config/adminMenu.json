@@ -65,8 +65,7 @@
     "route": "/admin/delivery",
     "children": [
       "Delivery Boys",
-      "Cash Collection",
-      "Assign Delivery"
+      "Cash Collection"
     ]
   },
   {
@@ -131,7 +130,8 @@
       "Order Trends",
       "Payment Breakdown",
       "Tax Reports",
-      "Refund Reports"
+      "Refund Reports",
+      "Escrow & Payouts"
     ]
   },
   {

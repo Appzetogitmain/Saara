@@ -32,7 +32,7 @@ const CategoryInFocus = ({ banner, items }) => {
         <Link to={displayBanner.link}>
           <motion.div 
             whileTap={{ scale: 0.98 }}
-            className="relative rounded-2xl overflow-hidden aspect-[16/9] shadow-lg">
+            className="relative rounded-2xl overflow-hidden h-48 sm:h-72 md:h-80 lg:h-96 w-full shadow-lg">
             <img 
               src={displayBanner.image} 
               alt={displayBanner.title}
@@ -66,7 +66,7 @@ const CategoryInFocus = ({ banner, items }) => {
       </div>
 
       {/* Circular Sub-categories */}
-      <div className="flex gap-1.5 overflow-x-auto pb-4 scrollbar-hide px-4">
+      <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 scrollbar-hide px-4 justify-start sm:justify-center">
         {focusItems.map((item, index) => (
           <Link 
             key={index}

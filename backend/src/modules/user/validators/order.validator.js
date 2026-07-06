@@ -25,7 +25,27 @@ export const placeOrderSchema = Joi.object({
 });
 
 export const createReturnRequestSchema = Joi.object({
-    reason: Joi.string().trim().min(5).max(500).required(),
+    requestType: Joi.string().valid('return', 'exchange').default('return').optional(),
+    exchangeDetails: Joi.object({
+        requestedVariant: Joi.object({
+            size: Joi.string().allow('').optional(),
+            color: Joi.string().allow('').optional(),
+        }).optional()
+    }).optional(),
+    returnReason: Joi.string().valid(
+        "Wrong Size",
+        "Wrong Color",
+        "Received Wrong Variant",
+        "Defective Product",
+        "Wrong Product Received",
+        "Product Damaged",
+        "Quality Not As Expected",
+        "Missing Parts or Accessories",
+        "Product Not Matching Description",
+        "Changed My Mind",
+        "Other"
+    ).required(),
+    customReason: Joi.string().trim().allow("").optional(),
     vendorId: Joi.string().optional(),
     items: Joi.array()
         .items(
@@ -37,5 +57,13 @@ export const createReturnRequestSchema = Joi.object({
         )
         .min(1)
         .optional(),
-    images: Joi.array().items(Joi.string().uri()).max(6).optional(),
+    images: Joi.any().optional(),
+    refundMethod: Joi.string().valid('bank', 'upi').optional(),
+    bankDetails: Joi.object({
+        accountHolder: Joi.string().allow('').optional(),
+        accountNumber: Joi.string().allow('').optional(),
+        ifsc: Joi.string().allow('').optional(),
+        bankName: Joi.string().allow('').optional()
+    }).optional(),
+    upiId: Joi.string().allow('').optional(),
 });

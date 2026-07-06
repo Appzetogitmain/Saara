@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { FiStar, FiUpload, FiX } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 
-const ReviewForm = ({ productId, onSubmit }) => {
+const ReviewForm = ({ productId, onSubmit, initialReview }) => {
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [images, setImages] = useState([]);
+  const [existingImages, setExistingImages] = useState([]);
 
   const {
     register,
@@ -16,13 +17,29 @@ const ReviewForm = ({ productId, onSubmit }) => {
     formState: { errors },
   } = useForm();
 
+  useEffect(() => {
+    if (initialReview) {
+      setRating(initialReview.rating || 0);
+      setExistingImages(initialReview.images || initialReview.reviewImages || []);
+      reset({
+        title: initialReview.title || '',
+        comment: initialReview.comment || initialReview.review || '',
+      });
+    } else {
+      setRating(0);
+      setImages([]);
+      setExistingImages([]);
+      reset({ title: '', comment: '' });
+    }
+  }, [initialReview, reset]);
+
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
-    if (images.length + files.length > 3) {
-      toast.error('Maximum 3 images allowed');
+    if (images.length + existingImages.length + files.length > 5) {
+      toast.error('Maximum 5 images allowed');
       return;
     }
-    const newImages = files.slice(0, 3 - images.length);
+    const newImages = files.slice(0, 5 - (images.length + existingImages.length));
     setImages([...images, ...newImages]);
   };
 
@@ -39,7 +56,7 @@ const ReviewForm = ({ productId, onSubmit }) => {
     const reviewData = {
       ...data,
       rating,
-      images,
+      images: [...existingImages, ...images],
       productId,
       date: new Date().toISOString(),
     };
@@ -52,7 +69,8 @@ const ReviewForm = ({ productId, onSubmit }) => {
       reset();
       setRating(0);
       setImages([]);
-      toast.success('Review submitted successfully!');
+      setExistingImages([]);
+      toast.success(initialReview ? 'Review updated successfully!' : 'Review submitted successfully!');
     }
   };
 
@@ -60,14 +78,16 @@ const ReviewForm = ({ productId, onSubmit }) => {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="glass-card rounded-2xl p-6 mb-8"
+      className="bg-white border border-gray-150 rounded-2xl p-6 mb-8 shadow-sm"
     >
-      <h3 className="text-xl font-bold text-gray-800 mb-6">Write a Review</h3>
+      <h3 className="text-base font-black text-gray-800 mb-6 uppercase tracking-wider">
+        {initialReview ? 'Edit Your Review' : 'Write a Product Review'}
+      </h3>
 
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-5">
         {/* Rating */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
             Rating <span className="text-red-500">*</span>
           </label>
           <div className="flex items-center gap-2">
@@ -90,14 +110,14 @@ const ReviewForm = ({ productId, onSubmit }) => {
               </button>
             ))}
             {rating > 0 && (
-              <span className="ml-2 text-sm text-gray-600">({rating} out of 5)</span>
+              <span className="ml-2 text-xs font-bold text-slate-500">({rating} out of 5)</span>
             )}
           </div>
         </div>
 
         {/* Review Title */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
             Review Title
           </label>
           <input
@@ -109,21 +129,21 @@ const ReviewForm = ({ productId, onSubmit }) => {
                 message: 'Title must be at least 3 characters',
               },
             })}
-            className={`w-full px-4 py-3 rounded-xl border-2 ${
+            className={`w-full px-4 py-2.5 rounded-xl border ${
               errors.title
-                ? 'border-red-300 focus:border-red-500'
-                : 'border-gray-200 focus:border-green-500'
-            } focus:outline-none transition-colors`}
-            placeholder="Give your review a title"
+                ? 'border-red-300 focus:ring-red-500'
+                : 'border-gray-200 focus:ring-pink-500'
+            } text-sm focus:outline-none transition-all`}
+            placeholder="Summarize your main opinion..."
           />
           {errors.title && (
-            <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
+            <p className="mt-1 text-xs text-red-600">{errors.title.message}</p>
           )}
         </div>
 
         {/* Review Text */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
+          <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
             Your Review <span className="text-red-500">*</span>
           </label>
           <textarea
@@ -134,44 +154,64 @@ const ReviewForm = ({ productId, onSubmit }) => {
                 message: 'Review must be at least 10 characters',
               },
             })}
-            rows={5}
-            className={`w-full px-4 py-3 rounded-xl border-2 ${
+            rows={4}
+            className={`w-full px-4 py-2.5 rounded-xl border ${
               errors.comment
-                ? 'border-red-300 focus:border-red-500'
-                : 'border-gray-200 focus:border-green-500'
-            } focus:outline-none transition-colors resize-none`}
-            placeholder="Share your experience with this product..."
+                ? 'border-red-300 focus:ring-red-500'
+                : 'border-gray-200 focus:ring-pink-500'
+            } text-sm focus:outline-none transition-all resize-none`}
+            placeholder="Share details of what you liked or disliked about this product..."
           />
           {errors.comment && (
-            <p className="mt-1 text-sm text-red-600">{errors.comment.message}</p>
+            <p className="mt-1 text-xs text-red-600">{errors.comment.message}</p>
           )}
         </div>
 
         {/* Image Upload */}
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Photos (Optional, max 3)
+          <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">
+            Photos (Optional, max 5)
           </label>
           <div className="flex flex-wrap gap-3">
-            {images.map((image, index) => (
-              <div key={index} className="relative">
+            {/* Existing Images */}
+            {existingImages.map((image, index) => (
+              <div key={`existing-${index}`} className="relative">
                 <img
-                  src={URL.createObjectURL(image)}
-                  alt={`Review ${index + 1}`}
-                  className="w-20 h-20 object-cover rounded-lg"
+                  src={image}
+                  alt={`Review Existing ${index + 1}`}
+                  className="w-20 h-20 object-cover rounded-xl border border-gray-100 shadow-sm"
                 />
                 <button
                   type="button"
-                  onClick={() => removeImage(index)}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                  onClick={() => setExistingImages(existingImages.filter((_, i) => i !== index))}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm"
                 >
                   <FiX className="text-xs" />
                 </button>
               </div>
             ))}
-            {images.length < 3 && (
-              <label className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center cursor-pointer hover:border-green-500 transition-colors">
-                <FiUpload className="text-gray-400 text-xl" />
+
+            {/* New Uploaded Images */}
+            {images.map((image, index) => (
+              <div key={`new-${index}`} className="relative">
+                <img
+                  src={URL.createObjectURL(image)}
+                  alt={`Review New ${index + 1}`}
+                  className="w-20 h-20 object-cover rounded-xl border border-gray-100 shadow-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeImage(index)}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors shadow-sm"
+                >
+                  <FiX className="text-xs" />
+                </button>
+              </div>
+            ))}
+
+            {existingImages.length + images.length < 5 && (
+              <label className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center cursor-pointer hover:border-pink-500 hover:text-pink-500 text-gray-400 transition-colors">
+                <FiUpload className="text-xl" />
                 <input
                   type="file"
                   accept="image/*"
@@ -187,9 +227,9 @@ const ReviewForm = ({ productId, onSubmit }) => {
         {/* Submit Button */}
         <button
           type="submit"
-          className="w-full sm:w-auto px-8 py-3 gradient-green text-white rounded-xl font-semibold hover:shadow-glow-green transition-all duration-300 hover:scale-105"
+          className="w-full sm:w-auto px-8 py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-bold text-sm shadow-sm transition-all"
         >
-          Submit Review
+          {initialReview ? 'Update Review' : 'Submit Review'}
         </button>
       </form>
     </motion.div>
@@ -197,4 +237,3 @@ const ReviewForm = ({ productId, onSubmit }) => {
 };
 
 export default ReviewForm;
-

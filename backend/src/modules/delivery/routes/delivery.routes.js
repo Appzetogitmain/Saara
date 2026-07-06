@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import * as authController from '../controllers/auth.controller.js';
 import * as orderController from '../controllers/order.controller.js';
+import * as returnController from '../controllers/return.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
 import { authLimiter, otpVerifyLimiter } from '../../../middlewares/rateLimiter.js';
 import { validate } from '../../../middlewares/validate.js';
-import { uploadDeliveryDocuments } from '../../../middlewares/upload.js';
+import { uploadDeliveryDocuments, uploadMultiple } from '../../../middlewares/upload.js';
 import {
     loginSchema,
     registerSchema,
@@ -51,6 +52,15 @@ if (!IS_PRODUCTION) {
 }
 router.patch('/orders/:id/status', ...deliveryAuth, orderController.updateDeliveryStatus);
 router.post('/orders/:id/resend-delivery-otp', ...deliveryAuth, orderController.resendDeliveryOtp);
+router.post('/orders/:id/accept', ...deliveryAuth, orderController.acceptOrder);
+router.post('/orders/:id/reject', ...deliveryAuth, orderController.rejectOrder);
+
+// Returns
+router.get('/returns', ...deliveryAuth, returnController.getAssignedReturnPickups);
+router.post('/returns/:id/accept', ...deliveryAuth, returnController.acceptReturnPickup);
+router.post('/returns/:id/reject', ...deliveryAuth, returnController.rejectReturnPickup);
+router.post('/returns/:id/verify-otp', ...deliveryAuth, returnController.verifyCustomerPickupOtp);
+router.patch('/returns/:id/status', ...deliveryAuth, uploadMultiple('photos', 5), returnController.updateReturnPickupStatus);
 
 // Location tracking
 router.patch('/location', ...deliveryAuth, orderController.updateLocation);

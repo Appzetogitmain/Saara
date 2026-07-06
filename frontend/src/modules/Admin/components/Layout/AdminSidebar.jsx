@@ -78,7 +78,6 @@ const getChildRoute = (parentRoute, childName) => {
     "/admin/delivery": {
       "Delivery Boys": "/admin/delivery/delivery-boys",
       "Cash Collection": "/admin/delivery/cash-collection",
-      "Assign Delivery": "/admin/delivery/assign-delivery",
     },
     "/admin/offers": {
       "Home Sliders": "/admin/offers/home-sliders",
@@ -105,6 +104,7 @@ const getChildRoute = (parentRoute, childName) => {
       "Payment Breakdown": "/admin/finance/payment-breakdown",
       "Tax Reports": "/admin/finance/tax-reports",
       "Refund Reports": "/admin/finance/refund-reports",
+      "Escrow & Payouts": "/admin/finance/escrow-dashboard",
     },
     "/admin/settings": {
       General: "/admin/settings/general",
@@ -121,7 +121,13 @@ const getChildRoute = (parentRoute, childName) => {
     },
     "/admin/firebase": {
       "Push Config": "/admin/firebase/push-config",
-      Authentication: "/admin/firebase/authentication",
+      "Authentication": "/admin/firebase/authentication",
+    },
+    "/admin/vendors": {
+      "Manage Vendors": "/admin/vendors/manage-vendors",
+      "Pending Approvals": "/admin/vendors/pending-approvals",
+      "Commission Rates": "/admin/vendors/commission-rates",
+      "Vendor Analytics": "/admin/vendors/vendor-analytics",
     },
     "/admin": {
       "Moderate Reels": "/admin/reels",
@@ -159,40 +165,43 @@ const AdminSidebar = ({ isOpen, onClose }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]); // Only trigger on route changes
 
-  // Auto-expand menu items when their route is active (only if viewing a child route)
+  // Check if a menu item is active
+  const isActive = (item) => {
+    if (item.route === "/admin/dashboard") {
+      return location.pathname === "/admin/dashboard";
+    }
+    if (item.route === "/admin") {
+      // Social Control should only be active on its exact page or its children's pages
+      if (location.pathname === "/admin" || location.pathname === "/admin/") return true;
+      const children = item.children || [];
+      return children.some((child) => {
+        const childRoute = getChildRoute(item.route, child);
+        return location.pathname === childRoute || location.pathname.startsWith(childRoute + "/");
+      });
+    }
+    return (
+      location.pathname === item.route ||
+      location.pathname.startsWith(item.route + "/")
+    );
+  };
+
+  // Auto-expand menu items when their route is active
   useEffect(() => {
-    const activeItem = adminMenu.find((item) => {
-      if (item.route === "/admin/dashboard") {
-        return location.pathname === "/admin/dashboard";
-      }
-      // Check if current path is a child of this item (not just the parent route itself)
-      const isChildRoute =
-        location.pathname.startsWith(item.route) &&
-        location.pathname !== item.route;
-      return isChildRoute;
-    });
+    const activeItem = adminMenu.find((item) => isActive(item));
     if (activeItem && activeItem.children && activeItem.children.length > 0) {
-      // Only expand if we're actually on a child route, keep the parent open
       setExpandedItems((prev) => {
         // If the parent is already expanded, keep it expanded (don't close others)
-        // This allows navigation between child items without closing the dropdown
         if (prev[activeItem.title]) {
           return prev;
         }
-        // Otherwise, close all others and expand this one
+        // Otherwise, expand this one
         return {
           [activeItem.title]: true,
         };
       });
     } else {
-      // If not on a child route, check if we should close expanded items
-      // Only close if we're navigating to a completely different parent route
-      const currentParent = adminMenu.find((item) => {
-        if (item.route === "/admin/dashboard") {
-          return location.pathname === "/admin/dashboard";
-        }
-        return location.pathname.startsWith(item.route);
-      });
+      // If not on an active item section, check if we should close expanded items
+      const currentParent = adminMenu.find((item) => isActive(item));
       // If we're on a parent route without children, close all expanded items
       if (
         currentParent &&
@@ -200,17 +209,8 @@ const AdminSidebar = ({ isOpen, onClose }) => {
       ) {
         setExpandedItems({});
       }
-      // If we're on a parent route with children, keep it expanded if it was already expanded
     }
   }, [location.pathname]);
-
-  // Check if a menu item is active
-  const isActive = (route) => {
-    if (route === "/admin/dashboard") {
-      return location.pathname === "/admin/dashboard";
-    }
-    return location.pathname.startsWith(route);
-  };
 
   // Toggle expanded state for menu items with children
   const toggleExpand = (title, closeOthers = true) => {
@@ -260,7 +260,7 @@ const AdminSidebar = ({ isOpen, onClose }) => {
     const Icon = iconMap[item.title] || FiPackage;
     const hasChildren = item.children && item.children.length > 0;
     const isExpanded = expandedItems[item.title];
-    const active = isActive(item.route);
+    const active = isActive(item);
 
     return (
       <div key={item.route} className="mb-1">
@@ -275,8 +275,16 @@ const AdminSidebar = ({ isOpen, onClose }) => {
           `}
           onClick={() => {
             if (hasChildren) {
-              // Close all other expanded items when clicking on a parent with children
-              toggleExpand(item.title, true);
+              if (isExpanded) {
+                // If it is already expanded, collapse it
+                toggleExpand(item.title, true);
+              } else {
+                // If it is collapsed, expand it and navigate to its landing page (if not /admin prefix namespace)
+                toggleExpand(item.title, true);
+                if (item.route !== "/admin") {
+                  handleMenuItemClick(item.route, item.title);
+                }
+              }
             } else {
               // Close all expanded items when clicking on a parent without children
               handleMenuItemClick(item.route);

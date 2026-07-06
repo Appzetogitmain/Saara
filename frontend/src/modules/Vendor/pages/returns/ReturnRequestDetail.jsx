@@ -22,15 +22,23 @@ import { useVendorAuthStore } from "../../store/vendorAuthStore";
 import {
   getVendorReturnRequestById,
   updateVendorReturnRequestStatus,
+  verifyVendorHandoffOtp,
 } from "../../services/vendorService";
 import toast from "react-hot-toast";
 
 const statusTransitions = {
   pending: ["approved", "rejected"],
-  approved: ["processing", "completed"],
-  processing: ["completed"],
-  rejected: [],
+  approved: ["pickup_pending"],
+  pickup_pending: ["pickup_assigned"],
+  pickup_assigned: ["picked_up"],
+  picked_up: ["delivered_to_vendor"],
+  delivered_to_vendor: ["completed", "replacement_preparing"],
+  replacement_preparing: ["replacement_ready"],
+  replacement_ready: ["replacement_assigned"],
+  replacement_assigned: ["out_for_delivery"],
+  out_for_delivery: ["completed"],
   completed: [],
+  rejected: [],
 };
 
 const ReturnRequestDetail = () => {
@@ -40,6 +48,40 @@ const ReturnRequestDetail = () => {
   const [returnRequest, setReturnRequest] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [status, setStatus] = useState("");
+  const [vendorChecklist, setVendorChecklist] = useState({
+    correctProduct: false,
+    correctVariant: false,
+    tagPresent: false,
+    accessoriesIncluded: false,
+    packagingAvailable: false,
+    conditionAcceptable: false,
+    matchesReason: false
+  });
+
+  const isVendorChecklistComplete = Object.values(vendorChecklist).every(Boolean);
+
+  const [handoffOtp, setHandoffOtp] = useState("");
+  const [isVerifyingHandoff, setIsVerifyingHandoff] = useState(false);
+
+  const handleVerifyHandoffOtp = async (e) => {
+    e.preventDefault();
+    if (!handoffOtp || handoffOtp.trim().length !== 6) {
+      toast.error("Please enter a valid 6-digit OTP.");
+      return;
+    }
+    setIsVerifyingHandoff(true);
+    try {
+      const res = await verifyVendorHandoffOtp(id, handoffOtp.trim());
+      const data = res?.data ?? res;
+      toast.success("Handoff verified successfully! Package received.");
+      setReturnRequest(data);
+      setStatus(data.status);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || "Failed to verify OTP.");
+    } finally {
+      setIsVerifyingHandoff(false);
+    }
+  };
 
   const vendorId = vendor?.id;
 
@@ -74,16 +116,8 @@ const ReturnRequestDetail = () => {
     const statusData = { status: newStatus };
     if (newStatus === "approved" && action === "approve") {
       statusData.refundStatus = "pending";
-    } else if (newStatus === "completed" && action === "process-refund") {
+    } else if (newStatus === "completed" && action === "confirm-received") {
       statusData.refundStatus = "processed";
-    } else if (newStatus === "completed" && !action) {
-      statusData.refundStatus = "processed";
-    } else if (
-      newStatus === "approved" &&
-      !action &&
-      returnRequest?.refundStatus !== "processed"
-    ) {
-      statusData.refundStatus = "pending";
     }
     if (newStatus === "rejected" && options?.rejectionReason !== undefined) {
       statusData.rejectionReason = options.rejectionReason;
@@ -103,7 +137,7 @@ const ReturnRequestDetail = () => {
     const statusMessages = {
       approve: "Return request approved",
       reject: "Return request rejected",
-      "process-refund": "Refund processed successfully",
+      "confirm-received": "Confirm receipt recorded. Refund processed successfully.",
     };
 
     toast.success(statusMessages[action] || "Status updated successfully");
@@ -249,23 +283,52 @@ const ReturnRequestDetail = () => {
                   </button>
                 </>
               )}
-              {returnRequest.status === "approved" &&
-                returnRequest.refundStatus === "pending" && (
+              {returnRequest.status === "delivered_to_vendor" && (
+                <>
                   <button
+                    disabled={!isVendorChecklistComplete}
                     onClick={() => {
-                      if (
-                        window.confirm(
-                          "Process refund for this return request?"
-                        )
-                      ) {
-                        handleStatusUpdate("completed", "process-refund");
+                      const isExchange = returnRequest.requestType === "exchange";
+                      const confirmMsg = isExchange
+                        ? "Confirm you received the returned product? This will restore catalog inventory and begin replacement preparation."
+                        : "Confirm you received the returned product? This will process the refund and restore catalog inventory.";
+                      if (window.confirm(confirmMsg)) {
+                        handleStatusUpdate(isExchange ? "replacement_preparing" : "completed", "confirm-received");
                       }
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-semibold">
-                    <FiRefreshCw className="text-sm" />
-                    Process Refund
+                    className={`flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed`}>
+                    <FiCheck className="text-sm" />
+                    Confirm Product Received
                   </button>
-                )}
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to reject this return request after inspection?")) {
+                        const reason = window.prompt("Enter rejection reason (required):");
+                        if (!reason || !reason.trim()) {
+                          toast.error("Rejection reason is required.");
+                          return;
+                        }
+                        handleStatusUpdate("rejected", "reject", { rejectionReason: reason.trim() });
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-750 transition-colors text-sm font-semibold">
+                    <FiX className="text-sm" />
+                    Reject Return
+                  </button>
+                </>
+              )}
+              {returnRequest.status === "replacement_preparing" && (
+                <button
+                  onClick={() => {
+                    if (window.confirm("Are you sure the replacement package is ready for dispatch?")) {
+                      handleStatusUpdate("replacement_ready", "mark-ready");
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm font-semibold">
+                  <FiPackage className="text-sm" />
+                  Mark Replacement Ready
+                </button>
+              )}
             </>
           )}
         </div>
@@ -274,6 +337,43 @@ const ReturnRequestDetail = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-4">
+          {/* OTP Handoff verification card */}
+          {returnRequest.status === 'picked_up' && (
+            <div className="bg-amber-50/40 border border-amber-250 rounded-lg p-5 shadow-sm space-y-3">
+              <h2 className="text-sm font-bold text-amber-850 flex items-center gap-1.5">
+                🔑 Delivery Partner Handoff Verification
+              </h2>
+              <p className="text-xs text-amber-700 leading-relaxed font-medium">
+                The delivery rider is currently returning this package. Please collect the physical returned product from the rider, ask them for the 6-digit **Vendor Handoff OTP**, and enter it below to confirm receipt.
+              </p>
+              
+              <form onSubmit={handleVerifyHandoffOtp} className="flex flex-col sm:flex-row gap-3 pt-1">
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="Enter 6-digit Handoff OTP"
+                  value={handoffOtp}
+                  onChange={(e) => setHandoffOtp(e.target.value.replace(/\D/g, ''))}
+                  className="flex-1 px-4 py-2 bg-white border border-amber-200 rounded-lg text-sm font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono tracking-widest text-center"
+                />
+                <button
+                  type="submit"
+                  disabled={isVerifyingHandoff}
+                  className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:bg-amber-400 shadow-sm"
+                >
+                  {isVerifyingHandoff ? "Verifying..." : "Verify & Accept Package"}
+                </button>
+              </form>
+
+              {/* Show debug code for testing */}
+              {returnRequest.vendorHandoffOtpDebug && (
+                <div className="mt-2 p-2 bg-white border border-amber-100 rounded-md text-center text-xs font-bold text-amber-900 font-mono">
+                  [TESTING ONLY] Handoff OTP Code: <span className="text-red-600 tracking-wider font-extrabold">{returnRequest.vendorHandoffOtpDebug}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Return Overview */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -369,30 +469,122 @@ const ReturnRequestDetail = () => {
             </div>
           </div>
 
-          {/* Return Reason */}
+          {/* Evidence Images Gallery */}
+          {((Array.isArray(returnRequest.evidenceImages) && returnRequest.evidenceImages.length > 0) || (Array.isArray(returnRequest.images) && returnRequest.images.length > 0)) && (
+            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+              <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+                🖼️ Uploaded Evidence Images
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                {((Array.isArray(returnRequest.evidenceImages) && returnRequest.evidenceImages.length > 0)
+                  ? returnRequest.evidenceImages.map(img => img.url)
+                  : returnRequest.images
+                ).map((imgUrl, i) => (
+                  <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-100 shadow-sm bg-slate-50">
+                    <img src={imgUrl} alt="Evidence" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-1">
+                      <button
+                        onClick={() => window.open(imgUrl, "_blank")}
+                        className="px-2 py-1 bg-white text-gray-800 rounded hover:bg-gray-100 text-[10px] font-bold shadow"
+                        title="View Fullscreen"
+                      >
+                        🔍 Zoom
+                      </button>
+                      <a
+                        href={imgUrl}
+                        download={`evidence-${i + 1}.png`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-2 py-1 bg-white text-gray-800 rounded hover:bg-gray-100 text-[10px] font-bold shadow text-center"
+                        title="Download"
+                      >
+                        ⬇️ Download
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Vendor inspection checklist */}
+          {returnRequest.status === "delivered_to_vendor" && (
+            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200 space-y-3">
+              <h2 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+                📋 Vendor Return Handoff Inspection
+              </h2>
+              <p className="text-xs text-gray-500">
+                Please physically inspect the returned items and check all items below to confirm correct package handoff.
+              </p>
+              <div className="space-y-2 mt-2">
+                {[
+                  { id: 'correctProduct', label: 'Correct Product received' },
+                  { id: 'correctVariant', label: 'Correct Variant (color/size) received' },
+                  { id: 'tagPresent', label: 'Original Tag Present' },
+                  { id: 'accessoriesIncluded', label: 'All Accessories Included' },
+                  { id: 'packagingAvailable', label: 'Original Packaging Available' },
+                  { id: 'conditionAcceptable', label: 'Product Condition Acceptable' },
+                  { id: 'matchesReason', label: 'Return matches customer claimed reason' }
+                ].map((check) => (
+                  <label key={check.id} className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={vendorChecklist[check.id] || false}
+                      onChange={(e) => {
+                        const val = e.target.checked;
+                        setVendorChecklist((prev) => ({
+                          ...prev,
+                          [check.id]: val
+                        }));
+                      }}
+                      className="w-4 h-4 border-gray-300 rounded text-primary-600 focus:ring-primary-500"
+                    />
+                    <span className={`text-xs font-semibold ${vendorChecklist[check.id] ? 'text-gray-850' : 'text-gray-500'}`}>
+                      {check.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Request Reason */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
               <FiAlertCircle className="text-primary-600 text-base" />
-              Return Reason
+              {returnRequest.requestType === 'exchange' ? 'Exchange Reason' : 'Return Reason'}
             </h2>
             <div className="space-y-2">
               <div>
-                <p className="text-xs text-gray-500 mb-1">Reason</p>
+                <p className="text-xs text-gray-500 mb-0.5">Reason</p>
                 <p className="font-semibold text-sm text-gray-800">
-                  {returnRequest.reason}
+                  {returnRequest.returnReason || returnRequest.reason}
                 </p>
               </div>
-              {returnRequest.description && (
+              {(returnRequest.customReason || returnRequest.description) && (
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Description</p>
-                  <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
-                    {returnRequest.description}
+                  <p className="text-xs text-gray-500 mb-0.5">Description</p>
+                  <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg leading-relaxed font-medium">
+                    {returnRequest.customReason || returnRequest.description}
                   </p>
+                </div>
+              )}
+              {returnRequest.requestType === 'exchange' && returnRequest.exchangeDetails?.requestedVariant && (
+                <div className="bg-purple-50/50 border border-purple-100 p-3 rounded-lg mt-3">
+                  <p className="text-[10px] font-black text-purple-800 uppercase tracking-wider mb-1">Requested Exchange Variant</p>
+                  <div className="flex gap-4 text-xs font-bold text-purple-700">
+                    {returnRequest.exchangeDetails.requestedVariant.size && (
+                      <span>Size: {returnRequest.exchangeDetails.requestedVariant.size}</span>
+                    )}
+                    {returnRequest.exchangeDetails.requestedVariant.color && (
+                      <span>Color: {returnRequest.exchangeDetails.requestedVariant.color}</span>
+                    )}
+                  </div>
                 </div>
               )}
               {returnRequest.rejectionReason && (
                 <div>
-                  <p className="text-xs text-red-500 mb-1">Rejection Reason</p>
+                  <p className="text-xs text-red-500 mb-0.5">Rejection Reason</p>
                   <p className="text-sm text-red-700 bg-red-50 p-3 rounded-lg">
                     {returnRequest.rejectionReason}
                   </p>
@@ -500,51 +692,12 @@ const ReturnRequestDetail = () => {
                   </p>
                 </div>
               </div>
-              {returnRequest.status === "approved" && (
+              {returnRequest.status !== "pending" && (
                 <div className="flex items-start gap-2">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0"></div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-800">
-                      Approved
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(returnRequest.updatedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              )}
-              {returnRequest.status === "processing" && (
-                <div className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 mt-1.5 flex-shrink-0"></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-800">
-                      Processing
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(returnRequest.updatedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              )}
-              {returnRequest.status === "completed" && (
-                <div className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1.5 flex-shrink-0"></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-800">
-                      Completed
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(returnRequest.updatedAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              )}
-              {returnRequest.status === "rejected" && (
-                <div className="flex items-start gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-gray-800">
-                      Rejected
+                    <p className="text-xs font-semibold text-gray-800 capitalize">
+                      {returnRequest.status.replace(/_/g, " ")}
                     </p>
                     <p className="text-xs text-gray-500">
                       {new Date(returnRequest.updatedAt).toLocaleDateString()}

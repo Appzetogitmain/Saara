@@ -16,6 +16,7 @@ import * as uploadController from '../controllers/upload.controller.js';
 import * as settingsController from '../controllers/settings.controller.js';
 import * as reelController from '../controllers/reel.controller.js';
 import * as affiliateController from '../controllers/affiliate.controller.js';
+import * as escrowController from '../controllers/escrow.controller.js';
 import { audit } from '../../../middlewares/audit.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
@@ -215,5 +216,10 @@ router.patch('/reels/:id/moderate', ...adminAuth, audit('MODERATE_REEL', 'Reel')
 // ─── Affiliate Management ───────────────────────────────────────────────────
 router.get('/affiliates/payouts/pending', ...adminAuth, affiliateController.getPendingPayouts);
 router.patch('/affiliates/:id/payouts/:payoutId', ...adminAuth, audit('PROCESS_AFFILIATE_PAYOUT', 'Affiliate'), affiliateController.completePayout);
+
+// ─── Escrow & Payout Management ──────────────────────────────────────────────
+router.get('/escrow/summary', ...adminAuth, escrowController.getEscrowSummary);
+router.get('/escrow/withdrawals', ...adminAuth, escrowController.getWithdrawalRequests);
+router.patch('/escrow/withdrawals/:id/status', ...adminAuth, escrowController.updateWithdrawalStatus);
 
 export default router;

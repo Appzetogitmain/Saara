@@ -32,7 +32,7 @@ const MobileTrackOrder = () => {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      if (!order && orderId) {
+      if (orderId) {
         const privateOrder = await fetchOrderById(orderId);
         if (!privateOrder) {
           await fetchPublicTrackingOrder(orderId);
@@ -43,7 +43,7 @@ const MobileTrackOrder = () => {
     return () => {
       mounted = false;
     };
-  }, [order, orderId, fetchOrderById, fetchPublicTrackingOrder]);
+  }, [orderId, fetchOrderById, fetchPublicTrackingOrder]);
 
   useEffect(() => {
     if (!isResolving && !order) {
@@ -100,7 +100,8 @@ const MobileTrackOrder = () => {
   const getTrackingSteps = () => {
     const isCancelled = normalizedStatus === 'cancelled';
     const isReturned = normalizedStatus === 'returned';
-    const isProcessingOrLater = ['processing', 'shipped', 'delivered', 'returned'].includes(normalizedStatus);
+    const isProcessingOrLater = ['processing', 'ready_for_pickup', 'shipped', 'delivered', 'returned'].includes(normalizedStatus);
+    const isReadyForPickupOrLater = ['ready_for_pickup', 'shipped', 'delivered', 'returned'].includes(normalizedStatus);
     const isShippedOrLater = ['shipped', 'delivered', 'returned'].includes(normalizedStatus);
     const isDelivered = normalizedStatus === 'delivered';
 
@@ -116,6 +117,12 @@ const MobileTrackOrder = () => {
         completed: !isCancelled && isProcessingOrLater,
         date: order?.processingAt || null,
         icon: FiPackage,
+      },
+      {
+        label: 'Ready for Pickup',
+        completed: !isCancelled && isReadyForPickupOrLater,
+        date: order?.readyForPickupAt || null,
+        icon: FiClock,
       },
       {
         label: 'Shipped',
@@ -192,6 +199,21 @@ const MobileTrackOrder = () => {
                   })}
                 </div>
               </div>
+
+              {/* Delivery OTP Code for testing / delivery verification */}
+              {order.status === 'shipped' && (
+                <div className="glass-card rounded-2xl p-4 bg-green-50 border border-green-200">
+                  <h2 className="text-base font-bold text-green-800 mb-1 flex items-center gap-1.5">
+                    🔑 Delivery Verification OTP
+                  </h2>
+                  <p className="text-xs text-green-700 mb-3">
+                    Please provide this 6-digit OTP code to the delivery boy to confirm successful delivery.
+                  </p>
+                  <p className="text-3xl font-extrabold text-green-800 tracking-widest text-center py-2 bg-white rounded-xl border border-green-300">
+                    {order.deliveryOtpDebug || 'Check Email'}
+                  </p>
+                </div>
+              )}
 
               {/* Tracking Number */}
               {order.trackingNumber && (

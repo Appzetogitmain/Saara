@@ -35,15 +35,18 @@ const deliveryBoySchema = new mongoose.Schema(
             default: 'available',
         },
         currentLocation: {
-            lat: { type: Number },
-            lng: { type: Number },
+            type: { type: String, default: 'Point' },
+            coordinates: [Number] // [lng, lat]
         },
         totalDeliveries: { type: Number, default: 0 },
         rating: { type: Number, default: 0 },
         cashCollected: { type: Number, default: 0 },
+        maxActiveOrders: { type: Number, default: 3 },
     },
     { timestamps: true }
 );
+
+deliveryBoySchema.index({ currentLocation: "2dsphere" });
 
 deliveryBoySchema.pre('save', async function (next) {
     if (!this.isModified('password')) return next();

@@ -49,7 +49,11 @@ export const useCategoryStore = create(
 
       // Get category by ID
       getCategoryById: (id) => {
-        return get().categories.find((cat) => String(cat.id) === String(id));
+        const targetId = id && typeof id === 'object' ? (id._id || id.id) : id;
+        return get().categories.find((cat) => {
+          const catId = cat.id && typeof cat.id === 'object' ? (cat.id._id || cat.id.id) : cat.id;
+          return String(catId || '') === String(targetId || '');
+        });
       },
 
       // Create category
@@ -148,18 +152,24 @@ export const useCategoryStore = create(
       // Get categories by parent
       getCategoriesByParent: (parentId) => {
         return get().categories.filter((cat) => {
-          const normalizedParent = typeof cat.parentId === 'object'
-            ? (cat.parentId?._id ?? cat.parentId?.id ?? null)
+          const normalizedParent = cat.parentId && typeof cat.parentId === 'object'
+            ? (cat.parentId._id || cat.parentId.id)
             : cat.parentId;
-          const catParentId = normalizedParent ? String(normalizedParent) : null;
-          const targetParentId = parentId ? String(parentId) : null;
-          return catParentId === targetParentId;
+          const targetParentId = parentId && typeof parentId === 'object' 
+            ? (parentId._id || parentId.id) 
+            : parentId;
+          return String(normalizedParent || '') === String(targetParentId || '');
         });
       },
 
       // Get root categories
       getRootCategories: () => {
-        return get().categories.filter((cat) => !cat.parentId);
+        return get().categories.filter((cat) => {
+          const normalizedParent = cat.parentId && typeof cat.parentId === 'object'
+            ? (cat.parentId._id || cat.parentId.id)
+            : cat.parentId;
+          return !normalizedParent;
+        });
       },
 
       // Reorder categories

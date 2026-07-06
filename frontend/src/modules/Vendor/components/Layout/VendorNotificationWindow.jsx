@@ -47,12 +47,12 @@ const VendorNotificationWindow = ({ isOpen, onClose, position = "right" }) => {
   };
 
   const getNotificationRoute = (notification) => {
+    if (notification.data?.returnRequestId) {
+      return `/vendor/return-requests/${notification.data.returnRequestId}`;
+    }
     const orderId = notification.orderId || notification.data?.orderId;
     if (orderId) {
       return "/vendor/orders/all-orders";
-    }
-    if (notification.data?.returnRequestId) {
-      return "/vendor/return-requests";
     }
     if (notification.data?.documentId) {
       return "/vendor/documents";

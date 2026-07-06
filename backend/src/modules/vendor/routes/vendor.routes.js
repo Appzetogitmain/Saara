@@ -66,6 +66,7 @@ router.patch('/stock/:productId', ...vendorAuth, productController.updateStock);
 router.get('/orders', ...vendorAuth, orderController.getVendorOrders);
 router.get('/orders/:id', ...vendorAuth, orderController.getVendorOrderById);
 router.patch('/orders/:id/status', ...vendorAuth, orderController.updateOrderStatus);
+router.post('/orders/:id/verify-pickup', ...vendorAuth, orderController.verifyPickup);
 
 // Customers
 router.get('/customers', ...vendorAuth, customerController.getVendorCustomers);
@@ -101,6 +102,7 @@ router.get('/analytics/overview', ...vendorAuth, analyticsController.getAnalytic
 // Wallet & Earnings
 router.get('/wallet/stats', ...vendorAuth, walletController.getWalletStats);
 router.get('/wallet/history', ...vendorAuth, walletController.getTransactionHistory);
+router.post('/wallet/withdraw', ...vendorAuth, walletController.requestWithdrawal);
 router.get('/earnings', ...vendorAuth, orderController.getEarnings);
 
 // Support Tickets
@@ -113,6 +115,7 @@ router.post('/support/tickets/:id/message', ...vendorAuth, supportController.rep
 router.get('/return-requests', ...vendorAuth, returnController.getVendorReturnRequests);
 router.get('/return-requests/:id', ...vendorAuth, returnController.getVendorReturnRequestById);
 router.patch('/return-requests/:id/status', ...vendorAuth, returnController.updateVendorReturnRequestStatus);
+router.post('/return-requests/:id/verify-handoff-otp', ...vendorAuth, returnController.verifyHandoffOtp);
 
 // Product reviews
 router.get('/reviews', ...vendorAuth, reviewController.getVendorReviews);

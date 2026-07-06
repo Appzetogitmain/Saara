@@ -126,10 +126,26 @@ const deriveDailyDeals = (products = []) => {
 };
 
 const DEFAULT_HERO_SLIDES = [
-  { image: heroSlide1 },
-  { image: heroSlide2 },
-  { image: heroSlide3 },
-  { image: heroSlide4 },
+  {
+    image: heroSlide1,
+    link: "/search",
+    hasOverlay: false
+  },
+  {
+    image: heroSlide2,
+    link: "/offers",
+    hasOverlay: false
+  },
+  {
+    image: heroSlide3,
+    link: "/categories",
+    hasOverlay: false
+  },
+  {
+    image: heroSlide4,
+    link: "/new-arrivals",
+    hasOverlay: false
+  }
 ];
 
 const extractResponseData = (response) => {
@@ -325,7 +341,10 @@ const MobileHome = () => {
             id: normalizeId(banner._id || banner.id || `home-slide-${index}`),
             image: banner.image,
             link: resolveBannerLink(banner),
-            title: banner.title || "",
+            title: banner.title || "Shop Smart. Live Better.",
+            subtitle: banner.subtitle || "BEST DEALS",
+            description: banner.description || "Discover the best products at unbeatable prices. Quality you can trust.",
+            hasOverlay: !!banner.title,
           }));
         setSlides(bannerSlides.length > 0 ? bannerSlides : DEFAULT_HERO_SLIDES);
 
@@ -579,7 +598,7 @@ const MobileHome = () => {
                   {slides.map((slide, index) => (
                     <div
                       key={index}
-                      className="flex-shrink-0"
+                      className="flex-shrink-0 relative animate-fadeIn"
                       onClick={() => handleSlideClick(slide)}
                       style={{
                         width: `${100 / slides.length}%`,
@@ -592,10 +611,57 @@ const MobileHome = () => {
                         className="w-full h-full object-cover pointer-events-none select-none"
                         draggable={false}
                         onError={(e) => {
-                          e.target.src = `https://via.placeholder.com/400x200?text=Slide+${index + 1
-                            }`;
+                          e.target.src = `https://via.placeholder.com/400x200?text=Slide+${index + 1}`;
                         }}
                       />
+
+                      {/* Text & Button overlays on the left */}
+                      {slide.hasOverlay !== false && (
+                        <>
+                          <div className="absolute inset-0 bg-gradient-to-r from-white/30 via-transparent to-transparent z-10 pointer-events-none" />
+                          <div className="absolute inset-y-0 left-0 pl-6 pr-4 md:pl-16 flex flex-col justify-center text-left z-20 max-w-[65%] pointer-events-auto">
+                            <div className="space-y-2 md:space-y-4">
+                              {slide.subtitle && (
+                                <span className="inline-block bg-[#e0d6ff] text-[#5b21b6] px-3 py-0.5 md:px-3.5 md:py-1 rounded-full text-[9px] md:text-xs font-black tracking-wide uppercase select-none">
+                                  {slide.subtitle}
+                                </span>
+                              )}
+                              <h2 className="text-gray-900 text-lg md:text-3xl lg:text-4xl xl:text-5xl font-black leading-tight tracking-tight drop-shadow-sm">
+                                {slide.title || "Shop Smart. Live Better."}
+                              </h2>
+                              <p className="text-gray-600 text-[10px] md:text-sm lg:text-base font-semibold leading-relaxed max-w-sm line-clamp-2 md:line-clamp-none">
+                                {slide.description || "Discover the best products at unbeatable prices."}
+                              </p>
+                            </div>
+
+                            {/* Action buttons */}
+                            <div className="flex items-center gap-3 md:gap-4 mt-4 md:mt-8">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Avoid triggering parent click
+                                  handleSlideClick(slide);
+                                }}
+                                className="bg-primary-600 hover:bg-primary-700 text-white font-black py-2 md:py-3.5 px-4 md:px-8 rounded-xl flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all text-[9px] md:text-sm shadow-md cursor-pointer select-none"
+                              >
+                                <span>Shop Now</span>
+                                <span>&rarr;</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Avoid triggering parent click
+                                  navigate("/offers");
+                                }}
+                                className="flex items-center gap-1.5 md:gap-2 text-gray-700 font-black text-[9px] md:text-sm hover:text-primary-600 transition-colors cursor-pointer select-none"
+                              >
+                                <span className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-white flex items-center justify-center shadow border border-gray-100 text-xs font-bold font-mono">&gt;</span>
+                                <span>Explore Deals</span>
+                              </button>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   ))}
                 </motion.div>
@@ -617,31 +683,45 @@ const MobileHome = () => {
                 </div>
               </div>
 
-              {/* Side Banner for Large Screens */}
-              <div className="hidden lg:block lg:col-span-1 h-[400px] xl:h-[450px] rounded-2xl overflow-hidden relative bg-gray-900 group">
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/90 z-10" />
-                <LazyImage
-                  src={sideBanner?.image || stylishWatchImg}
-                  alt={sideBanner?.title || "Premium Watch"}
-                  className="w-full h-full object-contain p-8 group-hover:scale-110 transition-transform duration-700"
-                  onError={(e) => {
-                    e.target.src = "https://via.placeholder.com/400x400?text=Premium+Watch";
-                  }}
-                />
-                <div className="absolute inset-x-0 bottom-0 p-8 z-20 flex flex-col items-center text-center">
-                  <span className="text-yellow-400 font-bold text-3xl mb-2 tracking-wider drop-shadow-lg">
-                    {sideBanner?.title || "PREMIUM"}
-                  </span>
-                  <p className="text-gray-300 text-sm mb-6 font-medium">
-                    {sideBanner?.subtitle || "Exclusive Collection"}
-                  </p>
+              {/* Side Banner for Large Screens (Luxury Collection) */}
+              <div
+                onClick={() => handleBannerNavigation(sideBanner?.link || "/search")}
+                className="hidden lg:flex lg:col-span-1 h-[400px] xl:h-[450px] rounded-3xl overflow-hidden relative bg-gradient-to-br from-[#111111] to-[#1e1e1e] p-8 border border-gray-800 cursor-pointer group shadow-lg"
+              >
+                {/* Text and Actions (Left side) */}
+                <div className="flex-1 flex flex-col justify-between z-20 text-left h-full max-w-[55%]">
+                  <div className="space-y-4">
+                    <span className="text-yellow-500 font-extrabold text-xs tracking-widest uppercase">
+                      PREMIUM COLLECTION
+                    </span>
+                    <h3 className="text-white text-3xl font-black leading-tight tracking-tight drop-shadow-sm">
+                      Luxury that Defines You
+                    </h3>
+                    <p className="text-gray-400 text-sm font-semibold leading-relaxed">
+                      Exclusive watches for every occasion.
+                    </p>
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => handleBannerNavigation(sideBanner?.link || "/offers")}
-                    className="bg-white text-gray-900 font-bold py-3.5 px-10 rounded-xl w-full hover:bg-gray-100 transition-all transform hover:-translate-y-1 shadow-lg hover:shadow-xl uppercase tracking-widest text-sm"
+                    className="flex items-center justify-center gap-1.5 bg-white text-gray-900 font-black py-3 px-6 rounded-xl hover:bg-gray-100 transition-all self-start shadow-md text-sm mt-4 select-none whitespace-nowrap"
                   >
-                    Shop Now
+                    <span>Explore Now</span>
+                    <span>&rarr;</span>
                   </button>
+                </div>
+
+                {/* Watch Image (Right side, absolute and offset) */}
+                <div className="absolute right-0 bottom-0 top-0 w-[55%] flex items-center justify-end z-10 select-none overflow-hidden">
+                  <img
+                    src={sideBanner?.image || stylishWatchImg}
+                    alt="Premium Watch"
+                    className="h-[110%] w-auto object-contain translate-x-[12%] group-hover:scale-105 group-hover:translate-x-[8%] transition-transform duration-700 pointer-events-none select-none"
+                    draggable={false}
+                    onError={(e) => {
+                      e.target.src = "https://via.placeholder.com/400x400?text=Premium+Watch";
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -697,33 +777,19 @@ const MobileHome = () => {
 
 
           {/* Tagline Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-            className="px-4 py-6 text-left">
-            <motion.h2
-              className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-gray-400 leading-tight flex items-center justify-start gap-3 flex-wrap"
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8, delay: 0.2 }}>
-              <span>Shop from 50+ Trusted Vendors</span>
-              <motion.span
-                animate={{
-                  scale: [1, 1.2, 1],
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                  repeatDelay: 2,
-                }}
-                className="text-primary-500 inline-block">
-                <FiHeart className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl fill-primary-500" />
-              </motion.span>
-            </motion.h2>
-          </motion.div>
+          <div className="py-12 px-6 text-center bg-gray-50 border border-gray-100 rounded-3xl mt-8 mx-4 shadow-sm">
+            <div className="max-w-2xl mx-auto space-y-4">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#e0d6ff] text-[#5b21b6] border border-[#d8b4fe]">
+                ✨ Saara E-Commerce
+              </span>
+              <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight">
+                Shop from 50+ Trusted Vendors
+              </h2>
+              <p className="text-xs md:text-sm text-gray-500 font-semibold max-w-md mx-auto leading-relaxed">
+                Saara brings together the best local and international shops in one marketplace. Enjoy secure payments, verified products, and fast local dispatch.
+              </p>
+            </div>
+          </div>
 
           {/* Bottom Spacing */}
           <div className="h-4" />
