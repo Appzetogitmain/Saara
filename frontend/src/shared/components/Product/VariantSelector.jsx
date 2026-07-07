@@ -16,7 +16,7 @@ const toEntries = (value) => {
   return [];
 };
 
-const VariantSelector = ({ variants, onVariantChange, currentPrice }) => {
+const VariantSelector = ({ variants, onVariantChange, currentPrice, selectedVariant: selectedVariantProp }) => {
   const [selectedVariant, setSelectedVariant] = useState({});
 
   const axes = useMemo(() => {
@@ -83,6 +83,12 @@ const VariantSelector = ({ variants, onVariantChange, currentPrice }) => {
       ? variants.defaultSelection
       : {};
     axes.forEach((axis) => {
+      // Prioritize selectedVariantProp value if present
+      const propVal = selectedVariantProp?.[axis.key];
+      if (propVal !== undefined && propVal !== null) {
+        nextSelection[axis.key] = propVal;
+        return;
+      }
       const directDefault = String(defaultSelection?.[axis.key] || "").trim();
       const legacyDefault = axis.key === "size"
         ? String(variants?.defaultVariant?.size || "").trim()
@@ -93,11 +99,21 @@ const VariantSelector = ({ variants, onVariantChange, currentPrice }) => {
       if (selected) nextSelection[axis.key] = selected;
     });
     setSelectedVariant(nextSelection);
-  }, [axes, variants]);
+  }, [axes, variants, selectedVariantProp]);
 
   useEffect(() => {
-    onVariantChange?.(selectedVariant || {});
-  }, [selectedVariant, onVariantChange]);
+    const keys = new Set([...Object.keys(selectedVariant || {}), ...Object.keys(selectedVariantProp || {})]);
+    let isDifferent = false;
+    for (const key of keys) {
+      if (String(selectedVariant?.[key] || '') !== String(selectedVariantProp?.[key] || '')) {
+        isDifferent = true;
+        break;
+      }
+    }
+    if (isDifferent) {
+      onVariantChange?.(selectedVariant || {});
+    }
+  }, [selectedVariant, selectedVariantProp, onVariantChange]);
 
   if (!axes.length) return null;
 

@@ -885,6 +885,7 @@ const MobileProductDetail = () => {
                           variants={product.variants}
                           onVariantChange={setSelectedVariant}
                           currentPrice={product.price}
+                          selectedVariant={selectedVariant}
                         />
                       </div>
                     )}

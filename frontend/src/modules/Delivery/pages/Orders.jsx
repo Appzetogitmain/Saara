@@ -86,6 +86,16 @@ const DeliveryOrders = () => {
     } else {
       loadReturns();
     }
+
+    const intervalId = setInterval(() => {
+      if (activeTab === 'deliveries') {
+        loadOrders(currentPage, filter);
+      } else {
+        loadReturns();
+      }
+    }, 10000); // Poll list every 10 seconds
+
+    return () => clearInterval(intervalId);
   }, [activeTab, currentPage, filter]);
 
   useEffect(() => {

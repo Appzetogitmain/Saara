@@ -11,6 +11,7 @@ export const createNotification = async ({ recipientId, recipientType, title, me
     // Real-time broadcast
     const room = `${recipientType}_${recipientId}`;
     emitToRoom(room, 'notification', notification);
+    emitToRoom(room, 'new_notification', notification);
     
     return notification;
 };

@@ -74,20 +74,28 @@ export const releaseEscrowPayments = async () => {
                     if (amount <= 0) continue; // skip zero payouts
                     const vendor = await Vendor.findById(vendorId);
                     if (vendor) {
-                        vendor.walletBalance = (vendor.walletBalance || 0) + amount;
-                        if (vendor.onHoldBalance >= amount) {
-                            vendor.onHoldBalance -= amount;
-                        } else {
-                            vendor.onHoldBalance = 0;
-                        }
-                        await vendor.save();
-
                         // Find matching pending commissions
                         const commissions = await Commission.find({
                             orderId: order._id,
                             vendorId: vendor._id,
                             status: { $in: ['pending', 'awaiting_settlement'] }
                         });
+
+                        const netPayout = commissions.reduce(
+                            (sum, commission) => sum + Number(commission.vendorEarnings || 0),
+                            0
+                        );
+
+                        if (netPayout <= 0) continue;
+
+                        vendor.walletBalance = (vendor.walletBalance || 0) + netPayout;
+                        if (vendor.onHoldBalance >= netPayout) {
+                            vendor.onHoldBalance -= netPayout;
+                        } else {
+                            vendor.onHoldBalance = 0;
+                        }
+                        await vendor.save();
+
                         const commissionIds = commissions.map(c => c._id);
 
                         if (commissionIds.length > 0) {
@@ -95,7 +103,7 @@ export const releaseEscrowPayments = async () => {
                             const settlement = await Settlement.create({
                                 vendorId: vendor._id,
                                 commissionIds,
-                                amount,
+                                amount: netPayout,
                                 paymentMethod: 'wallet',
                                 status: 'completed',
                                 notes: `Auto-release of escrow for Order #${order.orderId}`
@@ -119,9 +127,9 @@ export const releaseEscrowPayments = async () => {
                             recipientId: vendor._id,
                             recipientType: 'vendor',
                             title: 'Payment Released',
-                            message: `Payment of Rs.${amount} for Order #${order.orderId} has been released to your wallet.`,
+                            message: `Payment of Rs.${netPayout} for Order #${order.orderId} has been released to your wallet.`,
                             type: 'payment',
-                            data: { orderId: String(order.orderId), amount }
+                            data: { orderId: String(order.orderId), amount: netPayout }
                         });
                     }
                 }

@@ -345,8 +345,8 @@ export const useDeliveryAuthStore = create(
         };
       },
 
-      fetchOrderById: async (id) => {
-        set({ isLoadingOrder: true });
+      fetchOrderById: async (id, isBackground = false) => {
+        if (!isBackground) set({ isLoadingOrder: true });
         try {
           const response = await api.get(`/delivery/orders/${id}`);
           const payload = response?.data ?? response;

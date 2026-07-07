@@ -10,10 +10,10 @@ import { createNotification } from '../../../services/notification.service.js';
 import { emitToRoom } from '../../../services/socket.service.js';
 import { autoAssignDeliveryPartner } from '../../../services/assignmentService.js';
 
-const DELIVERY_OTP_TTL_MS = 10 * 60 * 1000;
+const IS_PRODUCTION = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+const DELIVERY_OTP_TTL_MS = IS_PRODUCTION ? 10 * 60 * 1000 : 24 * 60 * 60 * 1000;
 const DELIVERY_OTP_MAX_ATTEMPTS = 5;
 const DELIVERY_OTP_RESEND_COOLDOWN_MS = 60 * 1000;
-const IS_PRODUCTION = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
 
 const hashDeliveryOtp = (otp) => {
     const secret = process.env.JWT_SECRET;
@@ -507,7 +507,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     // Generate Pickup OTP for Vendor Handoff verification
     const generatedPickupOtp = generateDeliveryOtp();
     order.pickupOtpHash = hashDeliveryOtp(generatedPickupOtp);
-    order.pickupOtpExpiry = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes TTL
+    order.pickupOtpExpiry = new Date(Date.now() + (IS_PRODUCTION ? 30 * 60 * 1000 : 24 * 60 * 60 * 1000)); // 30 minutes in production, 24 hours in dev
     order.pickupOtpSentAt = new Date();
     if (!IS_PRODUCTION) {
         order.pickupOtpDebug = generatedPickupOtp;

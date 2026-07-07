@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { FiPackage, FiTruck, FiMapPin, FiCreditCard, FiRotateCw, FiArrowLeft, FiShoppingBag, FiX } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import MobileLayout from "../components/Layout/MobileLayout";
@@ -86,6 +86,30 @@ const MobileOrderDetail = () => {
     }
   }, [showReturnModal, allOrderItems]);
 
+  const getItemReturnStatus = (item) => {
+    if (!Array.isArray(order?.returnRequests)) return null;
+    for (const ret of order.returnRequests) {
+      if (Array.isArray(ret.items)) {
+        const match = ret.items.find(retItem => {
+          const itemProdId = String(item.productId || item.id || '');
+          const retProdId = String(retItem.productId || retItem.id || '');
+          if (itemProdId !== retProdId) return false;
+          if (item.variant && retItem.variant) {
+            return getVariantSignature(item.variant) === getVariantSignature(retItem.variant);
+          }
+          return true;
+        });
+        if (match) {
+          return {
+            status: ret.status,
+            requestType: ret.requestType
+          };
+        }
+      }
+    }
+    return null;
+  };
+
   const shippingAddress = order?.shippingAddress || {};
   const orderItems = Array.isArray(order?.items) ? order.items : [];
   const hasPendingOrCompletedReturn = Array.isArray(order?.returnRequests) && order.returnRequests.some(req => !['rejected'].includes(req.status));
@@ -106,16 +130,28 @@ const MobileOrderDetail = () => {
 
   useEffect(() => {
     let mounted = true;
-    (async () => {
+    
+    const fetchOrder = async () => {
       if (orderId) {
         await fetchOrderById(orderId);
       }
       if (mounted) setIsResolving(false);
-    })();
+    };
+
+    fetchOrder();
+
+    let intervalId;
+    if (!order || (order.status !== 'delivered' && order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'returned')) {
+      intervalId = setInterval(() => {
+        if (orderId) fetchOrderById(orderId);
+      }, 4000); // Poll every 4 seconds
+    }
+
     return () => {
       mounted = false;
+      if (intervalId) clearInterval(intervalId);
     };
-  }, [orderId, fetchOrderById]);
+  }, [orderId, fetchOrderById, order?.status]);
 
   useEffect(() => {
     if (!isResolving && !order) {
@@ -379,15 +415,23 @@ const MobileOrderDetail = () => {
                         <div className="space-y-2 pl-2">
                           {vendorGroup.items.map((item, itemIndex) => (
                             <div key={`${item.id}-${itemIndex}-${getVariantSignature(item?.variant || {})}`} className="flex items-center gap-3">
-                              <div className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                              <Link 
+                                to={`/product/${item.productId || item.id}?variantSize=${encodeURIComponent(item?.variant?.size || '')}&variantColor=${encodeURIComponent(item?.variant?.color || '')}`}
+                                className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 active:scale-95 transition-transform"
+                              >
                                 <LazyImage
                                   src={item.image}
                                   alt={item.name}
                                   className="w-full h-full object-cover"
                                 />
-                              </div>
+                              </Link>
                               <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-gray-800 text-sm mb-1">{item.name}</h3>
+                                <Link 
+                                  to={`/product/${item.productId || item.id}?variantSize=${encodeURIComponent(item?.variant?.size || '')}&variantColor=${encodeURIComponent(item?.variant?.color || '')}`}
+                                  className="hover:underline"
+                                >
+                                  <h3 className="font-semibold text-gray-800 text-sm mb-1">{item.name}</h3>
+                                </Link>
                                 <p className="text-xs text-gray-600">
                                   {formatPrice(item.price)} x {item.quantity}
                                 </p>
@@ -396,6 +440,24 @@ const MobileOrderDetail = () => {
                                     {formatVariantLabel(item?.variant)}
                                   </p>
                                 )}
+                                {(() => {
+                                  const ret = getItemReturnStatus(item);
+                                  if (!ret) return null;
+                                  if (ret.status === 'completed') {
+                                    return (
+                                      <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-[9px] font-bold uppercase tracking-wider border border-rose-100">
+                                        {ret.requestType === 'exchange' ? 'Exchanged' : 'Returned'}
+                                      </span>
+                                    );
+                                  } else if (ret.status !== 'rejected') {
+                                    return (
+                                      <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-55/10 text-amber-600 text-[9px] font-bold uppercase tracking-wider border border-amber-100 font-semibold">
+                                        Return Pending
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
                               </div>
                               <p className="font-bold text-gray-800 text-sm">
                                 {formatPrice(item.price * item.quantity)}
@@ -410,15 +472,23 @@ const MobileOrderDetail = () => {
                   <div className="space-y-3">
                     {orderItems.map((item, itemIndex) => (
                       <div key={`${item.id}-${itemIndex}-${getVariantSignature(item?.variant || {})}`} className="flex items-center gap-3">
-                        <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                        <Link 
+                          to={`/product/${item.productId || item.id}?variantSize=${encodeURIComponent(item?.variant?.size || '')}&variantColor=${encodeURIComponent(item?.variant?.color || '')}`}
+                          className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 active:scale-95 transition-transform"
+                        >
                           <LazyImage
                             src={item.image}
                             alt={item.name}
                             className="w-full h-full object-cover"
                           />
-                        </div>
+                        </Link>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-800 text-sm mb-1">{item.name}</h3>
+                          <Link 
+                            to={`/product/${item.productId || item.id}?variantSize=${encodeURIComponent(item?.variant?.size || '')}&variantColor=${encodeURIComponent(item?.variant?.color || '')}`}
+                            className="hover:underline"
+                          >
+                            <h3 className="font-semibold text-gray-800 text-sm mb-1">{item.name}</h3>
+                          </Link>
                           <p className="text-xs text-gray-600">
                             {formatPrice(item.price)} x {item.quantity}
                           </p>
@@ -427,6 +497,24 @@ const MobileOrderDetail = () => {
                                     {formatVariantLabel(item?.variant)}
                                   </p>
                                 )}
+                          {(() => {
+                            const ret = getItemReturnStatus(item);
+                            if (!ret) return null;
+                            if (ret.status === 'completed') {
+                              return (
+                                <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-[9px] font-bold uppercase tracking-wider border border-rose-100">
+                                  {ret.requestType === 'exchange' ? 'Exchanged' : 'Returned'}
+                                </span>
+                              );
+                            } else if (ret.status !== 'rejected') {
+                              return (
+                                <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-55/10 text-amber-600 text-[9px] font-bold uppercase tracking-wider border border-amber-100 font-semibold">
+                                  Return Pending
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                         <p className="font-bold text-gray-800 text-sm">
                           {formatPrice(item.price * item.quantity)}

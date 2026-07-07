@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -26,20 +26,31 @@ const DeliveryOrderDetail = () => {
   const [deliveryOtp, setDeliveryOtp] = useState('');
   const [isResendingOtp, setIsResendingOtp] = useState(false);
 
-  const loadOrder = async () => {
+  const loadOrder = useCallback(async (isBackground = false) => {
     try {
       setLoadFailed(false);
-      const response = await fetchOrderById(id);
+      const response = await fetchOrderById(id, isBackground);
       setOrder(response);
     } catch {
       setLoadFailed(true);
       setOrder(null);
     }
-  };
+  }, [id, fetchOrderById]);
 
   useEffect(() => {
-    loadOrder();
-  }, [id, fetchOrderById]);
+    loadOrder(false);
+
+    let intervalId;
+    if (!order || (order.status !== 'completed' && order.status !== 'cancelled')) {
+      intervalId = setInterval(() => {
+        loadOrder(true);
+      }, 4000); // Auto-sync every 4 seconds (background)
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [loadOrder, order?.status]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -100,6 +111,7 @@ const DeliveryOrderDetail = () => {
       setIsResendingOtp(true);
       await resendDeliveryOtp(order.id);
       toast.success('Delivery OTP resent to customer');
+      await loadOrder();
     } catch {
       // Error toast handled by API interceptor.
     } finally {

@@ -536,12 +536,23 @@ export const placeOrder = asyncHandler(async (req, res) => {
             }).catch((err) => console.error('[Order Notification] Failed to create:', err.message));
         }
 
-        // Notify vendors in real-time via Socket.io
+        // Notify vendors and create database notifications
         (order.vendorItems || []).forEach((vGroup) => {
+            createNotification({
+                recipientId: vGroup.vendorId,
+                recipientType: 'vendor',
+                title: 'New Order Received!',
+                message: `You have received a new order ${order.orderId} for ${vGroup.items?.length || 0} item(s) totalling ₹${vGroup.subtotal}.`,
+                type: 'order',
+                data: {
+                    orderId: String(order.orderId || order._id),
+                },
+            }).catch((err) => console.error('[Vendor Order Notification] Failed to create:', err.message));
+
             emitToRoom(`vendor_${vGroup.vendorId}`, 'new_order', {
                 orderId: order.orderId,
                 total: vGroup.subtotal,
-                itemsCount: vGroup.items.length,
+                itemsCount: vGroup.items?.length || 0,
             });
         });
     }
@@ -553,7 +564,27 @@ export const getUserOrders = asyncHandler(async (req, res) => {
     const skip = (page - 1) * limit;
     const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 }).skip(skip).limit(Number(limit));
     const total = await Order.countDocuments({ userId: req.user.id });
-    res.status(200).json(new ApiResponse(200, { orders, total, page: Number(page), pages: Math.ceil(total / limit) }, 'Orders fetched.'));
+
+    // Fetch return requests for these orders
+    const orderIds = orders.map(o => o._id);
+    const returnRequests = await ReturnRequest.find({ orderId: { $in: orderIds } }).lean();
+
+    // Group return requests by orderId
+    const returnMap = {};
+    returnRequests.forEach(retReq => {
+        const oId = String(retReq.orderId);
+        if (!returnMap[oId]) returnMap[oId] = [];
+        returnMap[oId].push(retReq);
+    });
+
+    // Attach returnRequests to each order
+    const ordersWithReturns = orders.map(order => {
+        const orderObj = order.toObject();
+        orderObj.returnRequests = returnMap[String(order._id)] || [];
+        return orderObj;
+    });
+
+    res.status(200).json(new ApiResponse(200, { orders: ordersWithReturns, total, page: Number(page), pages: Math.ceil(total / limit) }, 'Orders fetched.'));
 });
 
 // GET /api/user/orders/:id

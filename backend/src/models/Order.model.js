@@ -155,11 +155,11 @@ orderSchema.pre('save', function (next) {
                 const hash = crypto.createHash('sha256').update(`${otp}:${secret}`).digest('hex');
                 
                 this.deliveryOtpHash = hash;
-                this.deliveryOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes TTL
+                const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+                this.deliveryOtpExpiry = new Date(Date.now() + (isProduction ? 10 * 60 * 1000 : 24 * 60 * 60 * 1000)); // 10 minutes in prod, 24 hours in dev
                 this.deliveryOtpSentAt = now;
                 this.deliveryOtpAttempts = 0;
                 
-                const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
                 if (!isProduction) {
                     this.deliveryOtpDebug = otp;
                 }

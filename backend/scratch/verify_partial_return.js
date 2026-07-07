@@ -207,9 +207,9 @@ const runVerification = async () => {
 
     console.log('\n--- Verifying Post-Cron State ---');
     console.log(`Expected Order escrowStatus: "released", Actual: "${finalOrder.escrowStatus}"`);
-    // Wallet should increase only by the kept item's price (350)
+    // Wallet should increase only by the kept item's earnings (315)
     console.log(`Vendor wallet balance before: ${balanceBeforeCron}, after: ${finalVendor.walletBalance}`);
-    console.log(`Expected wallet increase: 350, Actual: ${finalVendor.walletBalance - balanceBeforeCron}`);
+    console.log(`Expected wallet increase: 315, Actual: ${finalVendor.walletBalance - balanceBeforeCron}`);
     console.log(`Expected Commission status: "paid", Actual: "${finalCommission.status}"`);
     console.log(`Settlements found: ${settlements.length}`);
     if (settlements.length > 0) {
@@ -220,14 +220,14 @@ const runVerification = async () => {
     if (finalOrder.escrowStatus !== 'released') {
         throw new Error('Verification failed: Escrow status was not released.');
     }
-    if (finalVendor.walletBalance - balanceBeforeCron !== 350) {
-        throw new Error('Verification failed: Vendor wallet balance did not increase by exactly 350.');
+    if (finalVendor.walletBalance - balanceBeforeCron !== 315) {
+        throw new Error('Verification failed: Vendor wallet balance did not increase by exactly 315.');
     }
     if (finalCommission.status !== 'paid') {
         throw new Error('Verification failed: Commission status was not paid.');
     }
-    if (settlements.length !== 1 || settlements[0].amount !== 350) {
-        throw new Error('Verification failed: Settlement amount was not exactly 350.');
+    if (settlements.length !== 1 || settlements[0].amount !== 315) {
+        throw new Error('Verification failed: Settlement amount was not exactly 315.');
     }
 
     // Clean up

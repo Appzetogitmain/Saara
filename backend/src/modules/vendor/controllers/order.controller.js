@@ -339,6 +339,22 @@ export const verifyPickup = asyncHandler(async (req, res) => {
         })
     );
 
+    if (order.deliveryBoyId) {
+        notificationTasks.push(
+            createNotification({
+                recipientId: order.deliveryBoyId,
+                recipientType: 'delivery',
+                title: 'Pickup verified successfully',
+                message: `Pickup for order ${order.orderId || order._id} has been verified. You can now proceed to deliver the items.`,
+                type: 'order',
+                data: {
+                    orderId: String(order.orderId || order._id),
+                    status: 'shipped',
+                },
+            })
+        );
+    }
+
     await Promise.allSettled(notificationTasks);
 
     res.status(200).json(new ApiResponse(200, order, 'Pickup OTP verified successfully. Package marked as shipped.'));

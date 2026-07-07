@@ -38,7 +38,10 @@ const OrderDetail = () => {
         try {
             await verifyVendorPickup(order.orderId ?? order._id, normalized);
             toast.success('Handoff verified successfully!');
-            window.location.reload();
+            const res = await getVendorOrderById(id);
+            const data = res?.data ?? res;
+            setOrder(data ?? null);
+            setPickupOtp('');
         } catch (error) {
             toast.error(error?.response?.data?.message || error?.message || 'Verification failed');
         } finally {
@@ -62,22 +65,34 @@ const OrderDetail = () => {
     useEffect(() => {
         if (!id || !vendorId) return;
 
-        const fetchOrder = async () => {
-            setLoading(true);
+        const fetchOrder = async (isInitial = false) => {
+            if (isInitial) setLoading(true);
             try {
                 const res = await getVendorOrderById(id);
                 const data = res?.data ?? res;
                 setOrder(data ?? null);
             } catch {
-                // api.js shows toast
-                setOrder(null);
+                if (isInitial) setOrder(null);
             } finally {
-                setLoading(false);
+                if (isInitial) setLoading(false);
             }
         };
 
-        fetchOrder();
-    }, [id, vendorId]);
+        if (!order) {
+            fetchOrder(true);
+        }
+
+        let intervalId;
+        if (!order || (order.status !== 'delivered' && order.status !== 'completed' && order.status !== 'cancelled')) {
+            intervalId = setInterval(() => {
+                fetchOrder(false);
+            }, 4000); // Poll every 4 seconds
+        }
+
+        return () => {
+            if (intervalId) clearInterval(intervalId);
+        };
+    }, [id, vendorId, order?.status]);
 
     const handleStatusChange = async (newStatus) => {
         if (!order) return;
