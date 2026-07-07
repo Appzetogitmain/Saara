@@ -1,8 +1,11 @@
-import { FiShoppingBag } from "react-icons/fi";
+import { FiShoppingBag, FiTrash2 } from "react-icons/fi";
 import { formatPrice } from "../../../../shared/utils/helpers";
 import { formatVariantLabel, getVariantSignature } from "../../../../shared/utils/variant";
+import { useCartStore } from "../../../../shared/store/useStore";
 
 const OrderSummary = ({ itemsByVendor, total, discount, shipping, tax, finalTotal }) => {
+  const removeItem = useCartStore((state) => state.removeItem);
+
   return (
     <div className="glass-card rounded-xl p-4">
       <h3 className="text-base font-bold text-gray-800 mb-3">Order Summary</h3>
@@ -34,6 +37,14 @@ const OrderSummary = ({ itemsByVendor, total, discount, shipping, tax, finalTota
                       <p className="text-[11px] text-gray-500">{formatVariantLabel(item?.variant)}</p>
                     )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(item.id, item.variant)}
+                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                    title="Remove item"
+                  >
+                    <FiTrash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               ))}
             </div>

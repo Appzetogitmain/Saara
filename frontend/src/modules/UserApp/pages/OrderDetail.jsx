@@ -37,6 +37,8 @@ const MobileOrderDetail = () => {
   const [customReason, setCustomReason] = useState('');
   const [returnVendorId, setReturnVendorId] = useState('');
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+  const [evidenceFiles, setEvidenceFiles] = useState([]);
+  const [evidencePreviews, setEvidencePreviews] = useState([]);
   const order = getOrder(orderId);
   const [selectedItems, setSelectedItems] = useState({});
 
@@ -218,6 +220,37 @@ const MobileOrderDetail = () => {
     });
   };
 
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (evidenceFiles.length + files.length > 5) {
+      toast.error('You can upload a maximum of 5 images');
+      return;
+    }
+
+    const newFiles = [...evidenceFiles, ...files];
+    setEvidenceFiles(newFiles);
+
+    const newPreviews = files.map((file) => URL.createObjectURL(file));
+    setEvidencePreviews([...evidencePreviews, ...newPreviews]);
+  };
+
+  const removeFile = (index) => {
+    URL.revokeObjectURL(evidencePreviews[index]);
+    const newFiles = evidenceFiles.filter((_, i) => i !== index);
+    const newPreviews = evidencePreviews.filter((_, i) => i !== index);
+    setEvidenceFiles(newFiles);
+    setEvidencePreviews(newPreviews);
+  };
+
+  const resetReturnModal = () => {
+    setReturnReason(RETURN_REASONS[0]);
+    setCustomReason('');
+    evidencePreviews.forEach((preview) => URL.revokeObjectURL(preview));
+    setEvidenceFiles([]);
+    setEvidencePreviews([]);
+    setShowReturnModal(false);
+  };
+
   const openReturnModal = () => {
     if (order.status !== 'delivered') {
       toast.error('Return can only be requested for delivered orders');
@@ -277,19 +310,22 @@ const MobileOrderDetail = () => {
     try {
       setIsSubmittingReturn(true);
       const submitPromises = Object.entries(itemsByVendor).map(([vendorId, items]) => {
-        return requestReturn(order.id, {
-          returnReason,
-          customReason: returnReason === 'Other' ? customReason.trim() : '',
-          vendorId,
-          items
+        const formData = new FormData();
+        formData.append('returnReason', returnReason);
+        formData.append('customReason', returnReason === 'Other' ? customReason.trim() : '');
+        formData.append('vendorId', vendorId);
+        formData.append('itemsJson', JSON.stringify(items));
+        
+        evidenceFiles.forEach((file) => {
+          formData.append('images', file);
         });
+
+        return requestReturn(order.id, formData);
       });
 
       await Promise.all(submitPromises);
       toast.success('Return request submitted successfully');
-      setShowReturnModal(false);
-      setReturnReason(RETURN_REASONS[0]);
-      setCustomReason('');
+      resetReturnModal();
       await fetchOrderById(order.id);
     } catch (error) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to submit return request');
@@ -734,7 +770,7 @@ const MobileOrderDetail = () => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center sm:justify-center"
-              onClick={() => setShowReturnModal(false)}
+              onClick={resetReturnModal}
             >
               <motion.div
                 initial={{ y: 20, opacity: 0 }}
@@ -746,7 +782,7 @@ const MobileOrderDetail = () => {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-gray-800">Request Return</h3>
                   <button
-                    onClick={() => setShowReturnModal(false)}
+                    onClick={resetReturnModal}
                     className="p-2 rounded-full hover:bg-gray-100"
                   >
                     <FiX className="text-gray-600" />
@@ -840,6 +876,47 @@ const MobileOrderDetail = () => {
                     />
                   </div>
                 )}
+
+                {/* Evidence Images Upload */}
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Evidence Photos (Optional, max 5)
+                  </label>
+                  <p className="text-[10px] text-gray-400 mb-2 font-medium">
+                    Upload images showing product defects or details to speed up vendor inspection.
+                  </p>
+                  
+                  {/* File Input */}
+                  <div className="flex items-center gap-2">
+                    <label className="flex items-center justify-center w-12 h-12 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-primary-500 hover:bg-slate-50 transition-all flex-shrink-0">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                        disabled={evidenceFiles.length >= 5}
+                      />
+                      <span className="text-lg font-bold text-gray-400">+</span>
+                    </label>
+
+                    {/* Previews List */}
+                    <div className="flex items-center gap-2 overflow-x-auto flex-1 py-1">
+                      {evidencePreviews.map((preview, index) => (
+                        <div key={index} className="relative w-12 h-12 rounded-xl overflow-hidden border border-gray-200 flex-shrink-0 bg-slate-50">
+                          <img src={preview} alt="preview" className="w-full h-full object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => removeFile(index)}
+                            className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs font-black hover:bg-red-650 transition-colors"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
 
                 <button
                   onClick={handleRequestReturn}
