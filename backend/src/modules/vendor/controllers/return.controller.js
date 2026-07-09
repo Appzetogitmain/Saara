@@ -11,6 +11,7 @@ import User from '../../../models/User.model.js';
 import Admin from '../../../models/Admin.model.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { autoAssignReturnPickupPartner, autoAssignExchangeReplacementPartner } from '../../../services/assignmentService.js';
+import { notifyOrderUpdate, notifyReturnUpdate } from '../../../services/socket.service.js';
 
 const normalizeVariantPart = (value) => String(value || '').trim().toLowerCase();
 const normalizeAxisName = (value) =>
@@ -604,6 +605,7 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                         }
                     }
                     await order.save();
+                    notifyOrderUpdate(order);
                 }
             }
         }
@@ -614,6 +616,7 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
     if (rejectionReason !== undefined) request.rejectionReason = nextRejectionReason;
     if (status !== 'rejected' && request.rejectionReason) request.rejectionReason = '';
     await request.save();
+    notifyReturnUpdate(request);
 
     // 3. AUTO-ASSIGN LOGISTICS DISPATCH TRIGGERS
     if (isApproving) {
@@ -716,6 +719,7 @@ export const verifyHandoffOtp = asyncHandler(async (req, res) => {
     if (hashedInput !== request.vendorHandoffOtpHash) {
         request.vendorHandoffOtpAttempts += 1;
         await request.save();
+        notifyReturnUpdate(request);
         const remaining = 5 - request.vendorHandoffOtpAttempts;
         throw new ApiError(400, `Incorrect OTP. ${remaining} attempts remaining.`);
     }
@@ -724,6 +728,7 @@ export const verifyHandoffOtp = asyncHandler(async (req, res) => {
     request.vendorHandoffOtpAttempts = 0;
     request.status = 'delivered_to_vendor';
     await request.save();
+    notifyReturnUpdate(request);
 
     // Trigger notification tasks
     const notificationTasks = [];

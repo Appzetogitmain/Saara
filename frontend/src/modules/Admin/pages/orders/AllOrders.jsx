@@ -28,6 +28,7 @@ import AnimatedSelect from "../../components/AnimatedSelect";
 import { formatPrice } from "../../../../shared/utils/helpers";
 import { formatCurrency, formatDateTime } from "../../utils/adminHelpers";
 import { getAllOrders, deleteOrder } from "../../services/adminService";
+import { getSocket, joinRoom, leaveRoom } from "../../../../shared/utils/socket";
 import toast from "react-hot-toast";
 
 // OrderItemsDropdown component
@@ -433,6 +434,27 @@ const AllOrders = () => {
 
   useEffect(() => {
     fetchOrders();
+
+    const token = localStorage.getItem('admin-token') || localStorage.getItem('token');
+    if (token) {
+      const socket = getSocket(token);
+      if (socket) {
+        joinRoom('admin_room');
+
+        const handleOrderUpdate = () => {
+          fetchOrders();
+        };
+
+        socket.on('order_updated', handleOrderUpdate);
+        socket.on('return_updated', handleOrderUpdate);
+
+        return () => {
+          socket.off('order_updated', handleOrderUpdate);
+          socket.off('return_updated', handleOrderUpdate);
+          leaveRoom('admin_room');
+        };
+      }
+    }
   }, [fetchOrders]);
 
   // Calculate order status counts

@@ -374,6 +374,20 @@ const ReturnRequestDetail = () => {
             </div>
           )}
 
+          {returnRequest.status === 'replacement_assigned' && (
+            <div className="bg-purple-50/40 border border-purple-250 rounded-lg p-5 shadow-sm space-y-3">
+              <h2 className="text-sm font-bold text-purple-850 flex items-center gap-1.5">
+                🔑 Replacement Handover OTP Verification
+              </h2>
+              <p className="text-xs text-purple-700 leading-relaxed font-medium">
+                A delivery partner has arrived to collect the replacement items. Please hand over the replacement items, and provide them with the following 6-digit **Handover OTP** to verify the pickup:
+              </p>
+              <div className="text-3xl font-extrabold text-purple-800 tracking-widest bg-white py-3 rounded-xl border border-purple-300 font-mono text-center shadow-inner">
+                {returnRequest.vendorHandoverOtpDebug || 'Check Inbox'}
+              </div>
+            </div>
+          )}
+
           {/* Return Overview */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">

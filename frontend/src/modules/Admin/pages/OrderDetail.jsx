@@ -21,6 +21,7 @@ import AnimatedSelect from '../components/AnimatedSelect';
 import { formatCurrency, formatDateTime } from '../utils/adminHelpers';
 import { getPlaceholderImage } from '../../../shared/utils/helpers';
 import { getOrderById, updateOrderStatus } from '../services/adminService';
+import { getSocket, joinRoom, leaveRoom } from '../../../shared/utils/socket';
 import toast from 'react-hot-toast';
 
 const ORDER_PRODUCT_PLACEHOLDER = getPlaceholderImage(100, 100, 'Product');
@@ -35,8 +36,10 @@ const OrderDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchOrderData = async () => {
-      setIsLoading(true);
+    let mounted = true;
+
+    const fetchOrderData = async (showLoading = true) => {
+      if (showLoading) setIsLoading(true);
       try {
         const response = await getOrderById(id);
         const o = response.data;
@@ -53,18 +56,57 @@ const OrderDetail = () => {
           date: o.createdAt
         };
 
-        setOrder(normalizedOrder);
-        setStatus(o.status);
+        if (mounted) {
+          setOrder(normalizedOrder);
+          setStatus(o.status);
+        }
       } catch (error) {
         console.error("Fetch order detail error:", error);
-        toast.error('Order not found');
-        navigate('/admin/orders/all-orders');
+        if (showLoading) {
+          toast.error('Order not found');
+          navigate('/admin/orders/all-orders');
+        }
       } finally {
-        setIsLoading(false);
+        if (showLoading && mounted) setIsLoading(false);
       }
     };
 
-    fetchOrderData();
+    fetchOrderData(true);
+
+    const token = localStorage.getItem('admin-token') || localStorage.getItem('token');
+    if (token && id) {
+      const socket = getSocket(token);
+      if (socket) {
+        joinRoom(`order_${id}`);
+
+        const handleOrderUpdate = (updatedOrder) => {
+          const updatedId = updatedOrder.orderId || updatedOrder._id;
+          if (String(updatedId) === String(id) && mounted) {
+            fetchOrderData(false);
+          }
+        };
+
+        const handleReturnUpdate = (updatedReturn) => {
+          if (String(updatedReturn.orderId) === String(id) && mounted) {
+            fetchOrderData(false);
+          }
+        };
+
+        socket.on('order_updated', handleOrderUpdate);
+        socket.on('return_updated', handleReturnUpdate);
+
+        return () => {
+          mounted = false;
+          socket.off('order_updated', handleOrderUpdate);
+          socket.off('return_updated', handleReturnUpdate);
+          leaveRoom(`order_${id}`);
+        };
+      }
+    }
+
+    return () => {
+      mounted = false;
+    };
   }, [id, navigate]);
 
   const handleStatusUpdate = async () => {

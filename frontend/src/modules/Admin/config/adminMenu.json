@@ -109,7 +109,7 @@
     "route": "/admin/support",
     "children": [
       "Live Chat",
-      "Ticket Types",
+      "Support Categories",
       "Tickets"
     ]
   },

@@ -27,7 +27,7 @@ const ExplorePage = () => {
     return (
         <PageTransition>
             <MobileLayout showBottomNav={true} showCartBar={false} showHeader={false}>
-                <div className="min-h-screen bg-black pb-24 font-sans">
+                <div className="min-h-[calc(100vh-56px)] bg-black pb-0 font-sans">
                     {/* Light Header with Search */}
                     <div className="sticky top-0 z-40 bg-white px-4 pt-4 pb-2 border-b border-gray-50">
                         <div className="relative group">

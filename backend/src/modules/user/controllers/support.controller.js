@@ -12,26 +12,41 @@ import { emitToRoom } from '../../../services/socket.service.js';
  */
 export const createTicket = asyncHandler(async (req, res) => {
     const { subject, message, ticketTypeId, priority = 'low' } = req.body;
+    const trimmedSubject = String(subject || '').trim();
+    const trimmedMessage = String(message || '').trim();
 
-    if (!subject || !message || !ticketTypeId) {
-        throw new ApiError(400, 'Subject, message and ticket type are required');
+    if (!trimmedSubject || !trimmedMessage || !ticketTypeId) {
+        throw new ApiError(400, 'Subject, message and category are required');
     }
 
-    const ticketType = await TicketType.findById(ticketTypeId);
+    if (trimmedSubject.length < 3 || trimmedSubject.length > 100) {
+        throw new ApiError(400, 'Subject must be between 3 and 100 characters');
+    }
+
+    if (trimmedMessage.length < 3 || trimmedMessage.length > 1000) {
+        throw new ApiError(400, 'Message must be between 3 and 1000 characters');
+    }
+
+    const ticketType = await TicketType.findOne({
+        _id: ticketTypeId,
+        isActive: true,
+        isArchived: false,
+        portals: 'customer'
+    });
     if (!ticketType) {
-        throw new ApiError(404, 'Ticket type not found');
+        throw new ApiError(400, 'Invalid or inactive support category');
     }
 
     const ticket = await SupportTicket.create({
-        userId: req.user._id,
-        subject,
+        userId: req.user.id,
+        subject: trimmedSubject,
         ticketTypeId,
         priority,
         status: 'open',
         messages: [{
-            senderId: req.user._id,
+            senderId: req.user.id,
             senderType: 'user',
-            message
+            message: trimmedMessage
         }]
     });
 
@@ -47,7 +62,7 @@ export const createTicket = asyncHandler(async (req, res) => {
  */
 export const getUserTickets = asyncHandler(async (req, res) => {
     const { page = 1, limit = 10, status } = req.query;
-    const filter = { userId: req.user._id };
+    const filter = { userId: req.user.id };
 
     if (status && status !== 'all') {
         filter.status = status;
@@ -82,7 +97,7 @@ export const getUserTickets = asyncHandler(async (req, res) => {
 export const getTicketById = asyncHandler(async (req, res) => {
     const ticket = await SupportTicket.findOne({
         _id: req.params.id,
-        userId: req.user._id
+        userId: req.user.id
     }).populate('ticketTypeId', 'name');
 
     if (!ticket) {
@@ -107,7 +122,7 @@ export const addTicketMessage = asyncHandler(async (req, res) => {
 
     const ticket = await SupportTicket.findOne({
         _id: req.params.id,
-        userId: req.user._id
+        userId: req.user.id
     });
 
     if (!ticket) {
@@ -119,7 +134,7 @@ export const addTicketMessage = asyncHandler(async (req, res) => {
     }
 
     ticket.messages.push({
-        senderId: req.user._id,
+        senderId: req.user.id,
         senderType: 'user',
         message: message.trim()
     });
@@ -134,8 +149,19 @@ export const addTicketMessage = asyncHandler(async (req, res) => {
 
     const latestMsg = ticket.messages[ticket.messages.length - 1];
 
+    const savedMessage = latestMsg.toObject();
+
+    const msgWithTicket = {
+        ...savedMessage,
+        ticketId: ticket._id,
+        status: ticket.status,
+        updatedAt: ticket.updatedAt
+    };
+
     // Real-time update
-    emitToRoom(`ticket_${ticket._id}`, 'new_support_message', latestMsg);
+    emitToRoom(`ticket_${ticket._id}`, 'new_support_message', msgWithTicket);
+    emitToRoom(`user_${ticket.userId}`, 'new_support_message', msgWithTicket);
+    emitToRoom('admin_room', 'new_support_message', msgWithTicket);
 
     res.status(200).json(
         new ApiResponse(200, latestMsg, 'Message added successfully')
@@ -148,6 +174,10 @@ export const addTicketMessage = asyncHandler(async (req, res) => {
  * @access  Private (User)
  */
 export const getActiveTicketTypes = asyncHandler(async (req, res) => {
-    const ticketTypes = await TicketType.find({ isActive: true }).sort({ name: 1 });
-    res.status(200).json(new ApiResponse(200, ticketTypes, 'Ticket types fetched successfully'));
+    const ticketTypes = await TicketType.find({
+        isActive: true,
+        isArchived: false,
+        portals: 'customer'
+    }).sort({ sortOrder: 1 });
+    res.status(200).json(new ApiResponse(200, ticketTypes, 'Support categories fetched successfully'));
 });

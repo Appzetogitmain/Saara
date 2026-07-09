@@ -68,8 +68,14 @@ export const initSocket = (server) => {
                     return;
                 }
             }
-
             socket.join(roomStr);
+        });
+
+        socket.on('leave', (room) => {
+            const roomStr = String(room || '').trim();
+            if (roomStr) {
+                socket.leave(roomStr);
+            }
         });
 
         socket.on('disconnect', () => {
@@ -88,4 +94,79 @@ export const getIO = () => {
 // Helper to emit events to a specific room
 export const emitToRoom = (room, event, data) => {
     if (io) io.to(room).emit(event, data);
+};
+
+// Helper to notify order updates real-time
+export const notifyOrderUpdate = async (order) => {
+    try {
+        if (!order) return;
+        const payload = order.toObject ? order.toObject() : order;
+        const orderId = payload._id || payload.orderId;
+        const userId = payload.userId?._id || payload.userId;
+        const deliveryBoyId = payload.deliveryBoyId?._id || payload.deliveryBoyId;
+
+        // Emit to the specific order room
+        emitToRoom(`order_${orderId}`, 'order_updated', payload);
+
+        // Emit to user room
+        if (userId) {
+            emitToRoom(`user_${userId}`, 'order_updated', payload);
+        }
+
+        // Emit to delivery boy room
+        if (deliveryBoyId) {
+            emitToRoom(`delivery_${deliveryBoyId}`, 'order_updated', payload);
+        }
+
+        // Emit to admin room
+        emitToRoom('admin_room', 'order_updated', payload);
+
+        // Emit to all vendors involved
+        if (Array.isArray(payload.vendorItems)) {
+            const vendorIds = [...new Set(payload.vendorItems.map(item => String(item.vendorId?._id || item.vendorId || '')))].filter(Boolean);
+            vendorIds.forEach(vendorId => {
+                emitToRoom(`vendor_${vendorId}`, 'order_updated', payload);
+            });
+        }
+    } catch (err) {
+        console.error('Error emitting order status update:', err);
+    }
+};
+
+// Helper to notify return updates real-time
+export const notifyReturnUpdate = async (request) => {
+    try {
+        if (!request) return;
+        const payload = request.toObject ? request.toObject() : request;
+        const returnId = payload._id;
+        const orderId = payload.orderId;
+        const userId = payload.userId?._id || payload.userId;
+        const vendorId = payload.vendorId?._id || payload.vendorId;
+        const deliveryBoyId = payload.deliveryBoyId?._id || payload.deliveryBoyId;
+
+        // Emit to specific order room
+        if (orderId) {
+            emitToRoom(`order_${orderId}`, 'return_updated', payload);
+        }
+
+        // Emit to user room
+        if (userId) {
+            emitToRoom(`user_${userId}`, 'return_updated', payload);
+        }
+
+        // Emit to vendor room
+        if (vendorId) {
+            emitToRoom(`vendor_${vendorId}`, 'return_updated', payload);
+        }
+
+        // Emit to delivery boy room
+        if (deliveryBoyId) {
+            emitToRoom(`delivery_${deliveryBoyId}`, 'return_updated', payload);
+        }
+
+        // Emit to admin room
+        emitToRoom('admin_room', 'return_updated', payload);
+    } catch (err) {
+        console.error('Error emitting return status update:', err);
+    }
 };

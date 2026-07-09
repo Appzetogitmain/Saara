@@ -3,6 +3,7 @@ import * as authController from '../controllers/auth.controller.js';
 import * as orderController from '../controllers/order.controller.js';
 import * as returnController from '../controllers/return.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
+import * as supportController from '../controllers/support.controller.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
 import { authLimiter, otpVerifyLimiter } from '../../../middlewares/rateLimiter.js';
@@ -60,6 +61,8 @@ router.get('/returns', ...deliveryAuth, returnController.getAssignedReturnPickup
 router.post('/returns/:id/accept', ...deliveryAuth, returnController.acceptReturnPickup);
 router.post('/returns/:id/reject', ...deliveryAuth, returnController.rejectReturnPickup);
 router.post('/returns/:id/verify-otp', ...deliveryAuth, returnController.verifyCustomerPickupOtp);
+router.post('/returns/:id/verify-vendor-handover-otp', ...deliveryAuth, returnController.verifyVendorHandoverOtp);
+router.post('/returns/:id/verify-customer-delivery-otp', ...deliveryAuth, returnController.verifyCustomerDeliveryOtp);
 router.patch('/returns/:id/status', ...deliveryAuth, uploadMultiple('photos', 5), returnController.updateReturnPickupStatus);
 
 // Location tracking
@@ -70,5 +73,11 @@ router.get('/notifications', ...deliveryAuth, notificationController.getDelivery
 router.put('/notifications/:id/read', ...deliveryAuth, notificationController.markDeliveryNotificationAsRead);
 router.put('/notifications/read-all', ...deliveryAuth, notificationController.markAllDeliveryNotificationsAsRead);
 router.delete('/notifications/:id', ...deliveryAuth, notificationController.deleteDeliveryNotification);
+
+// Support Desk
+router.get('/support/ticket-types', ...deliveryAuth, supportController.getTicketTypes);
+router.get('/support/tickets', ...deliveryAuth, supportController.getMyTickets);
+router.post('/support/tickets', ...deliveryAuth, supportController.createTicket);
+router.post('/support/tickets/:id/message', ...deliveryAuth, supportController.replyToTicket);
 
 export default router;

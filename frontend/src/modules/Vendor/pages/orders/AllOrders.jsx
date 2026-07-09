@@ -13,6 +13,7 @@ import AnimatedSelect from "../../../Admin/components/AnimatedSelect";
 import { formatPrice } from '../../../../shared/utils/helpers';
 import { useVendorAuthStore } from '../../store/vendorAuthStore';
 import { getAllVendorOrders, updateVendorOrderStatus } from '../../services/vendorService';
+import { getSocket, joinRoom, leaveRoom } from '../../../../shared/utils/socket';
 import toast from 'react-hot-toast';
 
 const AllOrders = () => {
@@ -25,22 +26,44 @@ const AllOrders = () => {
 
   const vendorId = vendor?.id;
 
+  const fetchOrders = async (showLoading = true) => {
+    if (showLoading) setIsLoading(true);
+    try {
+      const data = await getAllVendorOrders({ limit: 100 });
+      setOrders(data?.orders ?? []);
+    } catch {
+      // errors handled by api.js toast
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!vendorId) return;
+    fetchOrders(true);
+  }, [vendorId]);
+
   useEffect(() => {
     if (!vendorId) return;
 
-    const fetchOrders = async () => {
-      setIsLoading(true);
-      try {
-        const data = await getAllVendorOrders({ limit: 100 });
-        setOrders(data?.orders ?? []);
-      } catch {
-        // errors handled by api.js toast
-      } finally {
-        setIsLoading(false);
-      }
+    const token = localStorage.getItem('vendor-token') || localStorage.getItem('token');
+    if (!token) return;
+
+    const socket = getSocket(token);
+    if (!socket) return;
+
+    joinRoom(`vendor_${vendorId}`);
+
+    const handleOrderUpdate = (updatedOrder) => {
+      fetchOrders(false);
     };
 
-    fetchOrders();
+    socket.on('order_updated', handleOrderUpdate);
+
+    return () => {
+      socket.off('order_updated', handleOrderUpdate);
+      leaveRoom(`vendor_${vendorId}`);
+    };
   }, [vendorId]);
 
   const filteredOrders = useMemo(() => {

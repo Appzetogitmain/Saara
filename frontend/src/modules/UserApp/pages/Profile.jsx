@@ -116,8 +116,8 @@ const MobileProfile = () => {
 
   return (
     <PageTransition>
-      <MobileLayout showBottomNav={true} showCartBar={true}>
-        <div className="min-h-screen bg-white text-black font-sans pb-24">
+      <MobileLayout showBottomNav={true} showCartBar={false}>
+        <div className="min-h-[calc(100vh-56px)] bg-white text-black font-sans pb-0">
           <input ref={avatarInputRef} type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleAvatarChange} />
 
           {/* Header */}

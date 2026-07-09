@@ -6,6 +6,7 @@ import PageTransition from '../../../shared/components/PageTransition';
 import { formatPrice } from '../../../shared/utils/helpers';
 import toast from 'react-hot-toast';
 import { useDeliveryAuthStore } from '../store/deliveryStore';
+import { getSocket, joinRoom, leaveRoom } from '../../../shared/utils/socket';
 
 const DeliveryOrders = () => {
   const navigate = useNavigate();
@@ -25,6 +26,8 @@ const DeliveryOrders = () => {
     rejectReturnPickup,
     updateReturnPickupStatus,
     verifyReturnPickupOtp,
+    verifyVendorHandoverOtp,
+    verifyCustomerDeliveryOtp,
   } = useDeliveryAuthStore();
 
   const [activeTab, setActiveTab] = useState(() => {
@@ -80,6 +83,8 @@ const DeliveryOrders = () => {
     }
   };
 
+  const { deliveryBoy } = useDeliveryAuthStore();
+
   useEffect(() => {
     if (activeTab === 'deliveries') {
       loadOrders(currentPage, filter);
@@ -87,16 +92,35 @@ const DeliveryOrders = () => {
       loadReturns();
     }
 
-    const intervalId = setInterval(() => {
-      if (activeTab === 'deliveries') {
-        loadOrders(currentPage, filter);
-      } else {
-        loadReturns();
-      }
-    }, 10000); // Poll list every 10 seconds
+    const token = localStorage.getItem('delivery-token') || localStorage.getItem('token');
+    if (token && deliveryBoy?.id) {
+      const socket = getSocket(token);
+      if (socket) {
+        joinRoom(`delivery_${deliveryBoy.id}`);
 
-    return () => clearInterval(intervalId);
-  }, [activeTab, currentPage, filter]);
+        const handleOrderUpdate = () => {
+          if (activeTab === 'deliveries') {
+            loadOrders(currentPage, filter);
+          }
+        };
+
+        const handleReturnUpdate = () => {
+          if (activeTab === 'pickups') {
+            loadReturns();
+          }
+        };
+
+        socket.on('order_updated', handleOrderUpdate);
+        socket.on('return_updated', handleReturnUpdate);
+
+        return () => {
+          socket.off('order_updated', handleOrderUpdate);
+          socket.off('return_updated', handleReturnUpdate);
+          leaveRoom(`delivery_${deliveryBoy.id}`);
+        };
+      }
+    }
+  }, [activeTab, currentPage, filter, deliveryBoy?.id]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -177,6 +201,44 @@ const DeliveryOrders = () => {
     try {
       await verifyReturnPickupOtp(retId, inputOtp);
       toast.success('OTP verified successfully!');
+      loadReturns();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Verification failed');
+    } finally {
+      setOtpVerifying((prev) => ({ ...prev, [retId]: false }));
+    }
+  };
+
+  const handleVerifyVendorHandoverOtp = async (retId) => {
+    const inputOtp = otpInputs[retId] || '';
+    if (!inputOtp || inputOtp.length !== 6) {
+      toast.error('Please enter a valid 6-digit OTP.');
+      return;
+    }
+
+    setOtpVerifying((prev) => ({ ...prev, [retId]: true }));
+    try {
+      await verifyVendorHandoverOtp(retId, inputOtp);
+      toast.success('Vendor Handover OTP verified successfully!');
+      loadReturns();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Verification failed');
+    } finally {
+      setOtpVerifying((prev) => ({ ...prev, [retId]: false }));
+    }
+  };
+
+  const handleVerifyCustomerDeliveryOtp = async (retId) => {
+    const inputOtp = otpInputs[retId] || '';
+    if (!inputOtp || inputOtp.length !== 6) {
+      toast.error('Please enter a valid 6-digit OTP.');
+      return;
+    }
+
+    setOtpVerifying((prev) => ({ ...prev, [retId]: true }));
+    try {
+      await verifyCustomerDeliveryOtp(retId, inputOtp);
+      toast.success('Customer Delivery OTP verified successfully!');
       loadReturns();
     } catch (err) {
       toast.error(err.response?.data?.message || err.message || 'Verification failed');
@@ -860,20 +922,82 @@ const DeliveryOrders = () => {
                             </span>
                           )}
                           {ret.status === 'replacement_assigned' && (
-                            <button
-                              onClick={() => handleUpdateReturnStatus(ret._id, 'out_for_delivery', 'Out for Delivery')}
-                              className="flex-1 px-3 py-2 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
-                            >
-                              Mark Picked Up Replacement
-                            </button>
+                            <div className="w-full space-y-3 mt-2 border-t border-slate-100 pt-3">
+                              {!ret.vendorHandoverOtpVerified ? (
+                                <div className="space-y-2 bg-purple-50/20 border border-purple-150 p-3 rounded-2xl">
+                                  <label className="text-[10px] font-black text-purple-900 uppercase tracking-wider block">Enter Vendor Handover OTP</label>
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      maxLength={6}
+                                      placeholder="Enter 6-digit OTP"
+                                      value={otpInputs[ret._id] || ''}
+                                      onChange={(e) => setOtpInputs((prev) => ({ ...prev, [ret._id]: e.target.value.replace(/\D/g, '') }))}
+                                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                    />
+                                    <button
+                                      onClick={() => handleVerifyVendorHandoverOtp(ret._id)}
+                                      disabled={otpVerifying[ret._id]}
+                                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-colors disabled:bg-purple-400"
+                                    >
+                                      {otpVerifying[ret._id] ? 'Verifying...' : 'Verify OTP'}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-1.5 text-xs font-black text-green-700 bg-green-50 border border-green-150 p-2.5 rounded-xl">
+                                    <FiCheck className="text-sm" />
+                                    <span>Vendor Verification Successful (OTP Verified)</span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleUpdateReturnStatus(ret._id, 'out_for_delivery', 'Out for Delivery')}
+                                    className="w-full py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                                  >
+                                    Mark Replacement Picked Up
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           )}
                           {ret.status === 'out_for_delivery' && (
-                            <button
-                              onClick={() => handleUpdateReturnStatus(ret._id, 'completed', 'Completed')}
-                              className="flex-1 px-3 py-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
-                            >
-                              Mark Replacement Delivered
-                            </button>
+                            <div className="w-full space-y-3 mt-2 border-t border-slate-100 pt-3">
+                              {!ret.customerDeliveryOtpVerified ? (
+                                <div className="space-y-2 bg-indigo-50/20 border border-indigo-150 p-3 rounded-2xl">
+                                  <label className="text-[10px] font-black text-indigo-900 uppercase tracking-wider block">Enter Customer Delivery OTP</label>
+                                  <div className="flex gap-2">
+                                    <input
+                                      type="text"
+                                      maxLength={6}
+                                      placeholder="Enter 6-digit OTP"
+                                      value={otpInputs[ret._id] || ''}
+                                      onChange={(e) => setOtpInputs((prev) => ({ ...prev, [ret._id]: e.target.value.replace(/\D/g, '') }))}
+                                      className="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                    <button
+                                      onClick={() => handleVerifyCustomerDeliveryOtp(ret._id)}
+                                      disabled={otpVerifying[ret._id]}
+                                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors disabled:bg-indigo-400"
+                                    >
+                                      {otpVerifying[ret._id] ? 'Verifying...' : 'Verify OTP'}
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-1.5 text-xs font-black text-green-700 bg-green-50 border border-green-150 p-2.5 rounded-xl">
+                                    <FiCheck className="text-sm" />
+                                    <span>Customer Verification Successful (OTP Verified)</span>
+                                  </div>
+                                  <button
+                                    onClick={() => handleUpdateReturnStatus(ret._id, 'completed', 'Completed')}
+                                    className="w-full py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                                  >
+                                    Mark Replacement Delivered
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           )}
                           {ret.status === 'completed' && (
                             <span className="flex-1 text-center py-2 px-3 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-xl text-[10px] font-bold uppercase tracking-wider">

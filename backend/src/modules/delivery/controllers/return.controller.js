@@ -8,6 +8,7 @@ import crypto from 'crypto';
 import { uploadLocalFileToCloudinaryAndCleanup } from '../../../services/upload.service.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { autoAssignReturnPickupPartner, autoAssignExchangeReplacementPartner } from '../../../services/assignmentService.js';
+import { notifyReturnUpdate } from '../../../services/socket.service.js';
 
 // GET /api/delivery/returns
 export const getAssignedReturnPickups = asyncHandler(async (req, res) => {
@@ -46,8 +47,21 @@ export const acceptReturnPickup = asyncHandler(async (req, res) => {
     returnRequest.deliveryAssignmentStatus = 'accepted';
     if (!isExchangeLeg2) {
         returnRequest.status = 'pickup_assigned';
+    } else {
+        const handoverOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        const handoverHash = crypto.createHash('sha256').update(handoverOtp).digest('hex');
+        returnRequest.vendorHandoverOtpHash = handoverHash;
+        returnRequest.vendorHandoverOtpExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        returnRequest.vendorHandoverOtpAttempts = 0;
+        returnRequest.vendorHandoverOtpVerified = false;
+        
+        const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+        if (!isProduction) {
+            returnRequest.vendorHandoverOtpDebug = handoverOtp;
+        }
     }
     await returnRequest.save();
+    notifyReturnUpdate(returnRequest);
 
     // Notify customer
     if (returnRequest.userId) {
@@ -58,6 +72,18 @@ export const acceptReturnPickup = asyncHandler(async (req, res) => {
             message: isExchangeLeg2
                 ? `A delivery partner has been assigned to deliver your replacement items for order ${returnRequest.orderId?.orderId || ''}.`
                 : `A delivery partner has been assigned to pick up your returned items for order ${returnRequest.orderId?.orderId || ''}.`,
+            type: 'order',
+            data: { returnRequestId: String(returnRequest._id) }
+        });
+    }
+
+    // Notify vendor for replacement handover OTP
+    if (isExchangeLeg2 && returnRequest.vendorId) {
+        await createNotification({
+            recipientId: returnRequest.vendorId,
+            recipientType: 'vendor',
+            title: 'Replacement pickup OTP generated',
+            message: `A rider has accepted the replacement order for ${returnRequest.orderId?.orderId || ''}. Provide them with the Handover OTP to authorize pickup.`,
             type: 'order',
             data: { returnRequestId: String(returnRequest._id) }
         });
@@ -88,12 +114,14 @@ export const rejectReturnPickup = asyncHandler(async (req, res) => {
     if (isExchangeLeg2) {
         returnRequest.status = 'replacement_ready';
         await returnRequest.save();
+        notifyReturnUpdate(returnRequest);
         autoAssignExchangeReplacementPartner(returnRequest._id);
     } else {
         if (returnRequest.status === 'pickup_pending' || returnRequest.status === 'pickup_assigned') {
             returnRequest.status = 'approved';
         }
         await returnRequest.save();
+        notifyReturnUpdate(returnRequest);
         autoAssignReturnPickupPartner(returnRequest._id);
     }
 
@@ -126,6 +154,42 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
 
     if (status === 'delivered_to_vendor' && !returnRequest.vendorHandoffOtpVerified) {
         throw new ApiError(400, 'Vendor must verify the handoff OTP on their dashboard to mark this return request as delivered.');
+    }
+
+    if (status === 'out_for_delivery' && !returnRequest.vendorHandoverOtpVerified) {
+        throw new ApiError(400, 'Vendor Handover OTP must be verified before marking the replacement as picked up.');
+    }
+
+    if (status === 'completed' && !returnRequest.customerDeliveryOtpVerified) {
+        throw new ApiError(400, 'Customer Delivery OTP must be verified before marking the replacement as completed.');
+    }
+
+    if (status === 'out_for_delivery') {
+        const deliveryOtp = Math.floor(100000 + Math.random() * 900000).toString();
+        const deliveryHash = crypto.createHash('sha256').update(deliveryOtp).digest('hex');
+        returnRequest.customerDeliveryOtpHash = deliveryHash;
+        returnRequest.customerDeliveryOtpExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+        returnRequest.customerDeliveryOtpAttempts = 0;
+        returnRequest.customerDeliveryOtpVerified = false;
+
+        const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+        if (!isProduction) {
+            returnRequest.customerDeliveryOtpDebug = deliveryOtp;
+        }
+
+        // Cleanup Vendor Handover OTP
+        returnRequest.vendorHandoverOtpHash = null;
+        returnRequest.vendorHandoverOtpExpiresAt = null;
+        returnRequest.vendorHandoverOtpAttempts = 0;
+        returnRequest.vendorHandoverOtpDebug = null;
+    }
+
+    if (status === 'completed') {
+        // Cleanup Customer Delivery OTP
+        returnRequest.customerDeliveryOtpHash = null;
+        returnRequest.customerDeliveryOtpExpiresAt = null;
+        returnRequest.customerDeliveryOtpAttempts = 0;
+        returnRequest.customerDeliveryOtpDebug = null;
     }
 
     if (status === 'picked_up') {
@@ -173,6 +237,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
 
     returnRequest.status = status;
     await returnRequest.save();
+    notifyReturnUpdate(returnRequest);
 
     // Send notifications based on the new status
     const notificationTasks = [];
@@ -316,6 +381,7 @@ export const verifyCustomerPickupOtp = asyncHandler(async (req, res) => {
     if (hashedInput !== returnRequest.returnPickupOtpHash) {
         returnRequest.returnPickupOtpAttempts += 1;
         await returnRequest.save();
+        notifyReturnUpdate(returnRequest);
         const remaining = 5 - returnRequest.returnPickupOtpAttempts;
         throw new ApiError(400, `Incorrect OTP. ${remaining} attempts remaining.`);
     }
@@ -323,6 +389,81 @@ export const verifyCustomerPickupOtp = asyncHandler(async (req, res) => {
     returnRequest.returnPickupOtpVerified = true;
     returnRequest.returnPickupOtpAttempts = 0;
     await returnRequest.save();
+    notifyReturnUpdate(returnRequest);
 
     return res.status(200).json(new ApiResponse(200, { verified: true }, 'OTP verified successfully.'));
+});
+
+// POST /api/delivery/returns/:id/verify-vendor-handover-otp
+export const verifyVendorHandoverOtp = asyncHandler(async (req, res) => {
+    const { otp } = req.body;
+    if (!otp) throw new ApiError(400, 'OTP is required.');
+
+    const returnRequest = await ReturnRequest.findOne({
+        _id: req.params.id,
+        deliveryBoyId: req.user.id
+    });
+
+    if (!returnRequest) throw new ApiError(404, 'Return request not found.');
+
+    if (returnRequest.vendorHandoverOtpAttempts >= 5) {
+        throw new ApiError(400, 'OTP verification locked. Max incorrect attempts reached (5). Please ask the vendor to generate a new OTP.');
+    }
+
+    if (!returnRequest.vendorHandoverOtpExpiresAt || Date.now() > new Date(returnRequest.vendorHandoverOtpExpiresAt)) {
+        throw new ApiError(400, 'OTP has expired. Please ask the vendor to generate a new OTP.');
+    }
+
+    const hashedInput = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+    if (hashedInput !== returnRequest.vendorHandoverOtpHash) {
+        returnRequest.vendorHandoverOtpAttempts += 1;
+        await returnRequest.save();
+        notifyReturnUpdate(returnRequest);
+        const remaining = 5 - returnRequest.vendorHandoverOtpAttempts;
+        throw new ApiError(400, `Incorrect OTP. ${remaining} attempts remaining.`);
+    }
+
+    returnRequest.vendorHandoverOtpVerified = true;
+    returnRequest.vendorHandoverOtpAttempts = 0;
+    await returnRequest.save();
+    notifyReturnUpdate(returnRequest);
+
+    return res.status(200).json(new ApiResponse(200, { verified: true }, 'Vendor Handover OTP verified successfully.'));
+});
+
+// POST /api/delivery/returns/:id/verify-customer-delivery-otp
+export const verifyCustomerDeliveryOtp = asyncHandler(async (req, res) => {
+    const { otp } = req.body;
+    if (!otp) throw new ApiError(400, 'OTP is required.');
+
+    const returnRequest = await ReturnRequest.findOne({
+        _id: req.params.id,
+        deliveryBoyId: req.user.id
+    });
+
+    if (!returnRequest) throw new ApiError(404, 'Return request not found.');
+
+    if (returnRequest.customerDeliveryOtpAttempts >= 5) {
+        throw new ApiError(400, 'OTP verification locked. Max incorrect attempts reached (5). Please ask the customer to generate a new OTP.');
+    }
+
+    if (!returnRequest.customerDeliveryOtpExpiresAt || Date.now() > new Date(returnRequest.customerDeliveryOtpExpiresAt)) {
+        throw new ApiError(400, 'OTP has expired. Please ask the customer to generate a new OTP.');
+    }
+
+    const hashedInput = crypto.createHash('sha256').update(String(otp).trim()).digest('hex');
+    if (hashedInput !== returnRequest.customerDeliveryOtpHash) {
+        returnRequest.customerDeliveryOtpAttempts += 1;
+        await returnRequest.save();
+        notifyReturnUpdate(returnRequest);
+        const remaining = 5 - returnRequest.customerDeliveryOtpAttempts;
+        throw new ApiError(400, `Incorrect OTP. ${remaining} attempts remaining.`);
+    }
+
+    returnRequest.customerDeliveryOtpVerified = true;
+    returnRequest.customerDeliveryOtpAttempts = 0;
+    await returnRequest.save();
+    notifyReturnUpdate(returnRequest);
+
+    return res.status(200).json(new ApiResponse(200, { verified: true }, 'Customer Delivery OTP verified successfully.'));
 });

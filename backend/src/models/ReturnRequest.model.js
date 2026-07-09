@@ -102,6 +102,18 @@ const returnRequestSchema = new mongoose.Schema(
         vendorHandoffOtpAttempts: { type: Number, default: 0 },
         vendorHandoffOtpDebug: { type: String, default: null },
         vendorHandoffOtpVerified: { type: Boolean, default: false },
+        
+        vendorHandoverOtpHash: { type: String, default: null },
+        vendorHandoverOtpExpiresAt: { type: Date, default: null },
+        vendorHandoverOtpAttempts: { type: Number, default: 0 },
+        vendorHandoverOtpDebug: { type: String, default: null },
+        vendorHandoverOtpVerified: { type: Boolean, default: false },
+
+        customerDeliveryOtpHash: { type: String, default: null },
+        customerDeliveryOtpExpiresAt: { type: Date, default: null },
+        customerDeliveryOtpAttempts: { type: Number, default: 0 },
+        customerDeliveryOtpDebug: { type: String, default: null },
+        customerDeliveryOtpVerified: { type: Boolean, default: false },
     },
     { timestamps: true }
 );

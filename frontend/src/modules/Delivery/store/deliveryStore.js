@@ -535,6 +535,38 @@ export const useDeliveryAuthStore = create(
         }
       },
 
+      verifyVendorHandoverOtp: async (id, otp) => {
+        set({ isUpdatingOrderStatus: true });
+        try {
+          const response = await api.post(`/delivery/returns/${id}/verify-vendor-handover-otp`, { otp: String(otp).trim() });
+          const payload = response?.data ?? response;
+          set((state) => ({
+            returnPickups: state.returnPickups.map((ret) => (String(ret._id) === String(id) ? { ...ret, vendorHandoverOtpVerified: true } : ret)),
+            isUpdatingOrderStatus: false,
+          }));
+          return payload;
+        } catch (error) {
+          set({ isUpdatingOrderStatus: false });
+          throw error;
+        }
+      },
+
+      verifyCustomerDeliveryOtp: async (id, otp) => {
+        set({ isUpdatingOrderStatus: true });
+        try {
+          const response = await api.post(`/delivery/returns/${id}/verify-customer-delivery-otp`, { otp: String(otp).trim() });
+          const payload = response?.data ?? response;
+          set((state) => ({
+            returnPickups: state.returnPickups.map((ret) => (String(ret._id) === String(id) ? { ...ret, customerDeliveryOtpVerified: true } : ret)),
+            isUpdatingOrderStatus: false,
+          }));
+          return payload;
+        } catch (error) {
+          set({ isUpdatingOrderStatus: false });
+          throw error;
+        }
+      },
+
       // Initialize delivery auth state from localStorage
       initialize: () => {
         const token = localStorage.getItem('delivery-token');

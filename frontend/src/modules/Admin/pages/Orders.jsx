@@ -13,26 +13,50 @@ import {
 } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { getAllOrders } from '../services/adminService';
+import { getSocket, joinRoom, leaveRoom } from '../../../shared/utils/socket';
 
 const Orders = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load orders from backend
+  const fetchOrders = async (showLoading = true) => {
+    if (showLoading) setIsLoading(true);
+    try {
+      const response = await getAllOrders({ limit: 1000 });
+      setOrders(response.data.orders || []);
+    } catch (error) {
+      console.error("Orders overview fetch error:", error);
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchOrders = async () => {
-      setIsLoading(true);
-      try {
-        const response = await getAllOrders({ limit: 1000 });
-        setOrders(response.data.orders || []);
-      } catch (error) {
-        console.error("Orders overview fetch error:", error);
-      } finally {
-        setIsLoading(false);
-      }
+    fetchOrders(true);
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('admin-token') || localStorage.getItem('token');
+    if (!token) return;
+
+    const socket = getSocket(token);
+    if (!socket) return;
+
+    joinRoom('admin_room');
+
+    const handleOrderUpdate = () => {
+      fetchOrders(false);
     };
-    fetchOrders();
+
+    socket.on('order_updated', handleOrderUpdate);
+    socket.on('return_updated', handleOrderUpdate);
+
+    return () => {
+      socket.off('order_updated', handleOrderUpdate);
+      socket.off('return_updated', handleOrderUpdate);
+      leaveRoom('admin_room');
+    };
   }, []);
 
   // Calculate order statistics

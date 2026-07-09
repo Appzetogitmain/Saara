@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
-import { FiLogOut, FiTruck, FiPackage, FiHome, FiUser, FiMenu, FiBell } from "react-icons/fi";
+import { FiLogOut, FiTruck, FiPackage, FiHome, FiUser, FiMenu, FiBell, FiMessageSquare } from "react-icons/fi";
 import { useDeliveryAuthStore } from "../../store/deliveryStore";
 import { useDeliveryNotificationStore } from "../../store/deliveryNotificationStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -31,6 +31,7 @@ const DeliveryLayout = () => {
     { icon: FiHome, label: "Dashboard", path: "/delivery/dashboard" },
     { icon: FiPackage, label: "Orders", path: "/delivery/orders" },
     { icon: FiBell, label: "Notifications", path: "/delivery/notifications" },
+    { icon: FiMessageSquare, label: "Support", path: "/delivery/support" },
     { icon: FiUser, label: "Profile", path: "/delivery/profile" },
   ];
 
@@ -274,12 +275,12 @@ const DeliveryLayout = () => {
         </AnimatePresence>
 
         {/* Main Content */}
-        <main className="pt-20 pb-20 md:pb-6 flex-1 bg-slate-50/30">
+        <main className={`pt-20 ${location.pathname === '/delivery/support' && new URLSearchParams(location.search).get('id') ? 'pb-0' : 'pb-20'} md:pb-6 flex-1 bg-slate-50/30`}>
           <Outlet />
         </main>
 
         {/* Bottom Navigation */}
-        <DeliveryBottomNav />
+        {!(location.pathname === '/delivery/support' && new URLSearchParams(location.search).get('id')) && <DeliveryBottomNav />}
       </div>
     </div>
   );

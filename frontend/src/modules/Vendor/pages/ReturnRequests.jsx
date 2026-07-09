@@ -12,6 +12,7 @@ import {
   getAllVendorReturnRequests,
   updateVendorReturnRequestStatus,
 } from "../services/vendorService";
+import { getSocket, joinRoom, leaveRoom } from "../../../shared/utils/socket";
 import toast from "react-hot-toast";
 
 const ReturnRequests = () => {
@@ -25,26 +26,48 @@ const ReturnRequests = () => {
 
   const vendorId = vendor?.id;
 
+  const fetchReturnRequests = async (showLoading = true) => {
+    if (showLoading) setIsLoading(true);
+    try {
+      const res = await getAllVendorReturnRequests({ limit: 100 });
+      const payload = res?.data ?? res;
+      setReturnRequests(payload?.returnRequests ?? []);
+    } catch {
+      setReturnRequests([]);
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!vendorId) {
       setReturnRequests([]);
       return;
     }
+    fetchReturnRequests(true);
+  }, [vendorId]);
 
-    const fetchReturnRequests = async () => {
-      setIsLoading(true);
-      try {
-        const res = await getAllVendorReturnRequests({ limit: 100 });
-        const payload = res?.data ?? res;
-        setReturnRequests(payload?.returnRequests ?? []);
-      } catch {
-        setReturnRequests([]);
-      } finally {
-        setIsLoading(false);
-      }
+  useEffect(() => {
+    if (!vendorId) return;
+
+    const token = localStorage.getItem('vendor-token') || localStorage.getItem('token');
+    if (!token) return;
+
+    const socket = getSocket(token);
+    if (!socket) return;
+
+    joinRoom(`vendor_${vendorId}`);
+
+    const handleReturnUpdate = (updatedReturn) => {
+      fetchReturnRequests(false);
     };
 
-    fetchReturnRequests();
+    socket.on('return_updated', handleReturnUpdate);
+
+    return () => {
+      socket.off('return_updated', handleReturnUpdate);
+      leaveRoom(`vendor_${vendorId}`);
+    };
   }, [vendorId]);
 
   // Filtered return requests

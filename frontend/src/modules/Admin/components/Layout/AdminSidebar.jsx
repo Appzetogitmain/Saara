@@ -90,7 +90,7 @@ const getChildRoute = (parentRoute, childName) => {
     },
     "/admin/support": {
       "Live Chat": "/admin/support/live-chat",
-      "Ticket Types": "/admin/support/ticket-types",
+      "Support Categories": "/admin/support/ticket-types",
       Tickets: "/admin/support/tickets",
     },
     "/admin/reports": {

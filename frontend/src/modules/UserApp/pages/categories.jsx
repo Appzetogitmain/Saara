@@ -320,13 +320,13 @@ const MobileCategories = () => {
     filters.minPrice || filters.maxPrice || filters.minRating;
 
   // Calculate available height for content (accounting for bottom nav and cart bar)
-  const contentHeight = `calc(100vh - 80px)`;
+  const contentHeight = `calc(100vh - 56px)`;
 
   // Handle empty categories
   if (rootCategories.length === 0) {
     return (
       <PageTransition>
-        <MobileLayout showBottomNav={true} showCartBar={true}>
+        <MobileLayout showBottomNav={true} showCartBar={false}>
           <div className="w-full flex items-center justify-center min-h-[60vh] px-4">
             <div className="text-center">
               <div className="text-6xl text-gray-300 mx-auto mb-4">📦</div>
@@ -344,11 +344,11 @@ const MobileCategories = () => {
   }
 
   // Calculate header height for layout calculations
-  const headerSectionHeight = 80;
+  const headerSectionHeight = 54;
 
   return (
     <PageTransition>
-      <MobileLayout showBottomNav={true} showCartBar={true}>
+      <MobileLayout showBottomNav={true} showCartBar={false}>
         <div
           className="w-full flex flex-col"
           style={{ minHeight: contentHeight }}>
@@ -388,7 +388,7 @@ const MobileCategories = () => {
               ref={categoryListRef}
               className="w-20 md:w-24 bg-gray-50 border-r border-gray-200 overflow-y-auto scrollbar-hide flex-shrink-0"
               style={{
-                maxHeight: `calc(${contentHeight} - ${headerSectionHeight}px)`,
+                height: `calc(${contentHeight} - ${headerSectionHeight}px)`,
               }}>
               <div className="pb-[190px]">
                 {rootCategories.map((category) => {
@@ -446,7 +446,7 @@ const MobileCategories = () => {
             <div
               className="flex-1 overflow-y-auto bg-white flex-shrink-0"
               style={{
-                maxHeight: `calc(${contentHeight} - ${headerSectionHeight}px)`,
+                height: `calc(${contentHeight} - ${headerSectionHeight}px)`,
               }}>
               <div className="p-1 md:p-6">
                 <AnimatedBanner showPadding={false} className="mb-2" />

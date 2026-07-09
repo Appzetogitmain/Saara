@@ -2,6 +2,9 @@ import { useEffect } from "react";
 import api from "../utils/api";
 import { useCartStore } from "../store/useStore";
 import { useAuthStore } from "../store/authStore";
+import { getSocket, joinRoom, leaveRoom } from "../utils/socket";
+import { useOrderStore } from "../store/orderStore";
+import toast from "react-hot-toast";
 
 const PRODUCTS_CACHE_KEY = "user-catalog-products-cache";
 const VENDORS_CACHE_KEY = "user-catalog-vendors-cache";
@@ -40,7 +43,7 @@ const normalizeBrand = (raw) => ({
 });
 
 const AppBootstrap = () => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const { fetchCart } = useCartStore();
 
   useEffect(() => {
@@ -48,6 +51,56 @@ const AppBootstrap = () => {
       fetchCart();
     }
   }, [isAuthenticated, fetchCart]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user?.id) return;
+
+    const token = localStorage.getItem('token') || localStorage.getItem('user-token');
+    if (!token) return;
+
+    const socket = getSocket(token);
+    if (!socket) return;
+
+    joinRoom(`user_${user.id}`);
+
+    const handleOrderUpdate = (updatedOrder) => {
+      const currentPath = window.location.pathname;
+      const orderId = updatedOrder.orderId || updatedOrder._id;
+      const isViewingThisOrder = currentPath.includes(`/orders/${orderId}`);
+
+      // Centralized order store update
+      useOrderStore.getState().fetchOrderById(orderId);
+
+      if (!isViewingThisOrder) {
+        const orderDisplayId = String(updatedOrder.orderId || updatedOrder._id).slice(-6).toUpperCase();
+        toast.success(`Order #${orderDisplayId} status updated to: ${String(updatedOrder.status).replace(/_/g, ' ').toUpperCase()}`);
+      }
+    };
+
+    const handleReturnUpdate = (updatedReturn) => {
+      const currentPath = window.location.pathname;
+      const orderId = updatedReturn.orderId;
+      const isViewingThisOrder = orderId ? currentPath.includes(`/orders/${orderId}`) : false;
+
+      // Centralized store update by re-fetching order details
+      if (orderId) {
+        useOrderStore.getState().fetchOrderById(orderId);
+      }
+
+      if (!isViewingThisOrder) {
+        toast.success(`Return status updated to: ${String(updatedReturn.status).replace(/_/g, ' ').toUpperCase()}`);
+      }
+    };
+
+    socket.on('order_updated', handleOrderUpdate);
+    socket.on('return_updated', handleReturnUpdate);
+
+    return () => {
+      socket.off('order_updated', handleOrderUpdate);
+      socket.off('return_updated', handleReturnUpdate);
+      leaveRoom(`user_${user.id}`);
+    };
+  }, [isAuthenticated, user?.id]);
 
   useEffect(() => {
     let cancelled = false;

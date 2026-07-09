@@ -1,7 +1,7 @@
 import { createPortal } from "react-dom";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FiHome, FiPackage, FiUser, FiBell } from "react-icons/fi";
+import { FiHome, FiPackage, FiUser, FiBell, FiMessageSquare } from "react-icons/fi";
 import { useDeliveryNotificationStore } from "../../store/deliveryNotificationStore";
 
 const DeliveryBottomNav = () => {
@@ -12,6 +12,7 @@ const DeliveryBottomNav = () => {
     { path: "/delivery/dashboard", icon: FiHome, label: "Dashboard" },
     { path: "/delivery/orders", icon: FiPackage, label: "Orders" },
     { path: "/delivery/notifications", icon: FiBell, label: "Alerts" },
+    { path: "/delivery/support", icon: FiMessageSquare, label: "Support" },
     { path: "/delivery/profile", icon: FiUser, label: "Profile" },
   ];
 

@@ -13,6 +13,7 @@ import {
   FiTrendingUp,
 } from 'react-icons/fi';
 import PageTransition from '../../../shared/components/PageTransition';
+import { getSocket, joinRoom, leaveRoom } from '../../../shared/utils/socket';
 import { formatPrice } from '../../../shared/utils/helpers';
 import toast from 'react-hot-toast';
 import { useDeliveryAuthStore } from '../store/deliveryStore';
@@ -38,19 +39,51 @@ const DeliveryOrderDetail = () => {
   }, [id, fetchOrderById]);
 
   useEffect(() => {
-    loadOrder(false);
+    let mounted = true;
 
-    let intervalId;
-    if (!order || (order.status !== 'completed' && order.status !== 'cancelled')) {
-      intervalId = setInterval(() => {
-        loadOrder(true);
-      }, 4000); // Auto-sync every 4 seconds (background)
+    const loadOrderData = async (isBackground = false) => {
+      if (mounted) {
+        await loadOrder(isBackground);
+      }
+    };
+
+    loadOrderData(false);
+
+    const token = localStorage.getItem('delivery-token') || localStorage.getItem('token');
+    if (token && id) {
+      const socket = getSocket(token);
+      if (socket) {
+        joinRoom(`order_${id}`);
+
+        const handleOrderUpdate = (updatedOrder) => {
+          const updatedId = updatedOrder.orderId || updatedOrder._id;
+          if (String(updatedId) === String(id) && mounted) {
+            loadOrder(true);
+          }
+        };
+
+        const handleReturnUpdate = (updatedReturn) => {
+          if (String(updatedReturn.orderId) === String(id) && mounted) {
+            loadOrder(true);
+          }
+        };
+
+        socket.on('order_updated', handleOrderUpdate);
+        socket.on('return_updated', handleReturnUpdate);
+
+        return () => {
+          mounted = false;
+          socket.off('order_updated', handleOrderUpdate);
+          socket.off('return_updated', handleReturnUpdate);
+          leaveRoom(`order_${id}`);
+        };
+      }
     }
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      mounted = false;
     };
-  }, [loadOrder, order?.status]);
+  }, [id, loadOrder]);
 
   const getStatusColor = (status) => {
     switch (status) {

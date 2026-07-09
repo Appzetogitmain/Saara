@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import VendorSidebar from './VendorSidebar';
 import VendorHeader from './VendorHeader';
 import VendorBottomNav from './VendorBottomNav';
@@ -8,6 +8,7 @@ import useAdminHeaderHeight from '../../../Admin/hooks/useAdminHeaderHeight';
 const VendorLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const headerHeight = useAdminHeaderHeight();
+  const location = useLocation();
 
   // Bottom nav height is 64px (h-16)
   const bottomNavHeight = 64;
@@ -15,6 +16,8 @@ const VendorLayout = () => {
   // Add small buffer to prevent content overlap (8px)
   const topPadding = headerHeight + 8;
   const bottomPadding = bottomNavHeight + 8;
+
+  const isTicketDetail = location.pathname.startsWith('/vendor/support-tickets/') && location.pathname !== '/vendor/support-tickets';
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -33,7 +36,7 @@ const VendorLayout = () => {
             // Mobile: Use calculated heights with safe area support
             // Desktop: use the same computed top spacing for consistency
             paddingTop: `${Math.max(topPadding, 80)}px`, // Use calculated height or 80px, whichever is larger
-            paddingBottom: `calc(${Math.max(bottomPadding, 80)}px + env(safe-area-inset-bottom, 0px))`, // Use calculated height + safe area or 80px + safe area, whichever is larger
+            paddingBottom: isTicketDetail ? '0px' : `calc(${Math.max(bottomPadding, 80)}px + env(safe-area-inset-bottom, 0px))`, // Use calculated height + safe area or 80px + safe area, whichever is larger
           }}
         >
           <div className="w-full max-w-full overflow-x-hidden min-w-0">
@@ -43,7 +46,7 @@ const VendorLayout = () => {
       </div>
 
       {/* Bottom Navigation - Mobile Only */}
-      <VendorBottomNav />
+      {!isTicketDetail && <VendorBottomNav />}
     </div>
   );
 };

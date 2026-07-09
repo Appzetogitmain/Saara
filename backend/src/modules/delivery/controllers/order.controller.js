@@ -7,7 +7,7 @@ import mongoose from 'mongoose';
 import crypto from 'crypto';
 import { sendEmail } from '../../../services/email.service.js';
 import { createNotification } from '../../../services/notification.service.js';
-import { emitToRoom } from '../../../services/socket.service.js';
+import { emitToRoom, notifyOrderUpdate } from '../../../services/socket.service.js';
 import { autoAssignDeliveryPartner } from '../../../services/assignmentService.js';
 
 const IS_PRODUCTION = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
@@ -326,6 +326,7 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
         order.deliveredAt = new Date();
     }
     await order.save();
+    notifyOrderUpdate(order);
 
     const statusNotificationTasks = [];
     if (order.userId) {
@@ -412,6 +413,7 @@ export const resendDeliveryOtp = asyncHandler(async (req, res) => {
         order.deliveryOtpDebug = generatedOtp;
     }
     await order.save();
+    notifyOrderUpdate(order);
 
     try {
         const sent = await sendDeliveryOtpEmail(order, generatedOtp);
@@ -524,6 +526,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
     }
 
     await order.save();
+    notifyOrderUpdate(order);
 
     return res.status(200).json(new ApiResponse(200, order, 'Order offer accepted successfully.'));
 });
@@ -551,6 +554,7 @@ export const rejectOrder = asyncHandler(async (req, res) => {
     order.deliveryBoyId = undefined;
     order.deliveryAssignmentStatus = 'pending';
     await order.save();
+    notifyOrderUpdate(order);
 
     // Re-trigger auto-assignment for the order asynchronously
     autoAssignDeliveryPartner(order._id);

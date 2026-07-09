@@ -4,6 +4,7 @@ import { FiPackage, FiTruck, FiMapPin, FiCreditCard, FiRotateCw, FiArrowLeft, Fi
 import { motion } from 'framer-motion';
 import MobileLayout from "../components/Layout/MobileLayout";
 import { useOrderStore } from '../../../shared/store/orderStore';
+import { getSocket, joinRoom, leaveRoom } from '../../../shared/utils/socket';
 import { useCartStore } from '../../../shared/store/useStore';
 import { formatPrice } from '../../../shared/utils/helpers';
 import { formatVariantLabel, getVariantSignature } from '../../../shared/utils/variant';
@@ -11,6 +12,7 @@ import toast from 'react-hot-toast';
 import PageTransition from '../../../shared/components/PageTransition';
 import Badge from '../../../shared/components/Badge';
 import LazyImage from '../../../shared/components/LazyImage';
+import VariantSelector from '../../../shared/components/Product/VariantSelector';
 import api from '../../../shared/utils/api';
 const RETURN_REASONS = [
   "Wrong Size",
@@ -33,12 +35,29 @@ const MobileOrderDetail = () => {
   const { addItem } = useCartStore();
   const [isResolving, setIsResolving] = useState(true);
   const [showReturnModal, setShowReturnModal] = useState(false);
+  const [requestType, setRequestType] = useState('return'); // return, exchange
+  const [productDetailsMap, setProductDetailsMap] = useState({});
+  const [exchangeVariants, setExchangeVariants] = useState({});
   const [returnReason, setReturnReason] = useState(RETURN_REASONS[0]);
   const [customReason, setCustomReason] = useState('');
   const [returnVendorId, setReturnVendorId] = useState('');
   const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
   const [evidenceFiles, setEvidenceFiles] = useState([]);
   const [evidencePreviews, setEvidencePreviews] = useState([]);
+
+  const fetchDetailsForProduct = async (productId) => {
+    if (productDetailsMap[productId]) return;
+    try {
+      const res = await api.get(`/products/${productId}`);
+      const payload = res?.data ?? res;
+      setProductDetailsMap(prev => ({
+        ...prev,
+        [productId]: payload
+      }));
+    } catch (err) {
+      console.error('Failed to fetch details for product:', productId, err);
+    }
+  };
   const order = getOrder(orderId);
   const [selectedItems, setSelectedItems] = useState({});
 
@@ -140,24 +159,65 @@ const MobileOrderDetail = () => {
 
     fetchOrder();
 
-    let intervalId;
-    if (!order || (order.status !== 'delivered' && order.status !== 'completed' && order.status !== 'cancelled' && order.status !== 'returned')) {
-      intervalId = setInterval(() => {
-        if (orderId) fetchOrderById(orderId);
-      }, 4000); // Poll every 4 seconds
+    const token = localStorage.getItem('token') || localStorage.getItem('user-token');
+    if (token && orderId) {
+      const socket = getSocket(token);
+      if (socket) {
+        joinRoom(`order_${orderId}`);
+
+        const handleOrderUpdate = (updatedOrder) => {
+          const updatedId = updatedOrder.orderId || updatedOrder._id;
+          if (String(updatedId) === String(orderId) && mounted) {
+            fetchOrderById(orderId);
+          }
+        };
+
+        const handleReturnUpdate = (updatedReturn) => {
+          if (String(updatedReturn.orderId) === String(orderId) && mounted) {
+            fetchOrderById(orderId);
+          }
+        };
+
+        socket.on('order_updated', handleOrderUpdate);
+        socket.on('return_updated', handleReturnUpdate);
+
+        return () => {
+          mounted = false;
+          socket.off('order_updated', handleOrderUpdate);
+          socket.off('return_updated', handleReturnUpdate);
+          leaveRoom(`order_${orderId}`);
+        };
+      }
     }
 
     return () => {
       mounted = false;
-      if (intervalId) clearInterval(intervalId);
     };
-  }, [orderId, fetchOrderById, order?.status]);
+  }, [orderId, fetchOrderById]);
 
   useEffect(() => {
     if (!isResolving && !order) {
       navigate('/orders');
     }
   }, [isResolving, order, navigate]);
+
+  useEffect(() => {
+    if (requestType === 'exchange') {
+      setSelectedItems((prev) => {
+        const next = {};
+        let foundFirst = false;
+        Object.entries(prev).forEach(([id, val]) => {
+          const isChecked = val.checked && !foundFirst;
+          if (isChecked) {
+            foundFirst = true;
+            fetchDetailsForProduct(id);
+          }
+          next[id] = { ...val, checked: isChecked };
+        });
+        return next;
+      });
+    }
+  }, [requestType]);
 
   if (isResolving) {
     return (
@@ -232,13 +292,22 @@ const MobileOrderDetail = () => {
   };
 
   const handleToggleCheck = (prodId) => {
-    setSelectedItems((prev) => ({
-      ...prev,
-      [prodId]: {
-        ...prev[prodId],
-        checked: !prev[prodId]?.checked
+    setSelectedItems((prev) => {
+      const next = {};
+      const isChecking = !prev[prodId]?.checked;
+      
+      Object.entries(prev).forEach(([id, val]) => {
+        next[id] = {
+          ...val,
+          checked: id === prodId ? isChecking : (requestType === 'exchange' ? false : val.checked)
+        };
+      });
+
+      if (isChecking && requestType === 'exchange') {
+        fetchDetailsForProduct(prodId);
       }
-    }));
+      return next;
+    });
   };
 
   const handleUpdateQty = (prodId, change) => {
@@ -279,6 +348,8 @@ const MobileOrderDetail = () => {
   };
 
   const resetReturnModal = () => {
+    setRequestType('return');
+    setExchangeVariants({});
     setReturnReason(RETURN_REASONS[0]);
     setCustomReason('');
     evidencePreviews.forEach((preview) => URL.revokeObjectURL(preview));
@@ -298,6 +369,15 @@ const MobileOrderDetail = () => {
       setReturnVendorId(vendorOptions[0]?.id || '');
     }
     setShowReturnModal(true);
+    
+    // Prefetch for currently checked items if in exchange mode
+    if (requestType === 'exchange') {
+      Object.entries(selectedItems).forEach(([id, val]) => {
+        if (val.checked) {
+          fetchDetailsForProduct(id);
+        }
+      });
+    }
   };
 
   const handleRequestReturn = async () => {
@@ -332,6 +412,15 @@ const MobileOrderDetail = () => {
       return;
     }
 
+    if (requestType === 'exchange') {
+      const selectedItem = checkedItemsList[0];
+      const variant = selectedItem ? exchangeVariants[selectedItem.productId] : null;
+      if (!variant || (!variant.size && !variant.color)) {
+        toast.error('Please select a valid replacement variant (size/color) for exchange.');
+        return;
+      }
+    }
+
     const itemsByVendor = {};
     checkedItemsList.forEach((item) => {
       if (!itemsByVendor[item.vendorId]) {
@@ -351,6 +440,13 @@ const MobileOrderDetail = () => {
         formData.append('customReason', returnReason === 'Other' ? customReason.trim() : '');
         formData.append('vendorId', vendorId);
         formData.append('itemsJson', JSON.stringify(items));
+        formData.append('requestType', requestType);
+        if (requestType === 'exchange') {
+          const selectedItem = items[0];
+          const variant = exchangeVariants[selectedItem.productId] || {};
+          formData.append('exchangeSize', String(variant.size || '').trim());
+          formData.append('exchangeColor', String(variant.color || '').trim());
+        }
         
         evidenceFiles.forEach((file) => {
           formData.append('images', file);
@@ -665,6 +761,21 @@ const MobileOrderDetail = () => {
                               </div>
                             </div>
                           )}
+                          {ret.status === 'out_for_delivery' && (
+                            <div className="p-3 bg-purple-50/50 border border-purple-250 rounded-xl space-y-2">
+                              <p className="text-[10px] font-black text-purple-900 uppercase tracking-widest flex items-center gap-1.5 leading-none">
+                                🔑 Replacement Delivery OTP
+                              </p>
+                              <p className="text-[11px] font-semibold text-purple-700 leading-snug">
+                                Provide this 6-digit verification code to the rider when they arrive to deliver the replacement item.
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <span className="flex-1 text-2xl font-black text-purple-850 tracking-widest text-center py-2 bg-white rounded-lg border border-purple-200 font-mono shadow-sm">
+                                  {ret.customerDeliveryOtpDebug || 'Check Email'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
 
                           {/* Visual Timeline Stepper */}
                           {ret.status !== 'rejected' && (
@@ -829,7 +940,7 @@ const MobileOrderDetail = () => {
                     className="w-full py-3 bg-amber-50 text-amber-700 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors"
                   >
                     <FiPackage className="text-lg" />
-                    Request Return
+                    Request Return / Exchange
                   </button>
                 ) : (
                   (hasPendingOrCompletedReturn || ['returned', 'refunded', 'return_in_progress', 'exchange_in_progress'].includes(order?.status)) && (
@@ -868,7 +979,7 @@ const MobileOrderDetail = () => {
                 className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl p-4 sm:p-5"
               >
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-800">Request Return</h3>
+                  <h3 className="text-lg font-bold text-gray-800">Request Return / Exchange</h3>
                   <button
                     onClick={resetReturnModal}
                     className="p-2 rounded-full hover:bg-gray-100"
@@ -933,9 +1044,148 @@ const MobileOrderDetail = () => {
                   </div>
                 )}
 
+                {/* Request Type Selector */}
                 <div className="mb-4">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Reason for Return
+                    Request Type
+                  </label>
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setRequestType('return')}
+                      className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                        requestType === 'return'
+                          ? 'bg-white text-slate-800 shadow-sm border border-slate-100'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      Return (Refund)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRequestType('exchange')}
+                      className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                        requestType === 'exchange'
+                          ? 'bg-white text-slate-800 shadow-sm border border-slate-100'
+                          : 'text-slate-500 hover:text-slate-700'
+                      }`}
+                    >
+                      Exchange (Replacement)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Exchange Fields */}
+                {/* Exchange Fields */}
+                {requestType === 'exchange' && (
+                  <div className="mb-4 space-y-3 animate-fadeIn">
+                    {/* Find the checked product */}
+                    {(() => {
+                      const checkedEntry = Object.entries(selectedItems).find(([_, value]) => value.checked === true);
+                      if (!checkedEntry) {
+                        return (
+                          <div className="p-3 bg-purple-50/20 border border-dashed border-purple-200 rounded-xl text-center text-xs font-semibold text-purple-700">
+                            Please select an item above to choose replacement variant.
+                          </div>
+                        );
+                      }
+                      
+                      const prodId = checkedEntry[0];
+                      const orderItem = allOrderItems.find((it) => String(it.productId || it.id || '') === prodId);
+                      if (!orderItem) return null;
+
+                      return (
+                        <div className="space-y-3 p-3 bg-purple-50/20 border border-purple-100 rounded-2xl">
+                          {/* Show Current Variant */}
+                          <div className="p-2.5 bg-white border border-purple-200/60 rounded-xl space-y-1">
+                            <span className="text-[10px] font-black text-purple-900 uppercase tracking-widest block font-sans">Current Variant Purchased</span>
+                            <div className="flex gap-4 text-xs font-bold text-slate-700 font-sans">
+                              <span>Size: <span className="text-slate-900">{orderItem.variant?.size || 'N/A'}</span></span>
+                              <span>Color: <span className="text-slate-900 capitalize">{orderItem.variant?.color || 'N/A'}</span></span>
+                            </div>
+                          </div>
+
+                          {/* Choose Replacement */}
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black text-purple-900 uppercase tracking-widest block font-sans">Choose Replacement Variant</span>
+                            {productDetailsMap[prodId] ? (
+                              <VariantSelector
+                                variants={productDetailsMap[prodId].variants}
+                                currentPrice={productDetailsMap[prodId].price}
+                                selectedVariant={exchangeVariants[prodId] || {}}
+                                onVariantChange={(newVariant) => {
+                                  // Check if it is same as purchased
+                                  const sameSize = String(newVariant.size || '').trim().toLowerCase() === String(orderItem.variant?.size || '').trim().toLowerCase();
+                                  const sameColor = String(newVariant.color || '').trim().toLowerCase() === String(orderItem.variant?.color || '').trim().toLowerCase();
+                                  if (sameSize && sameColor) {
+                                    toast.error('Cannot exchange for the exact same size and color.');
+                                    return;
+                                  }
+                                  setExchangeVariants(prev => ({
+                                    ...prev,
+                                    [prodId]: newVariant
+                                  }));
+                                }}
+                              />
+                            ) : (
+                              <p className="text-xs text-slate-400 font-semibold italic">Loading variants...</p>
+                            )}
+                          </div>
+
+                          {/* Inventory Check & Price difference */}
+                          {exchangeVariants[prodId] && productDetailsMap[prodId] && (
+                            <div className="pt-2.5 border-t border-purple-200/50 space-y-2.5">
+                              {(() => {
+                                const variant = exchangeVariants[prodId];
+                                const productData = productDetailsMap[prodId];
+                                
+                                // Get stock level
+                                const signature = getVariantSignature(variant);
+                                const entries = Object.entries(productData.variants?.stockMap || {});
+                                const exact = entries.find(([k]) => String(k).trim().toLowerCase() === signature.toLowerCase());
+                                const stockCount = exact ? Number(exact[1]) : 0;
+                                
+                                // Get price difference
+                                const basePrice = Number(productData.price || 0);
+                                const priceEntries = Object.entries(productData.variants?.prices || {});
+                                const pExact = priceEntries.find(([k]) => String(k).trim().toLowerCase() === signature.toLowerCase());
+                                const variantPrice = pExact ? Number(pExact[1]) : basePrice;
+                                
+                                const purchasedPrice = Number(orderItem.price || 0);
+                                const priceDiff = variantPrice - purchasedPrice;
+                                
+                                const isOutOfStock = stockCount <= 0;
+                                
+                                return (
+                                  <div className="space-y-2">
+                                    {/* Stock status */}
+                                    <div className="flex items-center gap-1.5 text-xs font-bold font-sans">
+                                      <span className={isOutOfStock ? 'text-red-600' : 'text-emerald-600'}>
+                                        {isOutOfStock ? '● Out of Stock' : stockCount <= 3 ? `● Low Stock: Only ${stockCount} left` : '✓ In Stock'}
+                                      </span>
+                                    </div>
+                                    
+                                    {/* Price Diff */}
+                                    <div className="p-2.5 bg-white rounded-xl border border-slate-100 flex justify-between text-xs font-bold text-slate-700 font-sans shadow-sm">
+                                      <span>Price Difference:</span>
+                                      <span className={priceDiff > 0 ? 'text-red-650' : priceDiff < 0 ? 'text-green-650' : 'text-slate-900'}>
+                                        {priceDiff > 0 ? `Pay Difference: +${formatPrice(priceDiff)}` : priceDiff < 0 ? `Refund Difference: -${formatPrice(Math.abs(priceDiff))}` : 'No Difference'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Reason for Return / Exchange
                   </label>
                   <select
                     value={returnReason}
@@ -1011,7 +1261,7 @@ const MobileOrderDetail = () => {
                   disabled={isSubmittingReturn}
                   className="w-full py-3 gradient-green text-white rounded-xl font-semibold disabled:opacity-70"
                 >
-                  {isSubmittingReturn ? 'Submitting...' : 'Submit Return Request'}
+                  {isSubmittingReturn ? 'Submitting...' : requestType === 'exchange' ? 'Submit Exchange Request' : 'Submit Return Request'}
                 </button>
               </motion.div>
             </motion.div>

@@ -7,6 +7,7 @@ import User from '../../../models/User.model.js';
 import Commission from '../../../models/Commission.model.js';
 import Product from '../../../models/Product.model.js';
 import { createNotification } from '../../../services/notification.service.js';
+import { notifyOrderUpdate } from '../../../services/socket.service.js';
 
 // GET /api/admin/orders
 export const getAllOrders = asyncHandler(async (req, res) => {
@@ -170,6 +171,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     }
 
     await order.save();
+    notifyOrderUpdate(order);
 
     if (nextStatus === 'cancelled') {
         // Reverse vendor earnings visibility for this order.
@@ -291,6 +293,7 @@ export const assignDeliveryBoy = asyncHandler(async (req, res) => {
         });
     }
     await order.save();
+    notifyOrderUpdate(order);
 
     await createNotification({
         recipientId: deliveryBoy._id,

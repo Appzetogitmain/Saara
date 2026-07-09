@@ -232,6 +232,9 @@ export const updateTicketType = (id, data) =>
 export const deleteTicketType = (id) =>
     api.delete(`/admin/support/ticket-types/${id}`);
 
+export const reorderTicketTypes = (orderedIds) =>
+    api.post('/admin/support/ticket-types/reorder', { orderedIds });
+
 // ─── Reports ──────────────────────────────────────────────────────────────────
 export const getSalesReport = (params = {}) =>
     api.get('/admin/reports/sales', { params });

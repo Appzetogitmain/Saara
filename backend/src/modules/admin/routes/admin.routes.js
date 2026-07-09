@@ -166,6 +166,7 @@ router.patch('/support/tickets/:id/status', ...adminAuth, supportController.upda
 router.post('/support/tickets/:id/messages', ...adminAuth, supportController.addTicketMessage);
 router.get('/support/ticket-types', ...adminAuth, supportController.getAllTicketTypes);
 router.post('/support/ticket-types', ...adminAuth, supportController.createTicketType);
+router.post('/support/ticket-types/reorder', ...adminAuth, supportController.reorderTicketTypes);
 router.put('/support/ticket-types/:id', ...adminAuth, supportController.updateTicketType);
 router.delete('/support/ticket-types/:id', ...adminAuth, supportController.deleteTicketType);
 

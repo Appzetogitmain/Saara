@@ -10,6 +10,7 @@ import {
 import { motion } from 'framer-motion';
 import { useVendorAuthStore } from '../../store/vendorAuthStore';
 import { getVendorOrderById, updateVendorOrderStatus, verifyVendorPickup } from '../../services/vendorService';
+import { getSocket, joinRoom, leaveRoom } from '../../../../shared/utils/socket';
 import { formatPrice } from '../../../../shared/utils/helpers';
 import Badge from '../../../../shared/components/Badge';
 import AnimatedSelect from '../../../Admin/components/AnimatedSelect';
@@ -65,16 +66,18 @@ const OrderDetail = () => {
     useEffect(() => {
         if (!id || !vendorId) return;
 
+        let mounted = true;
+
         const fetchOrder = async (isInitial = false) => {
             if (isInitial) setLoading(true);
             try {
                 const res = await getVendorOrderById(id);
                 const data = res?.data ?? res;
-                setOrder(data ?? null);
+                if (mounted) setOrder(data ?? null);
             } catch {
-                if (isInitial) setOrder(null);
+                if (isInitial && mounted) setOrder(null);
             } finally {
-                if (isInitial) setLoading(false);
+                if (isInitial && mounted) setLoading(false);
             }
         };
 
@@ -82,17 +85,41 @@ const OrderDetail = () => {
             fetchOrder(true);
         }
 
-        let intervalId;
-        if (!order || (order.status !== 'delivered' && order.status !== 'completed' && order.status !== 'cancelled')) {
-            intervalId = setInterval(() => {
-                fetchOrder(false);
-            }, 4000); // Poll every 4 seconds
+        const token = localStorage.getItem('vendor-token') || localStorage.getItem('token');
+        if (token) {
+            const socket = getSocket(token);
+            if (socket) {
+                joinRoom(`order_${id}`);
+
+                const handleOrderUpdate = (updatedOrder) => {
+                    const updatedId = updatedOrder.orderId || updatedOrder._id;
+                    if (String(updatedId) === String(id) && mounted) {
+                        fetchOrder(false);
+                    }
+                };
+
+                const handleReturnUpdate = (updatedReturn) => {
+                    if (String(updatedReturn.orderId) === String(id) && mounted) {
+                        fetchOrder(false);
+                    }
+                };
+
+                socket.on('order_updated', handleOrderUpdate);
+                socket.on('return_updated', handleReturnUpdate);
+
+                return () => {
+                    mounted = false;
+                    socket.off('order_updated', handleOrderUpdate);
+                    socket.off('return_updated', handleReturnUpdate);
+                    leaveRoom(`order_${id}`);
+                };
+            }
         }
 
         return () => {
-            if (intervalId) clearInterval(intervalId);
+            mounted = false;
         };
-    }, [id, vendorId, order?.status]);
+    }, [id, vendorId]);
 
     const handleStatusChange = async (newStatus) => {
         if (!order) return;

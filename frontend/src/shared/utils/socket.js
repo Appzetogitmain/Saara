@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 const SOCKET_URL = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
 
 let socket = null;
+const joinedRooms = new Set();
 
 export const getSocket = (token) => {
     if (!socket && token) {
@@ -14,6 +15,11 @@ export const getSocket = (token) => {
 
         socket.on('connect', () => {
             console.log('🔌 Connected to socket server');
+            // Rejoin all active rooms on connection / reconnection
+            joinedRooms.forEach((room) => {
+                socket.emit('join', room);
+                console.log(`🔌 Rejoined room: ${room}`);
+            });
         });
 
         socket.on('disconnect', () => {
@@ -35,16 +41,21 @@ export const disconnectSocket = () => {
 };
 
 export const joinRoom = (room) => {
+    const roomStr = String(room || '').trim();
+    if (!roomStr) return;
+    joinedRooms.add(roomStr);
     if (socket) {
-        socket.emit('join', room);
+        socket.emit('join', roomStr);
+        console.log(`🔌 Joined room: ${roomStr}`);
     }
 };
 
 export const leaveRoom = (room) => {
+    const roomStr = String(room || '').trim();
+    if (!roomStr) return;
+    joinedRooms.delete(roomStr);
     if (socket) {
-        // socket.io doesn't have a default leave event we can emit manually unless we implement it on backend
-        // but we can just disconnect or rely on room management.
-        // Our backend doesn't have a 'leave' listener, it just cleans up on disconnect.
-        // Actually, we should probably add a leave listener on backend if we want to be clean.
+        socket.emit('leave', roomStr);
+        console.log(`🔌 Left room: ${roomStr}`);
     }
 };

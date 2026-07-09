@@ -15,6 +15,7 @@ import { calculateVendorShippingForGroups } from '../../../services/vendorShippi
 import { sendOrderConfirmationEmail } from '../../../services/email.service.js';
 import { uploadLocalFileToCloudinaryAndCleanup } from '../../../services/upload.service.js';
 import crypto from 'crypto';
+import { notifyOrderUpdate, notifyReturnUpdate } from '../../../services/socket.service.js';
 
 
 const normalizeVariantPart = (value) => String(value || '').trim().toLowerCase();
@@ -555,6 +556,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
                 itemsCount: vGroup.items?.length || 0,
             });
         });
+        notifyOrderUpdate(order);
     }
 });
 
@@ -602,9 +604,10 @@ export const getOrderDetail = asyncHandler(async (req, res) => {
 // PATCH /api/user/orders/:id/cancel
 export const cancelOrder = asyncHandler(async (req, res) => {
     const session = await mongoose.startSession();
+    let order = null;
     try {
         await session.withTransaction(async () => {
-            const order = await Order.findOne({ orderId: req.params.id, userId: req.user.id }).session(session);
+            order = await Order.findOne({ orderId: req.params.id, userId: req.user.id }).session(session);
             if (!order) throw new ApiError(404, 'Order not found.');
             if (!['pending', 'processing'].includes(order.status)) throw new ApiError(400, 'Order cannot be cancelled at this stage.');
 
@@ -668,6 +671,10 @@ export const cancelOrder = asyncHandler(async (req, res) => {
         });
     } finally {
         await session.endSession();
+    }
+
+    if (order) {
+        notifyOrderUpdate(order);
     }
 
     res.status(200).json(new ApiResponse(200, null, 'Order cancelled successfully.'));
@@ -804,8 +811,16 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
 
     // 3. Exchange validations
     if (requestType === 'exchange') {
-        const size = String(req.body.exchangeDetails?.requestedVariant?.size || '').trim();
-        const color = String(req.body.exchangeDetails?.requestedVariant?.color || '').trim();
+        let size = '';
+        let color = '';
+        if (req.body.exchangeDetails?.requestedVariant) {
+            size = String(req.body.exchangeDetails.requestedVariant.size || '').trim();
+            color = String(req.body.exchangeDetails.requestedVariant.color || '').trim();
+        } else {
+            size = String(req.body.exchangeSize || '').trim();
+            color = String(req.body.exchangeColor || '').trim();
+        }
+
         if (!size && !color) {
             throw new ApiError(400, 'Requested size or color variant selection is required for exchange.');
         }
@@ -822,6 +837,16 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
             const variantKey = resolveOrderItemVariantKey(product, mockOrderItem);
             if (!variantKey) {
                 throw new ApiError(400, `The variant Size: ${size}, Color: ${color} is not available for product ${product.name}.`);
+            }
+
+            // Prevent exchanging for the exact same variant
+            const orderItemMatch = order.items.find(it => String(it.productId) === String(product._id));
+            if (orderItemMatch) {
+                const purchasedSize = String(orderItemMatch.variant?.size || '').trim().toLowerCase();
+                const purchasedColor = String(orderItemMatch.variant?.color || '').trim().toLowerCase();
+                if (purchasedSize === size.toLowerCase() && purchasedColor === color.toLowerCase()) {
+                    throw new ApiError(400, 'Cannot exchange for the exact same variant size and color.');
+                }
             }
 
             const getStockFromMap = (stockMap, key) => {
@@ -935,6 +960,8 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
         .populate('orderId', 'orderId total createdAt')
         .populate('vendorId', 'storeName email');
 
+    notifyReturnUpdate(populated);
+
     res.status(201).json(new ApiResponse(201, normalizeReturnRequest(populated), 'Return request submitted successfully.'));
 });
 
@@ -1000,6 +1027,7 @@ export const regenerateReturnPickupOtp = asyncHandler(async (req, res) => {
     returnRequest.returnPickupOtpDebug = otp;
 
     await returnRequest.save();
+    notifyReturnUpdate(returnRequest);
 
     return res.status(200).json(new ApiResponse(200, {
         otpDebug: otp,

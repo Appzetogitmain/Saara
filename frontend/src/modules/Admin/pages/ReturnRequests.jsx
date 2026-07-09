@@ -8,6 +8,7 @@ import Badge from '../../../shared/components/Badge';
 import AnimatedSelect from '../components/AnimatedSelect';
 import { formatCurrency, formatDateTime } from '../utils/adminHelpers';
 import { useReturnStore } from '../../../shared/store/returnStore';
+import { getSocket, joinRoom, leaveRoom } from '../../../shared/utils/socket';
 
 const ReturnRequests = () => {
   const navigate = useNavigate();
@@ -53,6 +54,56 @@ const ReturnRequests = () => {
       startDate,
       endDate,
     });
+  }, [searchQuery, selectedStatus, dateFilter, fetchReturnRequests]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('admin-token') || localStorage.getItem('token');
+    if (token) {
+      const socket = getSocket(token);
+      if (socket) {
+        joinRoom('admin_room');
+
+        const handleReturnUpdate = () => {
+          const now = new Date();
+          const formatDate = (date) => date.toISOString().slice(0, 10);
+          let startDate;
+          let endDate;
+
+          if (dateFilter === 'today') {
+            const today = new Date(now);
+            today.setHours(0, 0, 0, 0);
+            startDate = formatDate(today);
+            endDate = formatDate(today);
+          } else if (dateFilter === 'week') {
+            const weekStart = new Date(now);
+            weekStart.setDate(now.getDate() - 7);
+            weekStart.setHours(0, 0, 0, 0);
+            startDate = formatDate(weekStart);
+            endDate = formatDate(now);
+          } else if (dateFilter === 'month') {
+            const monthStart = new Date(now);
+            monthStart.setDate(now.getDate() - 30);
+            monthStart.setHours(0, 0, 0, 0);
+            startDate = formatDate(monthStart);
+            endDate = formatDate(now);
+          }
+
+          fetchReturnRequests({
+            search: searchQuery,
+            status: selectedStatus === 'all' ? undefined : selectedStatus,
+            startDate,
+            endDate,
+          });
+        };
+
+        socket.on('return_updated', handleReturnUpdate);
+
+        return () => {
+          socket.off('return_updated', handleReturnUpdate);
+          leaveRoom('admin_room');
+        };
+      }
+    }
   }, [searchQuery, selectedStatus, dateFilter, fetchReturnRequests]);
 
   const filteredRequests = useMemo(() => {

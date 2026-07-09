@@ -49,12 +49,18 @@ const MobileLayout = ({ children, showBottomNav = true, showCartBar = true, show
     location.pathname === '/explore' ||
     location.pathname === '/profile';
 
+  const isCategoriesPage = location.pathname === '/categories';
+
   return (
     <div className="min-h-screen flex flex-col">
       {isDesktopHeaderVisible && <DesktopHeader />}
       {shouldShowHeader && <MobileHeader />}
       <main
-        className={`flex-grow w-full overflow-x-hidden max-w-[1440px] mx-auto px-0 md:px-8 lg:px-12 ${shouldShowBottomNav ? 'pb-20' : ''} ${showCartBar ? 'pb-24' : ''}`}
+        className={`flex-grow w-full overflow-x-hidden max-w-[1440px] mx-auto px-0 md:px-8 lg:px-12 ${
+          showCartBar 
+            ? 'pb-24' 
+            : (shouldShowBottomNav ? 'pb-14' : '')
+        }`}
         style={mainStyle}
       >
         {children}

@@ -8,6 +8,7 @@ import Settlement from '../../../models/Settlement.model.js';
 import mongoose from 'mongoose';
 import { createNotification } from '../../../services/notification.service.js';
 import { autoAssignDeliveryPartner } from '../../../services/assignmentService.js';
+import { notifyOrderUpdate } from '../../../services/socket.service.js';
 
 const deriveTopLevelOrderStatus = (vendorItems = [], fallback = 'pending') => {
     const statuses = (vendorItems || [])
@@ -98,6 +99,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     );
     order.status = deriveTopLevelOrderStatus(order.vendorItems, order.status);
     await order.save();
+    notifyOrderUpdate(order);
 
     if (status === 'ready_for_pickup') {
         // Trigger auto-assignment service in the background
@@ -305,6 +307,7 @@ export const verifyPickup = asyncHandler(async (req, res) => {
     order.pickupOtpDebug = undefined;
 
     await order.save();
+    notifyOrderUpdate(order);
 
     // Trigger notification tasks
     const notificationTasks = [];
