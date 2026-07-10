@@ -48,7 +48,9 @@ const getVendorOrderRevenue = (order, vendorId) => {
     const vendorItem = order?.vendorItems?.find(
         (vi) => String(vi?.vendorId) === String(vendorId)
     );
-    return Number(vendorItem?.subtotal || vendorItem?.vendorEarnings || 0);
+    if (!vendorItem) return 0;
+    const discount = Number(vendorItem.discount || 0);
+    return Number(vendorItem.subtotal || 0) - discount;
 };
 
 export const getAnalyticsOverview = asyncHandler(async (req, res) => {

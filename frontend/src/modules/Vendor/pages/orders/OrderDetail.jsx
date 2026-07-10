@@ -294,13 +294,41 @@ const OrderDetail = () => {
                         </div>
                         {vendorSubtotal > 0 && (
                             <div className="p-4 border-t border-gray-200 flex justify-end">
-                                <div className="text-right">
-                                    <p className="text-sm text-gray-500">
-                                        Your subtotal
-                                    </p>
-                                    <p className="text-lg font-bold text-gray-800">
-                                        {formatPrice(vendorSubtotal)}
-                                    </p>
+                                <div className="text-right space-y-1.5 min-w-[220px]">
+                                    <div className="flex justify-between gap-4 text-sm text-gray-500">
+                                        <span>Original Subtotal:</span>
+                                        <span className="font-medium text-gray-700">{formatPrice(vendorSubtotal)}</span>
+                                    </div>
+                                    <div className="flex justify-between gap-4 text-sm text-gray-500">
+                                        <span>Discounted Subtotal:</span>
+                                        <span className="font-semibold text-gray-800">
+                                            {formatPrice(
+                                                order.commissionDetails?.effectiveSubtotal !== undefined
+                                                    ? order.commissionDetails.effectiveSubtotal
+                                                    : (vendorSubtotal - (vendorItem?.discount || 0))
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between gap-4 text-sm text-gray-500">
+                                        <span>Commission:</span>
+                                        <span className="font-medium text-red-600">
+                                            -{formatPrice(
+                                                order.commissionDetails?.commission !== undefined
+                                                    ? order.commissionDetails.commission
+                                                    : parseFloat(((vendorSubtotal - (vendorItem?.discount || 0)) * (vendorItem?.commissionRate || 10) / 100).toFixed(2))
+                                            )}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between gap-4 pt-2 border-t border-gray-150 text-sm">
+                                        <span className="font-semibold text-gray-700">Vendor Earnings:</span>
+                                        <span className="font-bold text-primary-600">
+                                            {formatPrice(
+                                                order.commissionDetails?.vendorEarnings !== undefined
+                                                    ? order.commissionDetails.vendorEarnings
+                                                    : parseFloat(((vendorSubtotal - (vendorItem?.discount || 0)) * (1 - (vendorItem?.commissionRate || 10) / 100)).toFixed(2))
+                                            )}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         )}

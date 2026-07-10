@@ -9,14 +9,16 @@ import Badge from '../../../shared/components/Badge';
 import AnimatedSelect from '../components/AnimatedSelect';
 import { formatDateTime } from '../utils/adminHelpers';
 import { reorderBanners as reorderBannersApi } from '../services/adminService';
+import { BannerTypes, HOME_CONTENT_TYPES } from '../utils/bannerConstants';
 
-const Banners = () => {
+const HomeContent = () => {
   const {
     banners,
     isLoading,
     fetchBanners,
     deleteBanner,
     toggleBannerStatus,
+    getBannersByTypes,
   } = useBannerStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -33,7 +35,8 @@ const Banners = () => {
 
   // Filtered banners
   const filteredBanners = useMemo(() => {
-    return banners
+    const homeBanners = getBannersByTypes(HOME_CONTENT_TYPES);
+    return homeBanners
       .filter((banner) => {
         const matchesSearch =
           !searchQuery ||
@@ -51,7 +54,7 @@ const Banners = () => {
         return matchesSearch && matchesType && matchesStatus;
       })
       .sort((a, b) => a.order - b.order);
-  }, [banners, searchQuery, selectedType, selectedStatus]);
+  }, [banners, getBannersByTypes, searchQuery, selectedType, selectedStatus]);
 
   // Pagination
   const paginatedBanners = useMemo(() => {
@@ -78,7 +81,7 @@ const Banners = () => {
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('Are you sure you want to delete this banner?')) {
+    if (window.confirm('Are you sure you want to delete this content item?')) {
       deleteBanner(id);
     }
   };
@@ -137,15 +140,15 @@ const Banners = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="lg:hidden">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Banners</h1>
-          <p className="text-gray-600">Manage hero and promotional banners</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Home Content</h1>
+          <p className="text-gray-600">Manage promotional banner cards, category spotlights, and deals</p>
         </div>
         <button
           onClick={handleCreate}
           className="flex items-center gap-2 px-4 py-2 gradient-green text-white rounded-lg hover:shadow-glow-green transition-all font-semibold"
         >
           <FiPlus />
-          Add Banner
+          Add Content
         </button>
       </div>
 
@@ -159,7 +162,7 @@ const Banners = () => {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search banners..."
+              placeholder="Search content..."
               className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
@@ -169,16 +172,11 @@ const Banners = () => {
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
             options={[
-              { value: 'all', label: 'All Types' },
-              { value: 'home_slider', label: 'Home Sliders' },
-              { value: 'festival_offer', label: 'Festival Offer Banners' },
-              { value: 'banner', label: 'Generic Banners' },
-              { value: 'hero', label: 'Hero Banners' },
-              { value: 'promotional', label: 'Promotional Banners' },
-              { value: 'side_banner', label: 'Side Banners' },
-              { value: 'category_focus_banner', label: 'Category Focus Main' },
-              { value: 'category_focus_item', label: 'Category Focus Items' },
-              { value: 'deal_item', label: 'Deal Items' },
+              { value: 'all', label: 'All Content Types' },
+              { value: BannerTypes.PROMOTIONAL, label: 'Promotional Banners' },
+              { value: BannerTypes.CATEGORY_FOCUS_BANNER, label: 'Category Focus Main' },
+              { value: BannerTypes.CATEGORY_FOCUS_ITEM, label: 'Category Focus Items' },
+              { value: BannerTypes.DEAL_ITEM, label: 'Deal Items' },
             ]}
             className="min-w-[140px]"
           />
@@ -206,7 +204,7 @@ const Banners = () => {
               { label: 'Order', accessor: (row) => row.order },
               { label: 'Status', accessor: (row) => (row.isActive ? 'Active' : 'Inactive') },
             ]}
-            filename="banners"
+            filename="home-content"
           />
         </div>
       </div>
@@ -215,7 +213,8 @@ const Banners = () => {
       <div className="space-y-6">
         {filteredBanners.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-            <p className="text-gray-500">No banners found</p>
+            <p className="text-gray-500 font-bold mb-1">No Home Content Found</p>
+            <p className="text-xs text-gray-400">Create promotional banners, category highlights, and deal cards for the home page.</p>
           </div>
         ) : (
           <>
@@ -246,23 +245,15 @@ const Banners = () => {
                       </div>
                       <div className="absolute top-2 left-2">
                         <Badge variant="info">
-                          {banner.type === 'hero'
-                            ? 'Hero'
-                            : banner.type === 'promotional'
-                              ? 'Promo'
-                              : banner.type === 'side_banner'
-                                ? 'Side'
-                                : banner.type === 'home_slider'
-                                  ? 'Slider'
-                                  : banner.type === 'festival_offer'
-                                    ? 'Festival'
-                                    : banner.type === 'category_focus_banner'
-                                      ? 'Cat Main'
-                                      : banner.type === 'category_focus_item'
-                                        ? 'Cat Item'
-                                        : banner.type === 'deal_item'
-                                          ? 'Deal'
-                                          : 'Banner'}
+                          {banner.type === BannerTypes.PROMOTIONAL
+                            ? 'Promo'
+                            : banner.type === BannerTypes.CATEGORY_FOCUS_BANNER
+                              ? 'Cat Main'
+                              : banner.type === BannerTypes.CATEGORY_FOCUS_ITEM
+                                ? 'Cat Item'
+                                : banner.type === BannerTypes.DEAL_ITEM
+                                  ? 'Deal'
+                                  : banner.type}
                         </Badge>
                       </div>
                     </div>
@@ -341,6 +332,7 @@ const Banners = () => {
       {showForm && (
         <BannerForm
           banner={editingBanner}
+          allowedTypes={HOME_CONTENT_TYPES}
           onClose={handleFormClose}
           onSave={() => {
             fetchBanners();
@@ -351,4 +343,4 @@ const Banners = () => {
   );
 };
 
-export default Banners;
+export default HomeContent;

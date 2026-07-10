@@ -40,54 +40,31 @@ export const releaseEscrowPayments = async () => {
                 order.escrowStatus = 'released';
                 await order.save();
 
-                // Find all completed return requests for this order
-                const completedReturns = await ReturnRequest.find({
+                // Find all pending/awaiting_settlement commissions for this order
+                const commissions = await Commission.find({
                     orderId: order._id,
-                    status: 'completed'
+                    status: { $in: ['pending', 'awaiting_settlement'] }
                 });
 
-                // Collect returned product IDs
-                const returnedProductIds = new Set();
-                for (const ret of completedReturns) {
-                    if (Array.isArray(ret.items)) {
-                        for (const retItem of ret.items) {
-                            returnedProductIds.add(String(retItem.productId || retItem.id || ''));
-                        }
-                    }
-                }
-
-                // Group item payouts by vendor (excluding returned products)
-                const payouts = {};
-                for (const item of order.items) {
-                    const productIdStr = String(item.productId || item.id || '');
-                    if (returnedProductIds.has(productIdStr)) {
-                        console.log(`[Escrow Cron] Excluding returned product ${productIdStr} from vendor payout.`);
-                        continue;
-                    }
-                    const vId = String(item.vendorId);
-                    if (!payouts[vId]) payouts[vId] = 0;
-                    payouts[vId] += item.price * item.quantity;
+                // Group commissions by vendorId
+                const vendorCommissions = {};
+                for (const comm of commissions) {
+                    const vId = String(comm.vendorId);
+                    if (!vendorCommissions[vId]) vendorCommissions[vId] = [];
+                    vendorCommissions[vId].push(comm);
                 }
 
                 // Distribute funds to vendors
-                for (const [vendorId, amount] of Object.entries(payouts)) {
-                    if (amount <= 0) continue; // skip zero payouts
+                for (const [vendorId, vendorComms] of Object.entries(vendorCommissions)) {
+                    const netPayout = vendorComms.reduce(
+                        (sum, comm) => sum + Number(comm.vendorEarnings || 0),
+                        0
+                    );
+
+                    if (netPayout <= 0) continue; // skip zero payouts
+
                     const vendor = await Vendor.findById(vendorId);
                     if (vendor) {
-                        // Find matching pending commissions
-                        const commissions = await Commission.find({
-                            orderId: order._id,
-                            vendorId: vendor._id,
-                            status: { $in: ['pending', 'awaiting_settlement'] }
-                        });
-
-                        const netPayout = commissions.reduce(
-                            (sum, commission) => sum + Number(commission.vendorEarnings || 0),
-                            0
-                        );
-
-                        if (netPayout <= 0) continue;
-
                         vendor.walletBalance = (vendor.walletBalance || 0) + netPayout;
                         if (vendor.onHoldBalance >= netPayout) {
                             vendor.onHoldBalance -= netPayout;
@@ -96,31 +73,29 @@ export const releaseEscrowPayments = async () => {
                         }
                         await vendor.save();
 
-                        const commissionIds = commissions.map(c => c._id);
+                        const commissionIds = vendorComms.map(c => c._id);
 
-                        if (commissionIds.length > 0) {
-                            // Create Settlement document
-                            const settlement = await Settlement.create({
-                                vendorId: vendor._id,
-                                commissionIds,
-                                amount: netPayout,
-                                paymentMethod: 'wallet',
-                                status: 'completed',
-                                notes: `Auto-release of escrow for Order #${order.orderId}`
-                            });
+                        // Create Settlement document
+                        const settlement = await Settlement.create({
+                            vendorId: vendor._id,
+                            commissionIds,
+                            amount: netPayout,
+                            paymentMethod: 'wallet',
+                            status: 'completed',
+                            notes: `Auto-release of escrow for Order #${order.orderId}`
+                        });
 
-                            // Link commissions to settlement and set status to paid
-                            await Commission.updateMany(
-                                { _id: { $in: commissionIds } },
-                                {
-                                    $set: {
-                                        status: 'paid',
-                                        paidAt: new Date(),
-                                        settlementId: settlement._id
-                                    }
+                        // Link commissions to settlement and set status to paid
+                        await Commission.updateMany(
+                            { _id: { $in: commissionIds } },
+                            {
+                                $set: {
+                                    status: 'paid',
+                                    paidAt: new Date(),
+                                    settlementId: settlement._id
                                 }
-                            );
-                        }
+                            }
+                        );
 
                         // Notify Vendor
                         await createNotification({

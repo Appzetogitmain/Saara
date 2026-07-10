@@ -240,8 +240,17 @@ const VendorDashboard = () => {
                   (vi) => vi.vendorId?.toString() === vendorId?.toString()
                 );
                 const displayStatus = vendorItem?.status ?? order.status;
-                const displayAmount =
-                  vendorItem?.subtotal ?? order.totalAmount ?? order.total ?? 0;
+                const displayAmount = order.commissionDetails?.vendorEarnings !== undefined
+                  ? order.commissionDetails.vendorEarnings
+                  : vendorItem
+                    ? (() => {
+                        const effectiveSub = vendorItem.subtotal - (vendorItem.discount || 0);
+                        const comm = order.commissionDetails?.commission !== undefined
+                          ? order.commissionDetails.commission
+                          : parseFloat((effectiveSub * 0.1).toFixed(2));
+                        return parseFloat((effectiveSub - comm).toFixed(2));
+                      })()
+                    : 0;
 
                 return (
                 <div

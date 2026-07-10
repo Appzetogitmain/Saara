@@ -38,9 +38,24 @@ export const getVendorOrders = asyncHandler(async (req, res) => {
         ? { vendorItems: { $elemMatch: { vendorId: req.user.id, status } } }
         : { 'vendorItems.vendorId': req.user.id };
 
-    const orders = await Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(numericLimit);
+    const orders = await Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(numericLimit).lean();
     const total = await Order.countDocuments(filter);
-    res.status(200).json(new ApiResponse(200, { orders, total, page: numericPage, pages: Math.ceil(total / numericLimit) }, 'Orders fetched.'));
+
+    const orderIds = orders.map(o => o._id);
+    const commissions = await Commission.find({
+        orderId: { $in: orderIds },
+        vendorId: req.user.id
+    }).lean();
+
+    const ordersWithCommissions = orders.map(order => {
+        const comm = commissions.find(c => String(c.orderId) === String(order._id));
+        return {
+            ...order,
+            commissionDetails: comm || null
+        };
+    });
+
+    res.status(200).json(new ApiResponse(200, { orders: ordersWithCommissions, total, page: numericPage, pages: Math.ceil(total / numericLimit) }, 'Orders fetched.'));
 });
 
 // GET /api/vendor/orders/:id
@@ -57,7 +72,15 @@ export const getVendorOrderById = asyncHandler(async (req, res) => {
     }).populate('deliveryBoyId', 'name email phone vehicleType vehicleNumber status');
     if (!order) throw new ApiError(404, 'Order not found.');
 
-    res.status(200).json(new ApiResponse(200, order, 'Order fetched.'));
+    const commissionDoc = await Commission.findOne({
+        orderId: order._id,
+        vendorId: req.user.id
+    }).lean();
+
+    const orderObj = order.toObject();
+    orderObj.commissionDetails = commissionDoc || null;
+
+    res.status(200).json(new ApiResponse(200, orderObj, 'Order fetched.'));
 });
 
 // PATCH /api/vendor/orders/:id/status

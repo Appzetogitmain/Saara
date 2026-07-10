@@ -81,5 +81,10 @@ export const useBannerStore = create((set, get) => ({
   getBannersByType: (type) => {
     if (!type) return get().banners;
     return get().banners.filter((banner) => banner.type === type);
+  },
+
+  getBannersByTypes: (types) => {
+    if (!types || !types.length) return get().banners;
+    return get().banners.filter((banner) => types.includes(banner.type));
   }
 }));

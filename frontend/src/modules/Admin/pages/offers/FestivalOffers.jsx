@@ -15,7 +15,7 @@ import Badge from "../../../../shared/components/Badge";
 import ConfirmModal from "../../components/ConfirmModal";
 // import { formatDateTime } from "../../../utils/adminHelpers";
 
-const FestivalOffers = () => {
+const Offers = () => {
   const { campaigns, initialize, getCampaignsByType, deleteCampaign } =
     useCampaignStore();
 
@@ -171,17 +171,17 @@ const FestivalOffers = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="lg:hidden">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-            Festival Offers
+            Offers
           </h1>
           <p className="text-sm sm:text-base text-gray-600">
-            Manage seasonal and festival offers
+            Manage seasonal and event marketing campaigns
           </p>
         </div>
         <button
           onClick={() => setEditingOffer({ type: "festival" })}
           className="flex items-center gap-2 px-4 py-2 gradient-green text-white rounded-lg hover:shadow-glow-green transition-all font-semibold text-sm">
           <FiPlus />
-          <span>Add Festival Offer</span>
+          <span>Add Offer</span>
         </button>
       </div>
 
@@ -189,15 +189,15 @@ const FestivalOffers = () => {
         <div className="bg-white rounded-xl p-12 text-center shadow-sm border border-gray-200">
           <FiTag className="text-6xl text-gray-300 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-gray-800 mb-2">
-            No Festival Offers
+            No Offers Found
           </h3>
           <p className="text-gray-600 mb-6">
-            Create your first festival offer to get started!
+            Create your first seasonal or promotional campaign.
           </p>
           <button
             onClick={() => setEditingOffer({ type: "festival" })}
             className="px-6 py-3 gradient-green text-white rounded-xl font-semibold hover:shadow-glow-green transition-all">
-            Create Festival Offer
+            Create Offer
           </button>
         </div>
       ) : (
@@ -237,4 +237,4 @@ const FestivalOffers = () => {
   );
 };
 
-export default FestivalOffers;
+export default Offers;
