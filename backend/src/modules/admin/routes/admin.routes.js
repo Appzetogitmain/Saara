@@ -100,7 +100,7 @@ router.get('/analytics/inventory-stats', ...adminAuth, analyticsController.getIn
 router.get('/orders', ...adminAuth, orderController.getAllOrders);
 router.get('/orders/:id', ...adminAuth, orderController.getOrderById);
 router.patch('/orders/:id/status', ...adminAuth, audit('UPDATE_ORDER_STATUS', 'Order'), orderController.updateOrderStatus);
-router.patch('/orders/:id/assign-delivery', ...adminAuth, audit('ASSIGN_DELIVERY', 'Order'), orderController.assignDeliveryBoy);
+
 router.delete('/orders/:id', ...adminAuth, audit('DELETE_ORDER', 'Order'), orderController.deleteOrder);
 
 // ─── Products ─────────────────────────────────────────────────────────────────

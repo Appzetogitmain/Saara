@@ -634,7 +634,7 @@ export const initAssignmentScheduler = () => {
 
             // 2. Handle Return Pickup timeouts
             const expiredReturns = await ReturnRequest.find({
-                status: 'pickup_assigned',
+                status: 'pickup_pending',
                 deliveryAssignmentStatus: 'assigned',
                 updatedAt: { $lt: timeoutLimit }
             });

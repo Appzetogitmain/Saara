@@ -53,8 +53,6 @@ export const getOrderById = (id) =>
 export const updateOrderStatus = (id, status) =>
     api.patch(`/admin/orders/${id}/status`, { status });
 
-export const assignDeliveryBoy = (id, deliveryBoyId) =>
-    api.patch(`/admin/orders/${id}/assign-delivery`, { deliveryBoyId });
 
 export const deleteOrder = (id) =>
     api.delete(`/admin/orders/${id}`);

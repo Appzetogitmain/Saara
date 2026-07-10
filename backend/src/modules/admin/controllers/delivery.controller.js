@@ -409,28 +409,19 @@ export const settleCash = asyncHandler(async (req, res) => {
         isDeleted: { $ne: true },
     };
 
-    const unsettledStats = await Order.aggregate([
-        { $match: baseFilter },
-        {
-            $group: {
-                _id: null,
-                count: { $sum: 1 },
-                totalAmount: { $sum: '$total' },
-            },
-        },
-    ]);
+    const pendingOrders = await Order.find(baseFilter).select('_id total').lean();
 
-    const unsettledCount = unsettledStats?.[0]?.count || 0;
-    const settledAmount = Number(unsettledStats?.[0]?.totalAmount || 0);
-
-    if (unsettledCount === 0) {
+    if (pendingOrders.length === 0) {
         return res.status(200).json(
             new ApiResponse(200, { modifiedCount: 0, settledAmount: 0 }, 'No pending cash to settle')
         );
     }
 
+    const orderIds = pendingOrders.map((o) => o._id);
+    const settledAmount = pendingOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+
     const result = await Order.updateMany(
-        baseFilter,
+        { _id: { $in: orderIds } },
         {
             $set: { isCashSettled: true, settledAt: new Date() }
         }

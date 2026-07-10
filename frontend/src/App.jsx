@@ -54,7 +54,6 @@ import CustomerDetailPage from "./modules/Admin/pages/customers/CustomerDetailPa
 // Delivery Management child pages
 import DeliveryBoys from "./modules/Admin/pages/delivery/DeliveryBoys";
 import CashCollection from "./modules/Admin/pages/delivery/CashCollection";
-import AssignDelivery from "./modules/Admin/pages/delivery/AssignDelivery";
 // Vendors child pages
 import Vendors from "./modules/Admin/pages/Vendors";
 import ManageVendors from "./modules/Admin/pages/vendors/ManageVendors";
