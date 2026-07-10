@@ -5,6 +5,7 @@ import * as orderController from '../controllers/order.controller.js';
 import * as catalogController from '../controllers/catalog.controller.js';
 import * as customerController from '../controllers/customer.controller.js';
 import * as deliveryController from '../controllers/delivery.controller.js';
+import * as adminPayoutController from '../controllers/payout.controller.js';
 import * as returnController from '../controllers/return.controller.js';
 import * as supportController from '../controllers/support.controller.js';
 import * as reviewController from '../controllers/review.controller.js';
@@ -153,6 +154,10 @@ router.delete('/delivery-boys/:id', ...adminAuth, validate(deliveryBoyIdParamSch
 router.patch('/delivery-boys/:id/status', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), validate(updateDeliveryStatusSchema), deliveryController.updateDeliveryBoyStatus);
 router.patch('/delivery-boys/:id/application-status', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), validate(updateDeliveryApplicationStatusSchema), deliveryController.updateDeliveryBoyApplicationStatus);
 router.post('/delivery-boys/:id/settle-cash', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), validate(settleCashSchema), deliveryController.settleCash);
+router.post('/delivery-boys/:id/adjustment', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), adminPayoutController.adjustWalletBalance);
+
+router.get('/delivery/payout-requests', ...adminAuth, adminPayoutController.getWithdrawalRequests);
+router.patch('/delivery/payout-requests/:id/status', ...adminAuth, adminPayoutController.updateWithdrawalStatus);
 
 // ─── Return Requests ──────────────────────────────────────────────────────────
 router.get('/return-requests', ...adminAuth, returnController.getAllReturnRequests);

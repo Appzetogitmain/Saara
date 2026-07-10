@@ -8,6 +8,8 @@ import Commission from '../../../models/Commission.model.js';
 import Product from '../../../models/Product.model.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
+import mongoose from 'mongoose';
+import { processDeliveryBoyPayout } from '../../../services/deliveryPayout.service.js';
 
 // GET /api/admin/orders
 export const getAllOrders = asyncHandler(async (req, res) => {
@@ -116,61 +118,74 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
         }
     }
 
-    order.status = nextStatus;
-    if (nextStatus === 'delivered') {
-        order.deliveredAt = new Date();
-        order.cancelledAt = null;
-    } else if (nextStatus === 'cancelled') {
-        order.cancelledAt = new Date();
-    } else if (nextStatus === 'returned') {
-        order.cancelledAt = null;
-    } else {
-        order.deliveredAt = null;
-        order.cancelledAt = null;
-    }
-
-    if (nextStatus === 'processing') {
-        order.vendorItems = (order.vendorItems || []).map((vi) => {
-            const current = String(vi?.status || 'pending');
-            if (current === 'cancelled' || current === 'delivered') return vi;
-            return { ...vi.toObject(), status: 'processing' };
-        });
-    }
-    if (nextStatus === 'shipped') {
-        order.vendorItems = (order.vendorItems || []).map((vi) => {
-            const current = String(vi?.status || 'pending');
-            if (current === 'cancelled' || current === 'delivered') return vi;
-            return { ...vi.toObject(), status: 'shipped' };
-        });
-    }
-    if (nextStatus === 'delivered') {
-        order.vendorItems = (order.vendorItems || []).map((vi) => {
-            const current = String(vi?.status || 'pending');
-            if (current === 'cancelled') return vi;
-            return { ...vi.toObject(), status: 'delivered' };
-        });
-    }
-    if (nextStatus === 'cancelled') {
-        order.vendorItems = (order.vendorItems || []).map((vi) => {
-            const current = String(vi?.status || 'pending');
-            if (current === 'delivered') return vi;
-            return { ...vi.toObject(), status: 'cancelled' };
-        });
-    }
-
-    if (nextStatus === 'cancelled' && previousStatus !== 'cancelled' && ['pending', 'processing', 'shipped'].includes(previousStatus)) {
-        for (const item of order.items || []) {
-            const product = await Product.findById(item.productId);
-            if (!product) continue;
-            product.stockQuantity += Number(item.quantity || 0);
-            if (product.stockQuantity <= 0) product.stock = 'out_of_stock';
-            else if (product.stockQuantity <= product.lowStockThreshold) product.stock = 'low_stock';
-            else product.stock = 'in_stock';
-            await product.save();
+    if (nextStatus === 'delivered' && order.deliveryBoyId && !order.deliveryPayoutProcessed) {
+        const session = await mongoose.startSession();
+        try {
+            await session.withTransaction(async () => {
+                await processDeliveryBoyPayout(order._id, order.deliveryBoyId, session);
+            });
+        } finally {
+            await session.endSession();
         }
-    }
+        const freshOrder = await Order.findById(order._id).populate('userId', 'name email');
+        Object.assign(order, freshOrder.toObject());
+    } else {
+        order.status = nextStatus;
+        if (nextStatus === 'delivered') {
+            order.deliveredAt = new Date();
+            order.cancelledAt = null;
+        } else if (nextStatus === 'cancelled') {
+            order.cancelledAt = new Date();
+        } else if (nextStatus === 'returned') {
+            order.cancelledAt = null;
+        } else {
+            order.deliveredAt = null;
+            order.cancelledAt = null;
+        }
 
-    await order.save();
+        if (nextStatus === 'processing') {
+            order.vendorItems = (order.vendorItems || []).map((vi) => {
+                const current = String(vi?.status || 'pending');
+                if (current === 'cancelled' || current === 'delivered') return vi;
+                return { ...vi.toObject(), status: 'processing' };
+            });
+        }
+        if (nextStatus === 'shipped') {
+            order.vendorItems = (order.vendorItems || []).map((vi) => {
+                const current = String(vi?.status || 'pending');
+                if (current === 'cancelled' || current === 'delivered') return vi;
+                return { ...vi.toObject(), status: 'shipped' };
+            });
+        }
+        if (nextStatus === 'delivered') {
+            order.vendorItems = (order.vendorItems || []).map((vi) => {
+                const current = String(vi?.status || 'pending');
+                if (current === 'cancelled') return vi;
+                return { ...vi.toObject(), status: 'delivered' };
+            });
+        }
+        if (nextStatus === 'cancelled') {
+            order.vendorItems = (order.vendorItems || []).map((vi) => {
+                const current = String(vi?.status || 'pending');
+                if (current === 'delivered') return vi;
+                return { ...vi.toObject(), status: 'cancelled' };
+            });
+        }
+
+        if (nextStatus === 'cancelled' && previousStatus !== 'cancelled' && ['pending', 'processing', 'shipped'].includes(previousStatus)) {
+            for (const item of order.items || []) {
+                const product = await Product.findById(item.productId);
+                if (!product) continue;
+                product.stockQuantity += Number(item.quantity || 0);
+                if (product.stockQuantity <= 0) product.stock = 'out_of_stock';
+                else if (product.stockQuantity <= product.lowStockThreshold) product.stock = 'low_stock';
+                else product.stock = 'in_stock';
+                await product.save();
+            }
+        }
+
+        await order.save();
+    }
     notifyOrderUpdate(order);
 
     if (nextStatus === 'cancelled') {

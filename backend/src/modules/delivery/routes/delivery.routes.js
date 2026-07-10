@@ -4,6 +4,7 @@ import * as orderController from '../controllers/order.controller.js';
 import * as returnController from '../controllers/return.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
 import * as supportController from '../controllers/support.controller.js';
+import * as payoutController from '../controllers/payout.controller.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
 import { authLimiter, otpVerifyLimiter } from '../../../middlewares/rateLimiter.js';
@@ -79,5 +80,11 @@ router.get('/support/ticket-types', ...deliveryAuth, supportController.getTicket
 router.get('/support/tickets', ...deliveryAuth, supportController.getMyTickets);
 router.post('/support/tickets', ...deliveryAuth, supportController.createTicket);
 router.post('/support/tickets/:id/message', ...deliveryAuth, supportController.replyToTicket);
+
+// Wallet & Payouts
+router.get('/wallet/summary', ...deliveryAuth, payoutController.getWalletSummary);
+router.post('/wallet/withdraw', ...deliveryAuth, payoutController.requestWithdrawal);
+router.put('/wallet/payout-settings', ...deliveryAuth, payoutController.updatePayoutSettings);
+router.get('/wallet/transactions', ...deliveryAuth, payoutController.getWalletTransactions);
 
 export default router;

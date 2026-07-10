@@ -3,7 +3,9 @@ import ApiResponse from '../../../utils/ApiResponse.js';
 import ApiError from '../../../utils/ApiError.js';
 import Order from '../../../models/Order.model.js';
 import DeliveryBoy from '../../../models/DeliveryBoy.model.js';
+import DeliveryWalletTransaction from '../../../models/DeliveryWalletTransaction.model.js';
 import mongoose from 'mongoose';
+import { processDeliveryBoyPayout } from '../../../services/deliveryPayout.service.js';
 import crypto from 'crypto';
 import { sendEmail } from '../../../services/email.service.js';
 import { createNotification } from '../../../services/notification.service.js';
@@ -325,7 +327,21 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
     if (status === 'delivered') {
         order.deliveredAt = new Date();
     }
-    await order.save();
+
+    if (status === 'delivered') {
+        const session = await mongoose.startSession();
+        try {
+            await session.withTransaction(async () => {
+                await processDeliveryBoyPayout(order._id, req.user.id, session);
+            });
+        } finally {
+            await session.endSession();
+        }
+        order.deliveryPayoutProcessed = true;
+        order.deliveryPayoutProcessedAt = new Date();
+    } else {
+        await order.save();
+    }
     notifyOrderUpdate(order);
 
     const statusNotificationTasks = [];

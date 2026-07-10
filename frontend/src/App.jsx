@@ -54,6 +54,7 @@ import CustomerDetailPage from "./modules/Admin/pages/customers/CustomerDetailPa
 // Delivery Management child pages
 import DeliveryBoys from "./modules/Admin/pages/delivery/DeliveryBoys";
 import CashCollection from "./modules/Admin/pages/delivery/CashCollection";
+import AdminPayouts from "./modules/Admin/pages/delivery/Payouts";
 // Vendors child pages
 import Vendors from "./modules/Admin/pages/Vendors";
 import ManageVendors from "./modules/Admin/pages/vendors/ManageVendors";
@@ -159,6 +160,7 @@ import DeliveryOrderDetail from "./modules/Delivery/pages/OrderDetail";
 import DeliveryProfile from "./modules/Delivery/pages/Profile";
 import DeliveryNotifications from "./modules/Delivery/pages/Notifications";
 import DeliverySupport from "./modules/Delivery/pages/Support";
+import DeliveryWallet from "./modules/Delivery/pages/Wallet";
 // Vendor Routes
 import VendorLogin from "./modules/Vendor/pages/Login";
 import VendorRegister from "./modules/Vendor/pages/Register";
@@ -574,6 +576,7 @@ const AppRoutes = () => {
         <Route path="delivery" element={<DeliveryBoys />} />
         <Route path="delivery/delivery-boys" element={<DeliveryBoys />} />
         <Route path="delivery/cash-collection" element={<CashCollection />} />
+        <Route path="delivery/payout-requests" element={<AdminPayouts />} />
         <Route path="vendors" element={<Vendors />} />
         <Route path="vendors/manage-vendors" element={<ManageVendors />} />
         <Route
@@ -666,6 +669,7 @@ const AppRoutes = () => {
         <Route path="notifications" element={<DeliveryNotifications />} />
         <Route path="profile" element={<DeliveryProfile />} />
         <Route path="support" element={<DeliverySupport />} />
+        <Route path="wallet" element={<DeliveryWallet />} />
       </Route>
       {/* Vendor Routes */}
       <Route path="/vendor/login" element={<VendorLogin />} />

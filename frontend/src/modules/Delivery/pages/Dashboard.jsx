@@ -243,13 +243,17 @@ const DeliveryDashboard = () => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {statCards.map((stat, index) => {
             const Icon = stat.icon;
+            const isEarnings = stat.label === 'Earnings';
             return (
               <motion.div
                 key={stat.label}
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: index * 0.1 }}
-                className={`${stat.bg} rounded-3xl p-5 border shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden`}
+                onClick={isEarnings ? () => navigate('/delivery/wallet') : undefined}
+                className={`${stat.bg} rounded-3xl p-5 border shadow-sm hover:shadow-md transition-all duration-300 relative overflow-hidden ${
+                  isEarnings ? 'cursor-pointer hover:border-purple-300' : ''
+                }`}
               >
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{stat.label}</p>

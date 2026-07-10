@@ -48,12 +48,16 @@ export const autoAssignDeliveryPartner = async (orderId) => {
         const hasVendorCoords = vendorLocation?.coordinates?.length === 2;
 
         // 2. Fetch all online, active, approved delivery boys
+        const MAX_COD_LIMIT = 20000;
         const query = {
             status: 'available',
             isActive: true,
             applicationStatus: 'approved',
             _id: { $nin: order.rejectedDeliveryBoys || [] }
         };
+        if (order.paymentMethod === 'cash' || order.paymentMethod === 'cod') {
+            query.cashInHand = { $lte: MAX_COD_LIMIT - order.total };
+        }
 
         const deliveryBoys = await DeliveryBoy.find(query).lean();
         if (deliveryBoys.length === 0) {
@@ -223,6 +227,13 @@ export const autoAssignDeliveryPartner = async (orderId) => {
         // Update order assignment
         order.deliveryBoyId = selectedRider._id;
         order.deliveryAssignmentStatus = 'assigned';
+
+        let distanceInKm = 0;
+        if (selectedRider.distance !== undefined) {
+            distanceInKm = assignmentMethod === 'Google Maps API' ? parseFloat((selectedRider.distance / 1000).toFixed(2)) : parseFloat(selectedRider.distance.toFixed(2));
+        }
+        order.distance = distanceInKm;
+
         await order.save();
 
         console.log(`[Auto Assign] Order ${order.orderId || order._id} assigned to ${selectedRider.name} via ${assignmentMethod}`);

@@ -180,6 +180,15 @@ export const updateDeliveryBoy = (id, data) =>
 export const deleteDeliveryBoy = (id) =>
     api.delete(`/admin/delivery-boys/${id}`);
 
+export const adjustDeliveryBoyWallet = (id, data) =>
+    api.post(`/admin/delivery-boys/${id}/adjustment`, data);
+
+export const getDeliveryPayoutRequests = (params = {}) =>
+    api.get('/admin/delivery/payout-requests', { params });
+
+export const updateDeliveryWithdrawalStatus = (id, data) =>
+    api.patch(`/admin/delivery/payout-requests/${id}/status`, data);
+
 // ─── Return Requests ──────────────────────────────────────────────────────────
 export const getAllReturnRequests = (params = {}) =>
     api.get('/admin/return-requests', { params });

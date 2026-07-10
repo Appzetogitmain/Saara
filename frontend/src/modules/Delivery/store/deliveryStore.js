@@ -89,6 +89,9 @@ export const useDeliveryAuthStore = create(
       isUpdatingStatus: false,
       returnPickups: [],
       isLoadingReturns: false,
+      walletSummary: null,
+      walletTransactions: [],
+      walletTransactionsPagination: { total: 0, page: 1, limit: 20, pages: 1 },
 
       // Delivery boy login action
       register: async (registrationData) => {
@@ -563,6 +566,64 @@ export const useDeliveryAuthStore = create(
           return payload;
         } catch (error) {
           set({ isUpdatingOrderStatus: false });
+          throw error;
+        }
+      },
+
+      fetchWalletSummary: async () => {
+        try {
+          const response = await api.get('/delivery/wallet/summary');
+          const payload = response?.data ?? response ?? {};
+          const summary = payload?.data ?? payload;
+          set({ walletSummary: summary });
+          return summary;
+        } catch (error) {
+          throw error;
+        }
+      },
+
+      requestWithdrawal: async (amount) => {
+        try {
+          const response = await api.post('/delivery/wallet/withdraw', { amount });
+          return response?.data ?? response;
+        } catch (error) {
+          throw error;
+        }
+      },
+
+      updatePayoutSettings: async (settings) => {
+        try {
+          const response = await api.put('/delivery/wallet/payout-settings', settings);
+          const payload = response?.data ?? response ?? {};
+          const updatedSettings = payload?.data ?? payload;
+          set((state) => ({
+            walletSummary: state.walletSummary
+              ? { ...state.walletSummary, payoutMethodDetails: updatedSettings }
+              : { payoutMethodDetails: updatedSettings }
+          }));
+          return updatedSettings;
+        } catch (error) {
+          throw error;
+        }
+      },
+
+      fetchWalletTransactions: async (page = 1) => {
+        try {
+          const response = await api.get(`/delivery/wallet/transactions?page=${page}`);
+          const payload = response?.data ?? response ?? {};
+          const data = payload?.data ?? payload ?? {};
+          const list = Array.isArray(data.transactions) ? data.transactions : [];
+          set({
+            walletTransactions: list,
+            walletTransactionsPagination: {
+              total: Number(data.totalCount || 0),
+              page: Number(data.currentPage || 1),
+              limit: 20,
+              pages: Number(data.totalPages || 1)
+            }
+          });
+          return list;
+        } catch (error) {
           throw error;
         }
       },

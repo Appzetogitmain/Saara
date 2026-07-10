@@ -78,6 +78,7 @@ const getChildRoute = (parentRoute, childName) => {
     "/admin/delivery": {
       "Delivery Boys": "/admin/delivery/delivery-boys",
       "Cash Collection": "/admin/delivery/cash-collection",
+      "Payout Requests": "/admin/delivery/payout-requests",
     },
     "/admin/offers": {
       "Home Sliders": "/admin/offers/home-sliders",

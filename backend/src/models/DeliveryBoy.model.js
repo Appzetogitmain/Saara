@@ -42,6 +42,21 @@ const deliveryBoySchema = new mongoose.Schema(
         rating: { type: Number, default: 0 },
         cashCollected: { type: Number, default: 0 },
         maxActiveOrders: { type: Number, default: 3 },
+        walletBalance: { type: Number, default: 0 },
+        cashInHand: { type: Number, default: 0 },
+        payoutMethodDetails: {
+            type: {
+                method: { type: String, enum: ['bank', 'upi'] },
+                bankDetails: {
+                    accountHolder: String,
+                    accountNumber: String,
+                    ifsc: String,
+                    bankName: String
+                },
+                upiId: String
+            },
+            select: false
+        }
     },
     { timestamps: true }
 );
