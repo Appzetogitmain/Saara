@@ -37,9 +37,7 @@ const iconMap = {
   Brands: FiTag,
   Customers: FiUsers,
   "Delivery Management": FiTruck,
-  "Offers & Sliders": FiImage,
-  Banners: FiImage,
-  "Promo Codes": FiPercent,
+  Marketing: FiImage,
   Notifications: FiBell,
   "Support Desk": FiMessageCircle,
   Reports: FiFileText,
@@ -80,9 +78,11 @@ const getChildRoute = (parentRoute, childName) => {
       "Cash Collection": "/admin/delivery/cash-collection",
       "Payout Requests": "/admin/delivery/payout-requests",
     },
-    "/admin/offers": {
-      "Home Sliders": "/admin/offers/home-sliders",
-      "Festival Offers": "/admin/offers/festival-offers",
+    "/admin/marketing": {
+      "Home Sliders": "/admin/marketing/home-sliders",
+      "Home Content": "/admin/marketing/home-content",
+      Offers: "/admin/marketing/offers",
+      "Promo Codes": "/admin/marketing/promocodes",
     },
     "/admin/notifications": {
       "All Notifications": "/admin/notifications",

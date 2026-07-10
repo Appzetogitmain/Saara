@@ -21,13 +21,22 @@ export const getWalletStats = asyncHandler(async (req, res) => {
         'items.vendorId': vendorId
     }).lean();
 
+    const heldOrderIds = heldOrders.map(order => order._id);
+    const expectedCommissions = await Commission.find({
+        orderId: { $in: heldOrderIds },
+        vendorId: vendorId
+    }).lean();
+
+    const expectedCommMap = expectedCommissions.reduce((acc, comm) => {
+        const earnings = comm.vendorEarnings !== undefined 
+            ? comm.vendorEarnings 
+            : parseFloat((comm.subtotal - comm.commission).toFixed(2));
+        acc[String(comm.orderId)] = earnings;
+        return acc;
+    }, {});
+
     const expectedReleases = heldOrders.map(order => {
-        let amount = 0;
-        order.items.forEach(item => {
-            if (String(item.vendorId) === String(vendorId)) {
-                amount += item.price * item.quantity;
-            }
-        });
+        const amount = expectedCommMap[String(order._id)] || 0;
         return {
             orderId: order.orderId,
             amount: parseFloat(amount.toFixed(2)),
@@ -44,13 +53,22 @@ export const getWalletStats = asyncHandler(async (req, res) => {
         updatedAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
     }).sort({ updatedAt: -1 }).limit(10).lean();
 
+    const recentOrderIds = recentReleasedOrders.map(order => order._id);
+    const recentCommissions = await Commission.find({
+        orderId: { $in: recentOrderIds },
+        vendorId: vendorId
+    }).lean();
+
+    const recentCommMap = recentCommissions.reduce((acc, comm) => {
+        const earnings = comm.vendorEarnings !== undefined 
+            ? comm.vendorEarnings 
+            : parseFloat((comm.subtotal - comm.commission).toFixed(2));
+        acc[String(comm.orderId)] = earnings;
+        return acc;
+    }, {});
+
     const recentReleases = recentReleasedOrders.map(order => {
-        let amount = 0;
-        order.items.forEach(item => {
-            if (String(item.vendorId) === String(vendorId)) {
-                amount += item.price * item.quantity;
-            }
-        });
+        const amount = recentCommMap[String(order._id)] || 0;
         return {
             orderId: order.orderId,
             amount: parseFloat(amount.toFixed(2)),

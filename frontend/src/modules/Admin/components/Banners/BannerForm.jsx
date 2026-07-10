@@ -8,16 +8,35 @@ import toast from "react-hot-toast";
 import Button from "../Button";
 import { uploadAdminImage } from "../../services/adminService";
 import LinkPicker from "./LinkPicker";
+import { BannerTypes } from "../../utils/bannerConstants";
 
-const BannerForm = ({ banner, onClose, onSave }) => {
+const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
   const location = useLocation();
   const isAppRoute = location.pathname.startsWith("/app");
   const { createBanner, updateBanner } = useBannerStore();
   const isEdit = !!banner;
   const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+  const defaultType = allowedTypes && allowedTypes.length > 0 ? allowedTypes[0] : BannerTypes.HERO;
+
+  const allOptions = [
+    { value: BannerTypes.HOME_SLIDER, label: "Home Slider" },
+    { value: BannerTypes.FESTIVAL_OFFER, label: "Festival Offer Banner" },
+    { value: BannerTypes.BANNER, label: "Generic Banner" },
+    { value: BannerTypes.HERO, label: "Hero Banner" },
+    { value: BannerTypes.PROMOTIONAL, label: "Promotional Banner" },
+    { value: BannerTypes.SIDE_BANNER, label: "Side Banner (Home Right)" },
+    { value: BannerTypes.CATEGORY_FOCUS_BANNER, label: "Category Focus (Main Banner)" },
+    { value: BannerTypes.CATEGORY_FOCUS_ITEM, label: "Category Focus (Circle Item)" },
+    { value: BannerTypes.DEAL_ITEM, label: "Deal Card (Item)" },
+  ];
+
+  const filteredOptions = allowedTypes && allowedTypes.length > 0
+    ? allOptions.filter(opt => allowedTypes.includes(opt.value))
+    : allOptions;
+
   const [formData, setFormData] = useState({
-    type: "hero",
+    type: defaultType,
     title: "",
     subtitle: "",
     description: "",
@@ -32,7 +51,7 @@ const BannerForm = ({ banner, onClose, onSave }) => {
   useEffect(() => {
     if (banner) {
       setFormData({
-        type: banner.type || "hero",
+        type: banner.type || defaultType,
         title: banner.title || "",
         subtitle: banner.subtitle || "",
         description: banner.description || "",
@@ -44,7 +63,7 @@ const BannerForm = ({ banner, onClose, onSave }) => {
         endDate: banner.endDate ? banner.endDate.split("T")[0] : "",
       });
     }
-  }, [banner]);
+  }, [banner, defaultType]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -195,28 +214,20 @@ const BannerForm = ({ banner, onClose, onSave }) => {
                   Basic Information
                 </h3>
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Banner Type <span className="text-red-500">*</span>
-                    </label>
-                    <AnimatedSelect
-                      name="type"
-                      value={formData.type}
-                      onChange={handleChange}
-                      required
-                      options={[
-                        { value: "home_slider", label: "Home Slider" },
-                        { value: "festival_offer", label: "Festival Offer Banner" },
-                        { value: "banner", label: "Generic Banner" },
-                        { value: "hero", label: "Hero Banner" },
-                        { value: "promotional", label: "Promotional Banner" },
-                        { value: "side_banner", label: "Side Banner (Home Right)" },
-                        { value: "category_focus_banner", label: "Category Focus (Main Banner)" },
-                        { value: "category_focus_item", label: "Category Focus (Circle Item)" },
-                        { value: "deal_item", label: "Deal Card (Item)" },
-                      ]}
-                    />
-                  </div>
+                  {filteredOptions.length > 1 && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Banner Type <span className="text-red-500">*</span>
+                      </label>
+                      <AnimatedSelect
+                        name="type"
+                        value={formData.type}
+                        onChange={handleChange}
+                        required
+                        options={filteredOptions}
+                      />
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">

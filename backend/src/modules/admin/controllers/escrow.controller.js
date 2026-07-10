@@ -12,7 +12,7 @@ export const getEscrowSummary = asyncHandler(async (req, res) => {
     const heldOrders = await Order.find({ escrowStatus: 'held', status: 'delivered' }).lean();
     let totalEscrowBalance = 0;
     heldOrders.forEach(o => {
-        totalEscrowBalance += (o.total || 0);
+        totalEscrowBalance += (o.escrowAmount !== undefined ? o.escrowAmount : o.vendorEarnings !== undefined ? o.vendorEarnings : o.total || 0);
     });
 
     // Payments On Hold
@@ -28,7 +28,7 @@ export const getEscrowSummary = asyncHandler(async (req, res) => {
 
     let paymentsReleasedToday = 0;
     releasedTodayOrders.forEach(o => {
-        paymentsReleasedToday += (o.total || 0);
+        paymentsReleasedToday += (o.escrowAmount !== undefined ? o.escrowAmount : o.vendorEarnings !== undefined ? o.vendorEarnings : o.total || 0);
     });
 
     // Pending Refunds
@@ -38,7 +38,7 @@ export const getEscrowSummary = asyncHandler(async (req, res) => {
 
     let pendingRefunds = 0;
     pendingRefundOrders.forEach(o => {
-        pendingRefunds += (o.total || 0);
+        pendingRefunds += (o.escrowAmount !== undefined ? o.escrowAmount : o.vendorEarnings !== undefined ? o.vendorEarnings : o.total || 0);
     });
 
     // Refunds Completed
@@ -48,7 +48,7 @@ export const getEscrowSummary = asyncHandler(async (req, res) => {
 
     let refundsCompleted = 0;
     completedRefundOrders.forEach(o => {
-        refundsCompleted += (o.total || 0);
+        refundsCompleted += (o.escrowAmount !== undefined ? o.escrowAmount : o.vendorEarnings !== undefined ? o.vendorEarnings : o.total || 0);
     });
 
     // Withdrawal Requests metrics

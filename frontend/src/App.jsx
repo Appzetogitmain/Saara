@@ -24,7 +24,7 @@ import Brands from "./modules/Admin/pages/Brands";
 import Customers from "./modules/Admin/pages/Customers";
 
 import Campaigns from "./modules/Admin/pages/Campaigns";
-import Banners from "./modules/Admin/pages/Banners";
+import HomeContent from "./modules/Admin/pages/HomeContent";
 import Reviews from "./modules/Admin/pages/Reviews";
 import Analytics from "./modules/Admin/pages/Analytics";
 import Content from "./modules/Admin/pages/Content";
@@ -65,7 +65,7 @@ import AdminVendorAnalytics from "./modules/Admin/pages/vendors/VendorAnalytics"
 
 // Offers & Sliders child pages
 import HomeSliders from "./modules/Admin/pages/offers/HomeSliders";
-import FestivalOffers from "./modules/Admin/pages/offers/FestivalOffers";
+import Offers from "./modules/Admin/pages/offers/FestivalOffers";
 // Notifications child pages
 import PushNotifications from "./modules/Admin/pages/notifications/PushNotifications";
 import CustomMessages from "./modules/Admin/pages/notifications/CustomMessages";
@@ -590,10 +590,11 @@ const AppRoutes = () => {
         />
         <Route path="vendors/:id" element={<VendorDetail />} />
 
-        <Route path="offers" element={<HomeSliders />} />
-        <Route path="offers/home-sliders" element={<HomeSliders />} />
-        <Route path="offers/festival-offers" element={<FestivalOffers />} />
-        <Route path="promocodes" element={<PromoCodes />} />
+        <Route path="marketing" element={<Navigate to="/admin/marketing/home-sliders" replace />} />
+        <Route path="marketing/home-sliders" element={<HomeSliders />} />
+        <Route path="marketing/home-content" element={<HomeContent />} />
+        <Route path="marketing/offers" element={<Offers />} />
+        <Route path="marketing/promocodes" element={<PromoCodes />} />
         <Route path="notifications" element={<AllNotifications />} />
         <Route
           path="notifications/push-notifications"
@@ -640,7 +641,6 @@ const AppRoutes = () => {
         <Route path="firebase/push-config" element={<PushConfig />} />
         <Route path="firebase/authentication" element={<Authentication />} />
         <Route path="campaigns" element={<Campaigns />} />
-        <Route path="banners" element={<Banners />} />
         <Route path="reviews" element={<Reviews />} />
         <Route path="content" element={<Content />} />
       </Route>

@@ -90,12 +90,20 @@ const AllOrders = () => {
     return filtered;
   }, [orders, searchQuery, selectedStatus, vendorId]);
 
-  // Get per-vendor subtotal from vendorItems
-  const getVendorSubtotal = (order) => {
+  // Get per-vendor earnings (Net Payout)
+  const getVendorEarningsAmount = (order) => {
     const vendorItem = order.vendorItems?.find(
       (vi) => vi.vendorId?.toString() === vendorId?.toString()
     );
-    return vendorItem?.subtotal ?? order.total ?? order.totalAmount ?? 0;
+    if (order.commissionDetails?.vendorEarnings !== undefined) {
+      return order.commissionDetails.vendorEarnings;
+    }
+    if (!vendorItem) return 0;
+    const effectiveSub = vendorItem.subtotal - (vendorItem.discount || 0);
+    const comm = order.commissionDetails?.commission !== undefined
+      ? order.commissionDetails.commission
+      : parseFloat((effectiveSub * 0.1).toFixed(2));
+    return parseFloat((effectiveSub - comm).toFixed(2));
   };
 
   const getOrderStatus = (order) => {
@@ -169,7 +177,7 @@ const AllOrders = () => {
       sortable: true,
       render: (_, row) => (
         <span className="font-semibold text-gray-800">
-          {formatPrice(getVendorSubtotal(row))}
+          {formatPrice(getVendorEarningsAmount(row))}
         </span>
       ),
     },
@@ -268,7 +276,7 @@ const AllOrders = () => {
                 headers={[
                   { label: 'Order ID', accessor: (row) => row.orderId ?? row._id },
                   { label: 'Date', accessor: (row) => row.createdAt ? new Date(row.createdAt).toLocaleDateString() : '—' },
-                  { label: 'Amount', accessor: (row) => formatPrice(getVendorSubtotal(row)) },
+                  { label: 'Amount', accessor: (row) => formatPrice(getVendorEarningsAmount(row)) },
                   { label: 'Status', accessor: (row) => getOrderStatus(row) },
                 ]}
                 filename="vendor-orders"

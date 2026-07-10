@@ -10,19 +10,20 @@ import { getPlaceholderImage } from "../../../../shared/utils/helpers";
 import toast from "react-hot-toast";
 import { uploadAdminImage } from "../../services/adminService";
 import LinkPicker from "../../components/Banners/LinkPicker";
+import { BannerTypes, SLIDER_TYPES } from "../../utils/bannerConstants";
 
 const SLIDER_IMAGE_PLACEHOLDER = getPlaceholderImage(64, 64, "Image");
 
 const HomeSliders = () => {
   const location = useLocation();
   const isAppRoute = location.pathname.startsWith("/app");
-  const { banners, initialize, createBanner, updateBanner, deleteBanner } =
+  const { banners, initialize, createBanner, updateBanner, deleteBanner, getBannersByTypes } =
     useBannerStore();
-  const [selectedBannerType, setSelectedBannerType] = useState("home_slider");
+  const [selectedBannerType, setSelectedBannerType] = useState(BannerTypes.HOME_SLIDER);
 
   const sliders = useMemo(
     () =>
-      (banners || [])
+      getBannersByTypes(SLIDER_TYPES)
         .filter((banner) => banner.type === selectedBannerType)
         .map((banner) => ({
           ...banner,
@@ -30,7 +31,7 @@ const HomeSliders = () => {
           status: banner.isActive ? "active" : "inactive",
         }))
         .sort((a, b) => (a.order || 0) - (b.order || 0)),
-    [banners, selectedBannerType]
+    [getBannersByTypes, selectedBannerType]
   );
 
   const [editingSlider, setEditingSlider] = useState(null);
@@ -154,7 +155,7 @@ const HomeSliders = () => {
       sortable: false,
       render: (value) => (
         <span className="text-sm text-gray-700">
-          {value === "side_banner" ? "Side Banner" : "Home Slider"}
+          {value === BannerTypes.SIDE_BANNER ? "Side Banner" : "Home Slider"}
         </span>
       ),
     },
@@ -198,8 +199,8 @@ const HomeSliders = () => {
             value={selectedBannerType}
             onChange={(e) => setSelectedBannerType(e.target.value)}
             options={[
-              { value: "home_slider", label: "Home Sliders" },
-              { value: "side_banner", label: "Side Banners" },
+              { value: BannerTypes.HOME_SLIDER, label: "Home Sliders" },
+              { value: BannerTypes.SIDE_BANNER, label: "Side Banners" },
             ]}
             className="min-w-[170px]"
           />
@@ -217,7 +218,7 @@ const HomeSliders = () => {
             className="flex items-center gap-2 px-4 py-2 gradient-green text-white rounded-lg hover:shadow-glow-green transition-all font-semibold text-sm">
             <FiPlus />
             <span>
-              {selectedBannerType === "side_banner"
+              {selectedBannerType === BannerTypes.SIDE_BANNER
                 ? "Add Side Banner"
                 : "Add Slider"}
             </span>
@@ -225,9 +226,16 @@ const HomeSliders = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-        <DataTable data={sliders} columns={columns} pagination={true} itemsPerPage={10} />
-      </div>
+      {sliders.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
+          <p className="text-gray-500 font-bold mb-1">No Home Sliders Found</p>
+          <p className="text-xs text-gray-400">Create hero sliders and side banners for the home page.</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+          <DataTable data={sliders} columns={columns} pagination={true} itemsPerPage={10} />
+        </div>
+      )}
 
       <AnimatePresence>
         {editingSlider !== null && (
@@ -318,8 +326,8 @@ const HomeSliders = () => {
                       })
                     }
                     options={[
-                      { value: "home_slider", label: "Home Slider" },
-                      { value: "side_banner", label: "Side Banner (Home Right)" },
+                      { value: BannerTypes.HOME_SLIDER, label: "Home Slider" },
+                      { value: BannerTypes.SIDE_BANNER, label: "Side Banner (Home Right)" },
                     ]}
                     required
                   />

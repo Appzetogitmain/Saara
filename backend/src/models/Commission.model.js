@@ -9,6 +9,12 @@ const commissionSchema = new mongoose.Schema(
         commissionRate: { type: Number, required: true },
         commission: { type: Number, required: true },
         vendorEarnings: { type: Number, required: true },
+        discountShare: { type: Number, default: 0 },
+        effectiveSubtotal: { type: Number },
+        couponId: { type: mongoose.Schema.Types.ObjectId, ref: 'Coupon' },
+        couponCode: { type: String },
+        couponType: { type: String, enum: ["fixed", "percentage"] },
+        couponValue: { type: Number },
         status: {
             type: String,
             enum: ['pending', 'paid', 'cancelled'],

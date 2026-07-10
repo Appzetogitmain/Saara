@@ -16,6 +16,7 @@ import { sendOrderConfirmationEmail } from '../../../services/email.service.js';
 import { uploadLocalFileToCloudinaryAndCleanup } from '../../../services/upload.service.js';
 import crypto from 'crypto';
 import { notifyOrderUpdate, notifyReturnUpdate } from '../../../services/socket.service.js';
+import { calculateOrderFinancials } from '../../../services/financial.service.js';
 
 
 const normalizeVariantPart = (value) => String(value || '').trim().toLowerCase();
@@ -313,6 +314,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
             couponDiscount = coupon.value;
         }
         appliedCoupon = coupon;
+        couponDiscount = parseFloat(Math.min(couponDiscount, subtotal).toFixed(2));
     }
 
     // 3. Calculate shipping
@@ -330,14 +332,43 @@ export const placeOrder = asyncHandler(async (req, res) => {
         couponType: appliedCoupon?.type || null,
     });
 
-    // 4. Calculate dynamic tax
-    const totalTax = enrichedItems.reduce((acc, item) => acc + item.tax, 0);
-    const tax = parseFloat(totalTax.toFixed(2));
-    const total = parseFloat((subtotal - couponDiscount + shipping + tax).toFixed(2));
+    // 4. Calculate financial totals using centralized helper
+    enrichedItems.sort((a, b) => String(a.productId).localeCompare(String(b.productId)));
+
+    const vendorCommissions = {};
+    Object.values(vendorMap).forEach(v => {
+        vendorCommissions[String(v.vendorId)] = v.commissionRate;
+    });
+
+    const financials = calculateOrderFinancials({
+        items: enrichedItems,
+        couponDiscount,
+        shipping,
+        vendorCommissions
+    });
+
+    // Update enrichedItems tax with calculated itemTax from financials
+    financials.items.forEach((fItem, idx) => {
+        enrichedItems[idx].tax = fItem.itemTax;
+    });
+
+    const tax = financials.tax;
+    const total = financials.finalTotal;
 
     // 5. Build vendor item groups with dynamic tax
     const vendorItems = Object.values(vendorMap).map((v) => {
-        const vTax = v.items.reduce((acc, item) => acc + (item.tax || 0), 0);
+        const vCalc = financials.vendorCalculations.find(vc => String(vc.vendorId) === String(v.vendorId)) || {};
+        const vTax = financials.items
+            .filter(item => String(item.vendorId) === String(v.vendorId))
+            .reduce((acc, item) => acc + item.itemTax, 0);
+
+        v.items.forEach(item => {
+            const fItem = financials.items.find(fi => String(fi.productId) === String(item.productId));
+            if (fItem) {
+                item.tax = fItem.itemTax;
+            }
+        });
+
         return {
             vendorId: v.vendorId,
             vendorName: v.vendorName,
@@ -345,7 +376,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
             subtotal: v.subtotal,
             shipping: Number(shippingByVendor[String(v.vendorId)] || 0),
             tax: parseFloat(vTax.toFixed(2)),
-            discount: 0,
+            discount: vCalc.discountShare || 0,
             status: 'pending',
         };
     });
@@ -386,6 +417,13 @@ export const placeOrder = asyncHandler(async (req, res) => {
                 total,
                 couponCode: couponCode?.toUpperCase(),
                 couponDiscount,
+                discountedSubtotal: financials.discountedSubtotal,
+                taxableAmount: financials.taxableAmount,
+                commissionAmount: financials.commissionAmount,
+                vendorEarnings: financials.vendorEarnings,
+                escrowAmount: financials.escrowAmount,
+                settlementAmount: financials.settlementAmount,
+                platformRevenue: financials.platformRevenue,
                 trackingNumber: generateTrackingNumber(),
                 estimatedDelivery: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // +5 days
                 invoiceNumber: `INV-${orderIdSuffix}`, // Using the generated Order ID suffix or full ID
@@ -448,15 +486,26 @@ export const placeOrder = asyncHandler(async (req, res) => {
             }
 
             // 8. Record commissions
-            const commissionDocs = Object.values(vendorMap).map((v) => ({
-                orderId: order._id,
-                vendorId: v.vendorId,
-                vendorName: v.vendorName,
-                subtotal: v.subtotal,
-                commissionRate: v.commissionRate,
-                commission: parseFloat(((v.subtotal * v.commissionRate) / 100).toFixed(2)),
-                vendorEarnings: parseFloat((v.subtotal - (v.subtotal * v.commissionRate) / 100).toFixed(2)),
-            }));
+            const commissionDocs = financials.vendorCalculations.map((vc) => {
+                const v = Object.values(vendorMap).find(vm => String(vm.vendorId) === String(vc.vendorId));
+                return {
+                    orderId: order._id,
+                    vendorId: vc.vendorId,
+                    vendorName: v ? v.vendorName : '',
+                    subtotal: vc.subtotal,
+                    discountShare: vc.discountShare,
+                    effectiveSubtotal: vc.effectiveSubtotal,
+                    commissionRate: vc.commissionRate,
+                    commission: vc.commission,
+                    vendorEarnings: vc.vendorEarnings,
+                    ...(appliedCoupon ? {
+                        couponId: appliedCoupon._id,
+                        couponCode: appliedCoupon.code,
+                        couponType: appliedCoupon.type,
+                        couponValue: appliedCoupon.value,
+                    } : {})
+                };
+            });
             await Commission.insertMany(commissionDocs, { session });
 
             // 9. Increment coupon usage
@@ -865,10 +914,22 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
         }
     }
 
+    const commission = await Commission.findOne({ orderId: order._id, vendorId });
+    let discountRatio = 0;
+    if (commission) {
+        const discountShare = commission.discountShare !== undefined ? commission.discountShare : 0;
+        const commSubtotal = commission.subtotal || 0;
+        if (commSubtotal > 0) {
+            discountRatio = discountShare / commSubtotal;
+        }
+    }
+
     const refundAmount = normalizedItems.reduce((sum, item) => {
         const orderItem = vendorScopedItems.find((it) => String(it?.productId || '') === String(item.productId || ''));
         const unitPrice = Number(orderItem?.price || 0);
-        return sum + unitPrice * Number(item.quantity || 0);
+        const originalAmount = unitPrice * Number(item.quantity || 0);
+        const itemRefundAmount = originalAmount * (1 - discountRatio);
+        return sum + itemRefundAmount;
     }, 0);
 
     if (returnReason === "Other") {

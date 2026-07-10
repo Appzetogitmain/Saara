@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
@@ -143,12 +143,15 @@ const MobileCheckout = () => {
   const tax = taxableAmount * 0.18;
   const finalTotal = Math.max(0, total + shipping + tax - discount);
 
+  const prevTotalRef = useRef(total);
   useEffect(() => {
-    if (appliedCoupon) {
+    if (prevTotalRef.current !== total) {
+      prevTotalRef.current = total;
       setAppliedCoupon(null);
       setAppliedDiscount(0);
+      setCouponCode("");
     }
-  }, [total, appliedCoupon]);
+  }, [total]);
 
   useEffect(() => {
     let active = true;

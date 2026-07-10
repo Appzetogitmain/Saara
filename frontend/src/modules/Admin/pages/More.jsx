@@ -67,14 +67,14 @@ const More = () => {
       description: 'Create campaigns'
     },
     { 
-      path: '/admin/banners', 
-      label: 'Banners', 
+      path: '/admin/marketing/home-content', 
+      label: 'Home Content', 
       icon: FiImage, 
       gradient: 'from-pink-500 via-pink-600 to-pink-700',
       lightGradient: 'from-pink-50 via-pink-100/80 to-pink-50',
       shadowColor: 'shadow-pink-500/20',
       hoverShadow: 'hover:shadow-pink-500/30',
-      description: 'Manage banners'
+      description: 'Manage home page content sections'
     },
     { 
       path: '/admin/reviews', 

@@ -582,7 +582,7 @@ const CampaignForm = ({ campaign, onClose, onSave }) => {
                         { value: "flash_sale", label: "Flash Sale" },
                         { value: "daily_deal", label: "Daily Deal" },
                         { value: "special_offer", label: "Special Offer" },
-                        { value: "festival", label: "Festival Offer" },
+                        { value: "festival", label: "Offer" },
                       ]}
                     />
                   </div>

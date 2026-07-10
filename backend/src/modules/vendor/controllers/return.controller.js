@@ -465,8 +465,8 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                 });
                 await Promise.all(stockRestores);
 
-                // For completed Returns (issue refunds, reverse commissions)
-                if (status === 'completed') {
+                // For completed Returns (issue refunds, reverse commissions) - process only once (Idempotency)
+                if (status === 'completed' && request.status !== 'completed') {
                     // Find all completed return requests for this order and vendor (excluding current request which is not saved as completed yet)
                     const vendorCompletedReturns = await ReturnRequest.find({
                         orderId: order._id,
@@ -518,6 +518,11 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                                     status: 'cancelled',
                                     paidAt: null,
                                     settlementId: null,
+                                    subtotal: 0,
+                                    discountShare: 0,
+                                    effectiveSubtotal: 0,
+                                    commission: 0,
+                                    vendorEarnings: 0
                                 },
                             }
                         );
@@ -529,9 +534,29 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                             status: { $ne: 'cancelled' }
                         });
                         if (comm) {
+                            // Apply Backward Compatibility Rule for legacy documents
+                            const originalDiscountShare = comm.discountShare !== undefined ? comm.discountShare : 0;
+                            const originalSubtotal = comm.subtotal || 0;
+                            
+                            let newDiscountShare = 0;
+                            if (originalSubtotal > 0) {
+                                newDiscountShare = parseFloat((keptSubtotal * (originalDiscountShare / originalSubtotal)).toFixed(2));
+                            }
+                            
+                            // Edge-case Validation: Coupon Freeze & Capping
+                            if (newDiscountShare > keptSubtotal) {
+                                newDiscountShare = keptSubtotal;
+                            }
+                            
+                            const newEffectiveSubtotal = parseFloat((keptSubtotal - newDiscountShare).toFixed(2));
+                            const newCommission = parseFloat(((newEffectiveSubtotal * comm.commissionRate) / 100).toFixed(2));
+                            const newVendorEarnings = parseFloat((newEffectiveSubtotal - newCommission).toFixed(2));
+                            
                             comm.subtotal = keptSubtotal;
-                            comm.commission = parseFloat(((keptSubtotal * comm.commissionRate) / 100).toFixed(2));
-                            comm.vendorEarnings = parseFloat((keptSubtotal - comm.commission).toFixed(2));
+                            comm.discountShare = newDiscountShare;
+                            comm.effectiveSubtotal = newEffectiveSubtotal;
+                            comm.commission = newCommission;
+                            comm.vendorEarnings = newVendorEarnings;
                             await comm.save();
                         }
                     }

@@ -80,22 +80,14 @@
     ]
   },
   {
-    "title": "Offers & Sliders",
-    "route": "/admin/offers",
+    "title": "Marketing",
+    "route": "/admin/marketing",
     "children": [
       "Home Sliders",
-      "Festival Offers"
+      "Home Content",
+      "Offers",
+      "Promo Codes"
     ]
-  },
-  {
-    "title": "Banners",
-    "route": "/admin/banners",
-    "children": []
-  },
-  {
-    "title": "Promo Codes",
-    "route": "/admin/promocodes",
-    "children": []
   },
   {
     "title": "Notifications",
