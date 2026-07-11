@@ -26,18 +26,18 @@ import MobileCheckoutSteps from "../components/Mobile/MobileCheckoutSteps";
 import PageTransition from "../../../shared/components/PageTransition";
 import OrderSummary from "../components/Mobile/CheckoutOrderSummary";
 
-
 const MobileCheckout = () => {
   const navigate = useNavigate();
   const { items, getTotal, clearCart, getItemsByVendor } = useCartStore();
   const { user, isAuthenticated } = useAuthStore();
-  const { addresses, getDefaultAddress, addAddress, fetchAddresses } = useAddressStore();
+  const { addresses, getDefaultAddress, addAddress, fetchAddresses } =
+    useAddressStore();
   const { createOrder } = useOrderStore();
 
   // Group items by vendor
   const itemsByVendor = useMemo(
     () => getItemsByVendor(),
-    [items, getItemsByVendor]
+    [items, getItemsByVendor],
   );
 
   const [step, setStep] = useState(1);
@@ -183,7 +183,9 @@ const MobileCheckout = () => {
         const payload = response?.data ?? response;
         const nextShipping = Number(payload?.shipping);
         if (active) {
-          setEstimatedShipping(Number.isFinite(nextShipping) ? nextShipping : null);
+          setEstimatedShipping(
+            Number.isFinite(nextShipping) ? nextShipping : null,
+          );
         }
       } catch {
         if (active) {
@@ -203,7 +205,9 @@ const MobileCheckout = () => {
   }, [items, formData.country, shippingOption, appliedCoupon?.type]);
 
   const handleApplyCoupon = async (codeOverride = "") => {
-    const normalizedCode = String(codeOverride || couponCode).trim().toUpperCase();
+    const normalizedCode = String(codeOverride || couponCode)
+      .trim()
+      .toUpperCase();
     if (!normalizedCode) {
       toast.error("Please enter a coupon code");
       return;
@@ -271,7 +275,8 @@ const MobileCheckout = () => {
               </h2>
               <button
                 onClick={() => navigate("/home")}
-                className="gradient-green text-white px-6 py-3 rounded-xl font-semibold">
+                className="gradient-green text-white px-6 py-3 rounded-xl font-semibold"
+              >
                 Continue Shopping
               </button>
             </div>
@@ -288,7 +293,10 @@ const MobileCheckout = () => {
   // Load Razorpay SDK dynamically (Phase 2.1)
   const loadRazorpay = () =>
     new Promise((resolve) => {
-      if (window.Razorpay) { resolve(true); return; }
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
       const script = document.createElement("script");
       script.src = "https://checkout.razorpay.com/v1/checkout.js";
       script.onload = () => resolve(true);
@@ -301,8 +309,12 @@ const MobileCheckout = () => {
 
     const normalizedShipping = {
       name: String(formData.name || "").trim(),
-      email: String(formData.email || "").trim().toLowerCase(),
-      phone: String(formData.phone || "").replace(/\D/g, "").slice(-10),
+      email: String(formData.email || "")
+        .trim()
+        .toLowerCase(),
+      phone: String(formData.phone || "")
+        .replace(/\D/g, "")
+        .slice(-10),
       address: String(formData.address || "").trim(),
       city: String(formData.city || "").trim(),
       zipCode: String(formData.zipCode || "").trim(),
@@ -344,13 +356,15 @@ const MobileCheckout = () => {
         }));
 
         // Call payment/initialize for all payment methods (COD included)
-        const { data: initData } = await api.post('/user/payment/initialize', {
-            items: itemsPayload,
-            shippingAddress: normalizedShipping,
-            paymentMethod,
-            couponCode: appliedCoupon ? (appliedCoupon.code || couponCode.trim().toUpperCase()) : undefined,
-            shippingOption,
-          });
+        const { data: initData } = await api.post("/user/payment/initialize", {
+          items: itemsPayload,
+          shippingAddress: normalizedShipping,
+          paymentMethod,
+          couponCode: appliedCoupon
+            ? appliedCoupon.code || couponCode.trim().toUpperCase()
+            : undefined,
+          shippingOption,
+        });
 
         const payload = initData?.data ?? initData;
 
@@ -375,7 +389,7 @@ const MobileCheckout = () => {
             amount: Math.round((payload.amount || 0) * 100),
             currency: payload.currency || "INR",
             order_id: payload.razorpayOrderId,
-            name: "Saara",
+            name: "Porutkal",
             description: `Order #${payload.orderId}`,
             prefill: {
               name: normalizedShipping.name,
@@ -384,19 +398,32 @@ const MobileCheckout = () => {
             },
             theme: { color: "#6366f1" },
             handler: async (response) => {
+              const verifyToastId = toast.loading("Confirming your payment...");
               try {
-                // Webhook handles stock/commission — we just navigate
+                // Verify payment on the server immediately
+                await api.post("/user/payment/verify", {
+                  orderId: payload.orderId,
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                });
+
+                toast.success("Payment successful! Order confirmed.", { id: verifyToastId });
                 clearCart();
-                toast.success("Payment successful! Order confirmed.");
                 navigate(`/order-confirmation/${payload.orderId}`);
                 resolve();
               } catch (err) {
+                console.error("Verification failed:", err);
+                toast.error("Payment confirmation failed. Check your Orders tab.", { id: verifyToastId });
+                navigate(`/orders`);
                 reject(err);
               }
             },
             modal: {
               ondismiss: () => {
-                toast("Payment cancelled. Your order is saved — you can retry from Orders.");
+                toast(
+                  "Payment cancelled. Your order is saved — you can retry from Orders.",
+                );
                 navigate(`/orders`);
                 resolve();
               },
@@ -404,20 +431,25 @@ const MobileCheckout = () => {
           };
           const rzp = new window.Razorpay(options);
           rzp.on("payment.failed", (response) => {
-            toast.error(`Payment failed: ${response.error?.description || "Unknown error"}`);
+            toast.error(
+              `Payment failed: ${response.error?.description || "Unknown error"}`,
+            );
             navigate(`/orders`);
             resolve();
           });
           rzp.open();
         });
       } catch (error) {
-        toast.error(error?.response?.data?.message || error?.message || "Failed to place order");
+        toast.error(
+          error?.response?.data?.message ||
+            error?.message ||
+            "Failed to place order",
+        );
       } finally {
         setIsPlacingOrder(false);
       }
     }
   };
-
 
   return (
     <PageTransition>
@@ -429,7 +461,8 @@ const MobileCheckout = () => {
             <div className="px-4 py-1.5 flex items-center gap-3">
               <button
                 onClick={() => navigate(-1)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
                 <FiArrowLeft className="text-xl text-gray-700" />
               </button>
               <h1 className="text-lg font-bold text-gray-800">Checkout</h1>
@@ -440,7 +473,10 @@ const MobileCheckout = () => {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="pb-16 lg:px-4 lg:py-6 lg:pb-0">
+          <form
+            onSubmit={handleSubmit}
+            className="pb-16 lg:px-4 lg:py-6 lg:pb-0"
+          >
             <div className="lg:grid lg:grid-cols-12 lg:gap-8">
               {/* Left Column - Steps */}
               <div className="lg:col-span-8 space-y-6">
@@ -449,7 +485,8 @@ const MobileCheckout = () => {
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="px-4 py-4 lg:p-0">
+                    className="px-4 py-4 lg:p-0"
+                  >
                     <h2 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
                       <FiTruck className="text-primary-600" />
                       Shipping Information
@@ -466,10 +503,12 @@ const MobileCheckout = () => {
                             <div
                               key={address.id}
                               onClick={() => handleSelectAddress(address)}
-                              className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${selectedAddressId === address.id
-                                ? "border-primary-500 bg-primary-50"
-                                : "border-gray-200"
-                                }`}>
+                              className={`p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                                selectedAddressId === address.id
+                                  ? "border-primary-500 bg-primary-50"
+                                  : "border-gray-200"
+                              }`}
+                            >
                               <div className="flex items-start justify-between">
                                 <div className="flex items-start gap-2 flex-1">
                                   <FiMapPin className="text-primary-600 mt-0.5 flex-shrink-0" />
@@ -499,7 +538,8 @@ const MobileCheckout = () => {
                         <button
                           type="button"
                           onClick={() => setShowAddressForm(true)}
-                          className="flex items-center gap-2 text-primary-600 hover:text-primary-700 font-semibold text-sm">
+                          className="flex items-center gap-2 text-primary-600 hover:text-primary-700 font-semibold text-sm"
+                        >
                           <FiPlus />
                           Add New Address
                         </button>
@@ -558,7 +598,8 @@ const MobileCheckout = () => {
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="px-4 py-4 lg:p-0">
+                    className="px-4 py-4 lg:p-0"
+                  >
                     <h2 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
                       <FiCreditCard className="text-primary-600" />
                       Payment Method
@@ -567,10 +608,12 @@ const MobileCheckout = () => {
                       {["card", "cash", "bank"].map((method) => (
                         <label
                           key={method}
-                          className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${formData.paymentMethod === method
-                            ? "border-primary-500 bg-primary-50"
-                            : "border-gray-200"
-                            }`}>
+                          className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                            formData.paymentMethod === method
+                              ? "border-primary-500 bg-primary-50"
+                              : "border-gray-200"
+                          }`}
+                        >
                           <input
                             type="radio"
                             name="paymentMethod"
@@ -598,17 +641,21 @@ const MobileCheckout = () => {
                         </h3>
                         <div className="space-y-3">
                           <label
-                            className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${shippingOption === "standard"
-                              ? "border-primary-500 bg-primary-50"
-                              : "border-gray-200"
-                              }`}>
+                            className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                              shippingOption === "standard"
+                                ? "border-primary-500 bg-primary-50"
+                                : "border-gray-200"
+                            }`}
+                          >
                             <div>
                               <input
                                 type="radio"
                                 name="shippingOption"
                                 value="standard"
                                 checked={shippingOption === "standard"}
-                                onChange={(e) => setShippingOption(e.target.value)}
+                                onChange={(e) =>
+                                  setShippingOption(e.target.value)
+                                }
                                 className="w-5 h-5 text-primary-500 mr-3"
                               />
                               <span className="font-semibold text-gray-800 text-sm">
@@ -623,17 +670,21 @@ const MobileCheckout = () => {
                             </span>
                           </label>
                           <label
-                            className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${shippingOption === "express"
-                              ? "border-primary-500 bg-primary-50"
-                              : "border-gray-200"
-                              }`}>
+                            className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                              shippingOption === "express"
+                                ? "border-primary-500 bg-primary-50"
+                                : "border-gray-200"
+                            }`}
+                          >
                             <div>
                               <input
                                 type="radio"
                                 name="shippingOption"
                                 value="express"
                                 checked={shippingOption === "express"}
-                                onChange={(e) => setShippingOption(e.target.value)}
+                                onChange={(e) =>
+                                  setShippingOption(e.target.value)
+                                }
                                 className="w-5 h-5 text-primary-500 mr-3"
                               />
                               <span className="font-semibold text-gray-800 text-sm">
@@ -675,7 +726,8 @@ const MobileCheckout = () => {
                               type="button"
                               onClick={() => handleApplyCoupon()}
                               disabled={isApplyingCoupon}
-                              className="px-4 py-3 gradient-green text-white rounded-xl font-semibold hover:shadow-glow-green transition-all">
+                              className="px-4 py-3 gradient-green text-white rounded-xl font-semibold hover:shadow-glow-green transition-all"
+                            >
                               {isApplyingCoupon ? "Applying..." : "Apply"}
                             </button>
                           </div>
@@ -690,12 +742,16 @@ const MobileCheckout = () => {
                                   <button
                                     key={coupon._id || coupon.code}
                                     type="button"
-                                    onClick={() => handleApplyCoupon(coupon.code)}
+                                    onClick={() =>
+                                      handleApplyCoupon(coupon.code)
+                                    }
                                     disabled={isApplyingCoupon}
                                     className="w-full text-left p-2 bg-white rounded-lg border border-gray-200 hover:border-primary-300 transition-colors"
                                   >
                                     <div className="flex items-center justify-between">
-                                      <p className="text-sm font-semibold text-gray-800">{coupon.code}</p>
+                                      <p className="text-sm font-semibold text-gray-800">
+                                        {coupon.code}
+                                      </p>
                                       <p className="text-xs font-semibold text-primary-700">
                                         {coupon.type === "percentage"
                                           ? `${coupon.value}% OFF`
@@ -705,7 +761,8 @@ const MobileCheckout = () => {
                                       </p>
                                     </div>
                                     <p className="text-xs text-gray-600">
-                                      Min order: {formatPrice(coupon.minOrderValue || 0)}
+                                      Min order:{" "}
+                                      {formatPrice(coupon.minOrderValue || 0)}
                                     </p>
                                   </button>
                                 ))}
@@ -730,7 +787,8 @@ const MobileCheckout = () => {
                               setAppliedDiscount(0);
                               setCouponCode("");
                             }}
-                            className="text-red-600 hover:text-red-700">
+                            className="text-red-600 hover:text-red-700"
+                          >
                             <FiX className="text-lg" />
                           </button>
                         </div>
@@ -770,14 +828,20 @@ const MobileCheckout = () => {
                       <button
                         type="submit"
                         disabled={step === 2 && isPlacingOrder}
-                        className="w-full gradient-green text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:shadow-glow-green transition-all duration-300 transform hover:-translate-y-0.5">
-                        {step === 2 ? (isPlacingOrder ? "Placing Order..." : "Place Order") : "Continue to Payment"}
+                        className="w-full gradient-green text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:shadow-glow-green transition-all duration-300 transform hover:-translate-y-0.5"
+                      >
+                        {step === 2
+                          ? isPlacingOrder
+                            ? "Placing Order..."
+                            : "Place Order"
+                          : "Continue to Payment"}
                       </button>
                       {step === 2 && (
                         <button
                           type="button"
                           onClick={() => setStep(1)}
-                          className="w-full mt-3 py-2 text-gray-500 font-semibold hover:text-gray-700 transition-colors text-sm">
+                          className="w-full mt-3 py-2 text-gray-500 font-semibold hover:text-gray-700 transition-colors text-sm"
+                        >
                           Back to Shipping
                         </button>
                       )}
@@ -787,12 +851,13 @@ const MobileCheckout = () => {
                   {/* Trust Badges or Info */}
                   <div className="flex justify-center gap-4 text-gray-400 text-2xl pt-2 opacity-70">
                     <FiLock className="w-6 h-6" />
-                    <span className="text-xs text-gray-500">Secure Checkout</span>
+                    <span className="text-xs text-gray-500">
+                      Secure Checkout
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
-
           </form>
         </div>
 
@@ -803,7 +868,8 @@ const MobileCheckout = () => {
                 <button
                   type="button"
                   onClick={() => setStep(step - 1)}
-                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors">
+                  className="px-6 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+                >
                   Back
                 </button>
               )}
@@ -811,12 +877,17 @@ const MobileCheckout = () => {
                 type="button"
                 onClick={handleSubmit}
                 disabled={step === 2 && isPlacingOrder}
-                className="flex-1 gradient-green text-white py-3 rounded-xl font-semibold hover:shadow-glow-green transition-all duration-300">
-                {step === 2 ? (isPlacingOrder ? "Placing..." : "Place Order") : "Continue"}
+                className="flex-1 gradient-green text-white py-3 rounded-xl font-semibold hover:shadow-glow-green transition-all duration-300"
+              >
+                {step === 2
+                  ? isPlacingOrder
+                    ? "Placing..."
+                    : "Place Order"
+                  : "Continue"}
               </button>
             </div>
           </div>,
-          document.body
+          document.body,
         )}
 
         {/* Address Form Modal */}
@@ -861,18 +932,21 @@ const AddressFormModal = ({ onSubmit, onCancel }) => {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-black/50 z-50 flex items-end"
-      onClick={onCancel}>
+      onClick={onCancel}
+    >
       <motion.div
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-t-3xl p-6 w-full max-h-[90vh] overflow-y-auto">
+        className="bg-white rounded-t-3xl p-6 w-full max-h-[90vh] overflow-y-auto"
+      >
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-xl font-bold text-gray-800">Add New Address</h3>
           <button
             onClick={onCancel}
-            className="p-2 hover:bg-gray-100 rounded-full">
+            className="p-2 hover:bg-gray-100 rounded-full"
+          >
             <FiX className="text-xl" />
           </button>
         </div>
@@ -987,13 +1061,15 @@ const AddressFormModal = ({ onSubmit, onCancel }) => {
           <div className="flex gap-3 pt-4">
             <button
               type="submit"
-              className="flex-1 gradient-green text-white py-3 rounded-xl font-semibold hover:shadow-glow-green transition-all">
+              className="flex-1 gradient-green text-white py-3 rounded-xl font-semibold hover:shadow-glow-green transition-all"
+            >
               Add Address
             </button>
             <button
               type="button"
               onClick={onCancel}
-              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors">
+              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+            >
               Cancel
             </button>
           </div>

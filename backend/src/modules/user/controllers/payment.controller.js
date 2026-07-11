@@ -10,7 +10,9 @@ import Coupon from '../../../models/Coupon.model.js';
 import Vendor from '../../../models/Vendor.model.js';
 import ReturnRequest from '../../../models/ReturnRequest.model.js';
 import mongoose from 'mongoose';
-import { createRazorpayOrder } from '../../../services/payment.service.js';
+import { createRazorpayOrder, verifyPaymentSignature } from '../../../services/payment.service.js';
+import { processCapturedPayment } from '../../../services/paymentProcessor.js';
+
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
 import { calculateVendorShippingForGroups } from '../../../services/vendorShipping.service.js';
 import { generateOrderId } from '../../../utils/generateOrderId.js';
@@ -498,3 +500,44 @@ export const exchangeUpgradePayment = asyncHandler(async (req, res) => {
         key: process.env.RAZORPAY_KEY_ID,
     }, 'Exchange upgrade payment initialized.'));
 });
+
+// ─── POST /api/user/payment/verify ───────────────────────────────────────────
+// Verifies Razorpay signatures from the frontend, then processes the payment.
+export const verifyPayment = asyncHandler(async (req, res) => {
+    const { orderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
+
+    if (!orderId || !razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+        throw new ApiError(400, 'Missing payment verification details.');
+    }
+
+    // Verify signature cryptographically
+    const isValid = verifyPaymentSignature(razorpayOrderId, razorpayPaymentId, razorpaySignature);
+    if (!isValid) {
+        throw new ApiError(400, 'Invalid payment signature. Verification failed.');
+    }
+
+    // Retrieve order and resolve payment method
+    const order = await Order.findOne({ orderId }).lean();
+    if (!order) throw new ApiError(404, 'Order not found.');
+
+    // Process using the shared, concurrent-safe payment processor
+    await processCapturedPayment({
+        razorpayOrderId,
+        razorpayPaymentId,
+        method: order.paymentMethod || 'card',
+        payload: { source: 'frontend_direct_verify', body: req.body }
+    });
+
+    const updatedOrder = await Order.findById(order._id)
+        .select('orderId status paymentStatus total')
+        .lean();
+
+    return res.status(200).json(
+        new ApiResponse(200, {
+            orderId: updatedOrder.orderId,
+            status: updatedOrder.status,
+            paymentStatus: updatedOrder.paymentStatus,
+        }, 'Payment verified and order processed successfully.')
+    );
+});
+

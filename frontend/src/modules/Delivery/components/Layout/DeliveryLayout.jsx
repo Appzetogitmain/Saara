@@ -1,6 +1,16 @@
 import { useState, useEffect } from "react";
 import { Outlet, useNavigate, useLocation, Link } from "react-router-dom";
-import { FiLogOut, FiTruck, FiPackage, FiHome, FiUser, FiMenu, FiBell, FiMessageSquare, FiCreditCard } from "react-icons/fi";
+import {
+  FiLogOut,
+  FiTruck,
+  FiPackage,
+  FiHome,
+  FiUser,
+  FiMenu,
+  FiBell,
+  FiMessageSquare,
+  FiCreditCard,
+} from "react-icons/fi";
 import { useDeliveryAuthStore } from "../../store/deliveryStore";
 import { useDeliveryNotificationStore } from "../../store/deliveryNotificationStore";
 import { motion, AnimatePresence } from "framer-motion";
@@ -15,13 +25,13 @@ const DeliveryLayout = () => {
   const { unreadCount, fetchNotifications } = useDeliveryNotificationStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(
-    localStorage.getItem('delivery_sidebar_collapsed') === 'true'
+    localStorage.getItem("delivery_sidebar_collapsed") === "true",
   );
 
   const toggleSidebar = () => {
     const nextVal = !isCollapsed;
     setIsCollapsed(nextVal);
-    localStorage.setItem('delivery_sidebar_collapsed', String(nextVal));
+    localStorage.setItem("delivery_sidebar_collapsed", String(nextVal));
   };
 
   useEffect(() => {
@@ -61,10 +71,15 @@ const DeliveryLayout = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Desktop Persistent Sidebar (md and up) */}
-      <aside className={`hidden md:flex flex-col w-64 bg-white border-r border-slate-100 fixed top-0 bottom-0 left-0 z-30 transition-transform duration-300 ${isCollapsed ? '-translate-x-full' : 'translate-x-0'}`}>
+      <aside
+        className={`hidden md:flex flex-col w-64 bg-white border-r border-slate-100 fixed top-0 bottom-0 left-0 z-30 transition-transform duration-300 ${isCollapsed ? "-translate-x-full" : "translate-x-0"}`}
+      >
         {/* Sidebar Header with Logo */}
         <div className="p-5 border-b border-slate-100 flex items-center h-16 flex-shrink-0">
-          <Link to="/delivery/dashboard" className="flex items-center gap-2.5 overflow-visible">
+          <Link
+            to="/delivery/dashboard"
+            className="flex items-center gap-2.5 overflow-visible"
+          >
             {appLogo.src ? (
               <img
                 src={appLogo.src}
@@ -75,18 +90,25 @@ const DeliveryLayout = () => {
                   const p = e.target.parentElement;
                   if (p && !p.querySelector(".logo-fallback")) {
                     const el = document.createElement("span");
-                    el.className = "logo-fallback text-primary-600 font-extrabold text-sm";
-                    el.textContent = "SAARA";
+                    el.className =
+                      "logo-fallback text-primary-600 font-extrabold text-sm";
+                    el.textContent = "Porutkal";
                     p.appendChild(el);
                   }
                 }}
               />
             ) : (
-              <span className="logo-fallback text-primary-600 font-extrabold text-sm">SAARA</span>
+              <span className="logo-fallback text-primary-600 font-extrabold text-sm">
+                Porutkal
+              </span>
             )}
             <div className="flex flex-col">
-              <span className="text-xs font-black text-slate-800 tracking-tight leading-none">DELIVERY</span>
-              <span className="text-[8px] font-bold text-primary-600 tracking-widest uppercase mt-0.5 leading-none">PORTAL</span>
+              <span className="text-xs font-black text-slate-800 tracking-tight leading-none">
+                DELIVERY
+              </span>
+              <span className="text-[8px] font-bold text-primary-600 tracking-widest uppercase mt-0.5 leading-none">
+                PORTAL
+              </span>
             </div>
           </Link>
         </div>
@@ -107,7 +129,9 @@ const DeliveryLayout = () => {
             </div>
           </div>
           <div className="mt-3.5 flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full shadow-sm ${getStatusColor(deliveryBoy?.status)}`} />
+            <span
+              className={`w-2 h-2 rounded-full shadow-sm ${getStatusColor(deliveryBoy?.status)}`}
+            />
             <span className="text-[9px] text-slate-500 font-black uppercase tracking-wider capitalize">
               {deliveryBoy?.status || "offline"}
             </span>
@@ -154,9 +178,13 @@ const DeliveryLayout = () => {
       </aside>
 
       {/* Main Workspace Wrapper */}
-      <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${isCollapsed ? 'md:pl-0' : 'md:pl-64'}`}>
+      <div
+        className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${isCollapsed ? "md:pl-0" : "md:pl-64"}`}
+      >
         {/* Header */}
-        <header className={`fixed top-0 left-0 right-0 z-20 bg-white border-b border-slate-100 shadow-sm transition-all duration-300 ${isCollapsed ? 'md:left-0' : 'md:left-64'}`}>
+        <header
+          className={`fixed top-0 left-0 right-0 z-20 bg-white border-b border-slate-100 shadow-sm transition-all duration-300 ${isCollapsed ? "md:left-0" : "md:left-64"}`}
+        >
           <div className="flex items-center justify-between px-4 py-3 h-16">
             <div className="flex items-center gap-2">
               <button
@@ -183,7 +211,9 @@ const DeliveryLayout = () => {
                     }}
                   />
                 ) : (
-                  <span className="text-primary-600 font-extrabold text-sm">SAARA</span>
+                  <span className="text-primary-600 font-extrabold text-sm">
+                    Porutkal
+                  </span>
                 )}
               </div>
               <FiTruck className="hidden md:block text-primary-600 text-lg" />
@@ -191,10 +221,13 @@ const DeliveryLayout = () => {
                 Delivery Portal
               </h1>
             </div>
-            
+
             {/* Quick unread badge in top navbar for mobile */}
             <div className="md:hidden">
-              <Link to="/delivery/notifications" className="relative p-2 block hover:bg-slate-50 rounded-xl">
+              <Link
+                to="/delivery/notifications"
+                className="relative p-2 block hover:bg-slate-50 rounded-xl"
+              >
                 <FiBell className="text-slate-600 text-xl" />
                 {unreadCount > 0 && (
                   <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
@@ -238,7 +271,9 @@ const DeliveryLayout = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${getStatusColor(deliveryBoy?.status)}`} />
+                    <div
+                      className={`w-2 h-2 rounded-full ${getStatusColor(deliveryBoy?.status)}`}
+                    />
                     <span className="text-xs text-gray-600 capitalize">
                       {deliveryBoy?.status || "offline"}
                     </span>
@@ -265,11 +300,12 @@ const DeliveryLayout = () => {
                       >
                         <Icon className="text-xl flex-shrink-0" />
                         <span className="font-medium">{item.label}</span>
-                        {item.path === "/delivery/notifications" && unreadCount > 0 && (
-                          <span className="ml-auto min-w-[20px] px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-semibold text-center">
-                            {unreadCount > 99 ? "99+" : unreadCount}
-                          </span>
-                        )}
+                        {item.path === "/delivery/notifications" &&
+                          unreadCount > 0 && (
+                            <span className="ml-auto min-w-[20px] px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-semibold text-center">
+                              {unreadCount > 99 ? "99+" : unreadCount}
+                            </span>
+                          )}
                       </button>
                     );
                   })}
@@ -291,12 +327,17 @@ const DeliveryLayout = () => {
         </AnimatePresence>
 
         {/* Main Content */}
-        <main className={`pt-20 ${location.pathname === '/delivery/support' && new URLSearchParams(location.search).get('id') ? 'pb-0' : 'pb-20'} md:pb-6 flex-1 bg-slate-50/30`}>
+        <main
+          className={`pt-20 ${location.pathname === "/delivery/support" && new URLSearchParams(location.search).get("id") ? "pb-0" : "pb-20"} md:pb-6 flex-1 bg-slate-50/30`}
+        >
           <Outlet />
         </main>
 
         {/* Bottom Navigation */}
-        {!(location.pathname === '/delivery/support' && new URLSearchParams(location.search).get('id')) && <DeliveryBottomNav />}
+        {!(
+          location.pathname === "/delivery/support" &&
+          new URLSearchParams(location.search).get("id")
+        ) && <DeliveryBottomNav />}
       </div>
     </div>
   );

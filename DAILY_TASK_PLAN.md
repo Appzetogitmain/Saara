@@ -1,4 +1,4 @@
-# SAARA — 7-Day Daily Task Plan
+# Porutkal — 7-Day Daily Task Plan
 
 ---
 
@@ -53,7 +53,7 @@ app.use(cors({
 **File:** `frontend/src/shared/utils/constants.js`
 ```js
 // Change line 5:
-export const APP_NAME = 'Saara Multi-Vendor E-Commerce';
+export const APP_NAME = 'Porutkal Multi-Vendor E-Commerce';
 ```
 **Expected output:** App name consistent across all pages.
 
@@ -206,7 +206,7 @@ if (formData.paymentMethod === 'card') {
             key: keyId,
             amount, currency,
             order_id: rzpOrderId,
-            name: 'Saara',
+            name: 'Porutkal',
             handler: async (response) => {
                 await api.post('/user/payments/verify', {
                     orderId: order.id,
@@ -660,7 +660,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=...
 SMTP_PASS=...
-FROM_NAME=Saara
+FROM_NAME=Porutkal
 FROM_EMAIL=noreply@yourdomain.com
 RAZORPAY_KEY_ID=rzp_live_...
 RAZORPAY_KEY_SECRET=...

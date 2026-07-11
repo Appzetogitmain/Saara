@@ -62,10 +62,12 @@ const normalizeProduct = (raw) => {
         : null;
 
   const id = normalizeId(raw?.id || raw?._id);
-  const vendorId = normalizeId(vendorObj?._id || vendorObj?.id || raw?.vendorId);
+  const vendorId = normalizeId(
+    vendorObj?._id || vendorObj?.id || raw?.vendorId,
+  );
   const brandId = normalizeId(brandObj?._id || brandObj?.id || raw?.brandId);
   const categoryId = normalizeId(
-    categoryObj?._id || categoryObj?.id || raw?.categoryId
+    categoryObj?._id || categoryObj?.id || raw?.categoryId,
   );
   const image = raw?.image || raw?.images?.[0] || "";
 
@@ -74,7 +76,8 @@ const normalizeProduct = (raw) => {
     id,
     _id: id,
     vendorId,
-    vendorName: raw?.vendorName || vendorObj?.storeName || vendorObj?.name || "",
+    vendorName:
+      raw?.vendorName || vendorObj?.storeName || vendorObj?.name || "",
     brandId,
     brandName: raw?.brandName || brandObj?.name || "",
     categoryId,
@@ -83,7 +86,9 @@ const normalizeProduct = (raw) => {
     images: Array.isArray(raw?.images) ? raw.images : image ? [image] : [],
     price: toNumber(raw?.price, 0),
     originalPrice:
-      raw?.originalPrice !== undefined ? toNumber(raw.originalPrice, undefined) : undefined,
+      raw?.originalPrice !== undefined
+        ? toNumber(raw.originalPrice, undefined)
+        : undefined,
     rating: toNumber(raw?.rating, 0),
     reviewCount: toNumber(raw?.reviewCount, 0),
     isActive: raw?.isActive !== false,
@@ -116,12 +121,12 @@ const deriveDailyDeals = (products = []) => {
     (p) =>
       p.originalPrice !== undefined &&
       toNumber(p.originalPrice, 0) > toNumber(p.price, 0) &&
-      !p.flashSale
+      !p.flashSale,
   );
   const merged = [...flash, ...discounted];
   return merged.filter(
     (p, index, arr) =>
-      index === arr.findIndex((x) => normalizeId(x.id) === normalizeId(p.id))
+      index === arr.findIndex((x) => normalizeId(x.id) === normalizeId(p.id)),
   );
 };
 
@@ -129,23 +134,23 @@ const DEFAULT_HERO_SLIDES = [
   {
     image: heroSlide1,
     link: "/search",
-    hasOverlay: false
+    hasOverlay: false,
   },
   {
     image: heroSlide2,
     link: "/offers",
-    hasOverlay: false
+    hasOverlay: false,
   },
   {
     image: heroSlide3,
     link: "/categories",
-    hasOverlay: false
+    hasOverlay: false,
   },
   {
     image: heroSlide4,
     link: "/new-arrivals",
-    hasOverlay: false
-  }
+    hasOverlay: false,
+  },
 ];
 
 const extractResponseData = (response) => {
@@ -177,19 +182,22 @@ const KNOWN_USER_ROUTE_PATTERNS = [
 ];
 
 const getPathnameFromTarget = (target) =>
-  String(target || "").trim().split("?")[0].split("#")[0];
+  String(target || "")
+    .trim()
+    .split("?")[0]
+    .split("#")[0];
 
 const isKnownInternalRoute = (target) => {
   const pathname = getPathnameFromTarget(target);
   if (!pathname) return false;
-  return KNOWN_USER_ROUTE_PATTERNS.some((pattern) =>
-    !!matchPath({ path: pattern, end: true }, pathname)
+  return KNOWN_USER_ROUTE_PATTERNS.some(
+    (pattern) => !!matchPath({ path: pattern, end: true }, pathname),
   );
 };
 
 const resolveBannerLink = (banner) => {
   const candidate = String(
-    banner?.linkUrl || banner?.link || banner?.url || ""
+    banner?.linkUrl || banner?.link || banner?.url || "",
   ).trim();
   if (!candidate) return "";
   if (isExternalLink(candidate)) return candidate;
@@ -198,11 +206,13 @@ const resolveBannerLink = (banner) => {
   return "";
 };
 
-const isExternalLink = (target) => /^https?:\/\//i.test(String(target || "").trim());
+const isExternalLink = (target) =>
+  /^https?:\/\//i.test(String(target || "").trim());
 const isSafeInternalPath = (target) => String(target || "").startsWith("/");
 
 const getButtonStyleClasses = (style = "primary", isDarkBg = false) => {
-  const base = "inline-flex items-center justify-center gap-2 font-black py-2.5 px-6 md:py-3.5 md:px-8 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-[10px] md:text-sm active:scale-95";
+  const base =
+    "inline-flex items-center justify-center gap-2 font-black py-2.5 px-6 md:py-3.5 md:px-8 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-[10px] md:text-sm active:scale-95";
   if (isDarkBg) {
     switch (style) {
       case "secondary":
@@ -274,7 +284,8 @@ const MobileHome = () => {
     if (catalogProducts.length === 0) return fallbackMostPopular.slice(0, 6);
     return [...catalogProducts]
       .sort((a, b) => {
-        const reviewsDiff = toNumber(b.reviewCount, 0) - toNumber(a.reviewCount, 0);
+        const reviewsDiff =
+          toNumber(b.reviewCount, 0) - toNumber(a.reviewCount, 0);
         if (reviewsDiff !== 0) return reviewsDiff;
         return toNumber(b.rating, 0) - toNumber(a.rating, 0);
       })
@@ -335,9 +346,7 @@ const MobileHome = () => {
         const payload = extractResponseData(vendorsRes.value);
         const vendorsSource = asList(payload?.vendors);
         setHomeVendors(
-          vendorsSource
-            .map(normalizeVendor)
-            .filter((vendor) => vendor.id)
+          vendorsSource.map(normalizeVendor).filter((vendor) => vendor.id),
         );
       }
 
@@ -345,21 +354,19 @@ const MobileHome = () => {
         const payload = extractResponseData(brandsRes.value);
         const brandsSource = asList(payload);
         setHomeBrands(
-          brandsSource
-            .map(normalizeBrand)
-            .filter((brand) => brand.id)
+          brandsSource.map(normalizeBrand).filter((brand) => brand.id),
         );
       }
 
       if (bannersRes.status === "fulfilled") {
         const payload = extractResponseData(bannersRes.value);
         const allBanners = asList(payload).filter(
-          (banner) => banner?.image && banner?.isActive !== false
+          (banner) => banner?.image && banner?.isActive !== false,
         );
 
         const bannerSlides = allBanners
           .filter((banner) =>
-            ["home_slider", "hero"].includes(String(banner?.type || ""))
+            ["home_slider", "hero"].includes(String(banner?.type || "")),
           )
           .sort((a, b) => toNumber(a.order, 0) - toNumber(b.order, 0))
           .map((banner, index) => ({
@@ -374,7 +381,9 @@ const MobileHome = () => {
             link: resolveBannerLink(banner),
             title: banner.title || "Shop Smart. Live Better.",
             subtitle: banner.subtitle || "BEST DEALS",
-            description: banner.description || "Discover the best products at unbeatable prices. Quality you can trust.",
+            description:
+              banner.description ||
+              "Discover the best products at unbeatable prices. Quality you can trust.",
             hasOverlay: !!banner.title,
           }));
         setSlides(bannerSlides.length > 0 ? bannerSlides : DEFAULT_HERO_SLIDES);
@@ -421,7 +430,9 @@ const MobileHome = () => {
 
         // Category Focus Banner
         const focusBanner = allBanners
-          .filter((banner) => String(banner?.type || "") === "category_focus_banner")
+          .filter(
+            (banner) => String(banner?.type || "") === "category_focus_banner",
+          )
           .sort((a, b) => toNumber(a.order, 0) - toNumber(b.order, 0))[0];
         if (focusBanner) {
           setCategoryFocusBanner({
@@ -443,7 +454,9 @@ const MobileHome = () => {
 
         // Category Focus Items
         const focusItems = allBanners
-          .filter((banner) => String(banner?.type || "") === "category_focus_item")
+          .filter(
+            (banner) => String(banner?.type || "") === "category_focus_item",
+          )
           .sort((a, b) => toNumber(a.order, 0) - toNumber(b.order, 0))
           .map((banner) => ({
             name: banner.title,
@@ -586,10 +599,16 @@ const MobileHome = () => {
 
   const handleBannerNavigation = (banner) => {
     if (!banner) return;
-    const target = typeof banner === "string" ? banner : String(banner?.link || banner?.linkUrl || "").trim();
+    const target =
+      typeof banner === "string"
+        ? banner
+        : String(banner?.link || banner?.linkUrl || "").trim();
     if (!target) return;
 
-    const openInNewTab = typeof banner === "object" && banner !== null ? !!banner.openInNewTab : false;
+    const openInNewTab =
+      typeof banner === "object" && banner !== null
+        ? !!banner.openInNewTab
+        : false;
 
     if (openInNewTab || isExternalLink(target)) {
       window.open(target, "_blank", "noopener,noreferrer");
@@ -629,7 +648,8 @@ const MobileHome = () => {
           style={{
             transform: `translateY(${Math.min(pullDistance, 80)}px)`,
             transition: isPulling ? "none" : "transform 0.3s ease-out",
-          }}>
+          }}
+        >
           {/* Hero Banner */}
           <div className="px-4 pb-4 pt-2">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -639,7 +659,8 @@ const MobileHome = () => {
                 onTouchStart={onTouchStart}
                 onTouchMove={onTouchMove}
                 onTouchEnd={onTouchEnd}
-                style={{ touchAction: "pan-y", userSelect: "none" }}>
+                style={{ touchAction: "pan-y", userSelect: "none" }}
+              >
                 {/* Slider Container - All slides in a row */}
                 <motion.div
                   className="flex h-full"
@@ -650,15 +671,17 @@ const MobileHome = () => {
                   animate={{
                     x:
                       dragOffset !== 0
-                        ? `calc(-${currentSlide * (100 / slides.length)
-                        }% - ${dragOffset}px)`
+                        ? `calc(-${
+                            currentSlide * (100 / slides.length)
+                          }% - ${dragOffset}px)`
                         : `-${currentSlide * (100 / slides.length)}%`,
                   }}
                   transition={{
                     duration: dragOffset !== 0 ? 0 : 0.6,
                     ease: [0.25, 0.46, 0.45, 0.94], // Smooth easing
                     type: "tween",
-                  }}>
+                  }}
+                >
                   {slides.map((slide, index) => (
                     <div
                       key={index}
@@ -668,9 +691,15 @@ const MobileHome = () => {
                         width: `${100 / slides.length}%`,
                         height: "100%",
                         cursor: slide?.link ? "pointer" : "default",
-                      }}>
+                      }}
+                    >
                       <picture className="w-full h-full pointer-events-none select-none">
-                        {slide.mobileImage && <source media="(max-width: 640px)" srcSet={slide.mobileImage} />}
+                        {slide.mobileImage && (
+                          <source
+                            media="(max-width: 640px)"
+                            srcSet={slide.mobileImage}
+                          />
+                        )}
                         <img
                           src={slide.image}
                           alt={slide.altText || `Slide ${index + 1}`}
@@ -697,7 +726,8 @@ const MobileHome = () => {
                                 {slide.title || "Shop Smart. Live Better."}
                               </h2>
                               <p className="text-gray-600 text-[10px] md:text-sm lg:text-base font-semibold leading-relaxed max-w-sm line-clamp-2 md:line-clamp-none">
-                                {slide.description || "Discover the best products at unbeatable prices."}
+                                {slide.description ||
+                                  "Discover the best products at unbeatable prices."}
                               </p>
                             </div>
 
@@ -710,7 +740,10 @@ const MobileHome = () => {
                                     e.stopPropagation(); // Avoid triggering parent click
                                     handleSlideClick(slide);
                                   }}
-                                  className={getButtonStyleClasses(slide.buttonStyle, false)}
+                                  className={getButtonStyleClasses(
+                                    slide.buttonStyle,
+                                    false,
+                                  )}
                                 >
                                   <span>{slide.buttonText || "Shop Now"}</span>
                                   <span>&rarr;</span>
@@ -723,7 +756,9 @@ const MobileHome = () => {
                                   }}
                                   className="flex items-center gap-1.5 md:gap-2 text-gray-700 font-black text-[9px] md:text-sm hover:text-primary-600 transition-colors cursor-pointer select-none"
                                 >
-                                  <span className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-white flex items-center justify-center shadow border border-gray-100 text-xs font-bold font-mono">&gt;</span>
+                                  <span className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-white flex items-center justify-center shadow border border-gray-100 text-xs font-bold font-mono">
+                                    &gt;
+                                  </span>
                                   <span>Explore Deals</span>
                                 </button>
                               </div>
@@ -743,10 +778,11 @@ const MobileHome = () => {
                         setAutoSlidePaused(true);
                         setTimeout(() => setAutoSlidePaused(false), 2000);
                       }}
-                      className={`h-1.5 rounded-full transition-all pointer-events-auto ${index === currentSlide
-                        ? "bg-white w-6"
-                        : "bg-white/50 w-1.5"
-                        }`}
+                      className={`h-1.5 rounded-full transition-all pointer-events-auto ${
+                        index === currentSlide
+                          ? "bg-white w-6"
+                          : "bg-white/50 w-1.5"
+                      }`}
                     />
                   ))}
                 </div>
@@ -767,14 +803,18 @@ const MobileHome = () => {
                       {sideBanner?.title || "Luxury that Defines You"}
                     </h3>
                     <p className="text-gray-400 text-sm font-semibold leading-relaxed">
-                      {sideBanner?.description || "Exclusive watches for every occasion."}
+                      {sideBanner?.description ||
+                        "Exclusive watches for every occasion."}
                     </p>
                   </div>
 
                   {sideBanner?.showButton !== false && (
                     <button
                       type="button"
-                      className={getButtonStyleClasses(sideBanner?.buttonStyle, true)}
+                      className={getButtonStyleClasses(
+                        sideBanner?.buttonStyle,
+                        true,
+                      )}
                     >
                       <span>{sideBanner?.buttonText || "Explore Now"}</span>
                       <span>&rarr;</span>
@@ -785,14 +825,20 @@ const MobileHome = () => {
                 {/* Watch Image (Right side, absolute and offset) */}
                 <div className="absolute right-0 bottom-0 top-0 w-[55%] flex items-center justify-end z-10 select-none overflow-hidden">
                   <picture className="h-[110%] w-auto object-contain translate-x-[12%] group-hover:scale-105 group-hover:translate-x-[8%] transition-transform duration-700 pointer-events-none select-none">
-                    {sideBanner?.mobileImage && <source media="(max-width: 640px)" srcSet={sideBanner.mobileImage} />}
+                    {sideBanner?.mobileImage && (
+                      <source
+                        media="(max-width: 640px)"
+                        srcSet={sideBanner.mobileImage}
+                      />
+                    )}
                     <img
                       src={sideBanner?.image || stylishWatchImg}
                       alt={sideBanner?.altText || "Premium Watch"}
                       className="h-full w-auto object-contain pointer-events-none select-none"
                       draggable={false}
                       onError={(e) => {
-                        e.target.src = "https://via.placeholder.com/400x400?text=Premium+Watch";
+                        e.target.src =
+                          "https://via.placeholder.com/400x400?text=Premium+Watch";
                       }}
                     />
                   </picture>
@@ -807,17 +853,19 @@ const MobileHome = () => {
           {/* Categories */}
           <MobileCategoryGrid />
 
-
           {/* Animated Banner */}
           <AnimatedBanner banners={promoBanners} />
 
           {/* Featured Products */}
           <div className="py-4 bg-white mb-2">
             <div className="px-4 flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800 tracking-tight">Featured Products</h2>
+              <h2 className="text-xl font-bold text-gray-800 tracking-tight">
+                Featured Products
+              </h2>
               <Link
                 to="/search"
-                className="text-sm text-primary-600 font-semibold hover:text-primary-700 transition-colors">
+                className="text-sm text-primary-600 font-semibold hover:text-primary-700 transition-colors"
+              >
                 See All
               </Link>
             </div>
@@ -828,7 +876,8 @@ const MobileHome = () => {
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="min-w-[170px] w-[170px] flex-shrink-0">
+                  className="min-w-[170px] w-[170px] flex-shrink-0"
+                >
                   <ProductCard product={product} />
                 </motion.div>
               ))}
@@ -836,7 +885,10 @@ const MobileHome = () => {
           </div>
 
           {/* Category In Focus */}
-          <CategoryInFocus banner={categoryFocusBanner} items={categoryFocusItems} />
+          <CategoryInFocus
+            banner={categoryFocusBanner}
+            items={categoryFocusItems}
+          />
 
           {/* Deals Section */}
           <DealsSection items={dealItems} />
@@ -844,23 +896,19 @@ const MobileHome = () => {
           {/* Trust Bar */}
           <TrustBar />
 
-
-
-
-
-
-
           {/* Tagline Section */}
           <div className="py-12 px-6 text-center bg-gray-50 border border-gray-100 rounded-3xl mt-8 mx-4 shadow-sm">
             <div className="max-w-2xl mx-auto space-y-4">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#e0d6ff] text-[#5b21b6] border border-[#d8b4fe]">
-                ✨ Saara E-Commerce
+                ✨ Porutkal E-Commerce
               </span>
               <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight">
                 Shop from 50+ Trusted Vendors
               </h2>
               <p className="text-xs md:text-sm text-gray-500 font-semibold max-w-md mx-auto leading-relaxed">
-                Saara brings together the best local and international shops in one marketplace. Enjoy secure payments, verified products, and fast local dispatch.
+                Porutkal brings together the best local and international shops
+                in one marketplace. Enjoy secure payments, verified products,
+                and fast local dispatch.
               </p>
             </div>
           </div>

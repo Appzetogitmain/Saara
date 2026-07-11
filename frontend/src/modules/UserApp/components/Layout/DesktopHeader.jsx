@@ -30,13 +30,16 @@ const DesktopHeader = () => {
   const itemCount = useCartStore((state) => state.getItemCount());
   const wishlistCount = useWishlistStore((state) => state.getItemCount());
   const unreadCount = useUserNotificationStore((state) => state.unreadCount);
-  const ensureHydrated = useUserNotificationStore((state) => state.ensureHydrated);
+  const ensureHydrated = useUserNotificationStore(
+    (state) => state.ensureHydrated,
+  );
   const toggleCart = useUIStore((state) => state.toggleCart);
 
   // Category Store
   const { categories, initialize, getRootCategories } = useCategoryStore();
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-  const [selectedCategoryName, setSelectedCategoryName] = useState("All Categories");
+  const [selectedCategoryName, setSelectedCategoryName] =
+    useState("All Categories");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -67,10 +70,7 @@ const DesktopHeader = () => {
       ) {
         setShowNavCategories(false);
       }
-      if (
-        userMenuRef.current &&
-        !userMenuRef.current.contains(event.target)
-      ) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
         setShowUserMenu(false);
       }
     };
@@ -102,13 +102,32 @@ const DesktopHeader = () => {
       <div className="w-full bg-[#f3f4f6] text-gray-700 py-2 border-b border-gray-200">
         <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-12 flex items-center justify-between text-xs font-semibold">
           <div className="flex items-center gap-1.5 hover:text-primary-600 cursor-pointer transition-colors">
-            <span className="bg-primary-600 text-white px-1.5 py-0.5 rounded text-[10px] tracking-wide uppercase">Sale</span>
-            <span>Big Summer Sale is Live! Up to 60% OFF on Electronics &rarr;</span>
+            <span className="bg-primary-600 text-white px-1.5 py-0.5 rounded text-[10px] tracking-wide uppercase">
+              Sale
+            </span>
+            <span>
+              Big Summer Sale is Live! Up to 60% OFF on Electronics &rarr;
+            </span>
           </div>
           <div className="flex items-center gap-6">
-            <Link to="/app" className="hover:text-primary-600 transition-colors">📱 Download App</Link>
-            <Link to="/orders" className="hover:text-primary-600 transition-colors">📦 Track Order</Link>
-            <Link to="/support" className="hover:text-primary-600 transition-colors">💬 Help & Support</Link>
+            <Link
+              to="/app"
+              className="hover:text-primary-600 transition-colors"
+            >
+              📱 Download App
+            </Link>
+            <Link
+              to="/orders"
+              className="hover:text-primary-600 transition-colors"
+            >
+              📦 Track Order
+            </Link>
+            <Link
+              to="/support"
+              className="hover:text-primary-600 transition-colors"
+            >
+              💬 Help & Support
+            </Link>
           </div>
         </div>
       </div>
@@ -125,24 +144,36 @@ const DesktopHeader = () => {
                   alt={appLogo.alt}
                   className="h-10 lg:h-12 w-auto object-contain"
                 />
-                <span className="text-xl lg:text-2xl font-black text-gray-800 tracking-tight">Saara</span>
+                <span className="text-xl lg:text-2xl font-black text-gray-800 tracking-tight">
+                  Porutkal
+                </span>
               </div>
             ) : (
-              <span className="text-2xl font-extrabold text-primary-600">Saara</span>
+              <span className="text-2xl font-extrabold text-primary-600">
+                Porutkal
+              </span>
             )}
           </Link>
 
           {/* Premium Search Bar with Category Dropdown */}
           <div className="flex-1 max-w-xl">
-            <form onSubmit={handleSearchSubmit} className="relative flex items-center bg-gray-50 rounded-full pl-5 pr-1 py-1 border border-gray-200 focus-within:border-primary-500 focus-within:bg-white focus-within:shadow-md transition-all duration-300">
+            <form
+              onSubmit={handleSearchSubmit}
+              className="relative flex items-center bg-gray-50 rounded-full pl-5 pr-1 py-1 border border-gray-200 focus-within:border-primary-500 focus-within:bg-white focus-within:shadow-md transition-all duration-300"
+            >
               {/* Category selector */}
-              <div ref={categoryDropdownRef} className="relative pr-3 mr-3 border-r border-gray-200 shrink-0">
+              <div
+                ref={categoryDropdownRef}
+                className="relative pr-3 mr-3 border-r border-gray-200 shrink-0"
+              >
                 <button
                   type="button"
                   onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
                   className="flex items-center gap-1 text-gray-600 text-xs lg:text-sm font-bold hover:text-primary-600 select-none cursor-pointer focus:outline-none"
                 >
-                  <span className="max-w-[100px] truncate">{selectedCategoryName}</span>
+                  <span className="max-w-[100px] truncate">
+                    {selectedCategoryName}
+                  </span>
                   <FiChevronDown className="text-gray-400" />
                 </button>
                 <AnimatePresence>
@@ -217,7 +248,9 @@ const DesktopHeader = () => {
                   </span>
                 )}
               </div>
-              <span className="text-xs lg:text-sm font-semibold tracking-wide hidden xl:inline">Wishlist</span>
+              <span className="text-xs lg:text-sm font-semibold tracking-wide hidden xl:inline">
+                Wishlist
+              </span>
             </Link>
 
             {/* Cart */}
@@ -233,7 +266,9 @@ const DesktopHeader = () => {
                   </span>
                 )}
               </div>
-              <span className="text-xs lg:text-sm font-semibold tracking-wide hidden xl:inline">Cart</span>
+              <span className="text-xs lg:text-sm font-semibold tracking-wide hidden xl:inline">
+                Cart
+              </span>
             </button>
 
             {/* Notifications */}
@@ -249,7 +284,9 @@ const DesktopHeader = () => {
                   </span>
                 )}
               </div>
-              <span className="text-xs lg:text-sm font-semibold tracking-wide hidden xl:inline">Notifications</span>
+              <span className="text-xs lg:text-sm font-semibold tracking-wide hidden xl:inline">
+                Notifications
+              </span>
             </Link>
 
             {/* User Profile */}
@@ -288,8 +325,12 @@ const DesktopHeader = () => {
                       className="absolute right-0 mt-3 bg-white rounded-2xl shadow-xl border border-gray-100 p-2.5 z-[1000] min-w-[220px]"
                     >
                       <div className="px-3 py-2 border-b border-gray-100 mb-2">
-                        <p className="font-bold text-gray-800 text-sm">{user?.name || "User"}</p>
-                        <p className="text-xs text-gray-500 truncate mt-0.5">{user?.email || ""}</p>
+                        <p className="font-bold text-gray-800 text-sm">
+                          {user?.name || "User"}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate mt-0.5">
+                          {user?.email || ""}
+                        </p>
                       </div>
                       <Link
                         to="/profile"
@@ -368,7 +409,9 @@ const DesktopHeader = () => {
                         className="flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 rounded-xl transition-colors text-left text-gray-700 text-xs lg:text-sm font-semibold truncate"
                       >
                         <span>{cat.name}</span>
-                        <span className="text-[10px] text-gray-400">&rarr;</span>
+                        <span className="text-[10px] text-gray-400">
+                          &rarr;
+                        </span>
                       </Link>
                     ))}
                   </div>
@@ -411,8 +454,12 @@ const DesktopHeader = () => {
 
           {/* Secondary links / micro promotion details */}
           <div className="hidden lg:flex items-center gap-4 text-xs font-semibold text-gray-500">
-            <span className="flex items-center gap-1"><FiPercent /> Smart Offers</span>
-            <span className="flex items-center gap-1"><FiZap /> Trending Now</span>
+            <span className="flex items-center gap-1">
+              <FiPercent /> Smart Offers
+            </span>
+            <span className="flex items-center gap-1">
+              <FiZap /> Trending Now
+            </span>
           </div>
         </div>
       </div>

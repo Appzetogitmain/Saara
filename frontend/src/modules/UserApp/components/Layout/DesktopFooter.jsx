@@ -1,6 +1,11 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { FiFacebook, FiInstagram, FiTwitter, FiArrowRight } from 'react-icons/fi';
+import React from "react";
+import { Link } from "react-router-dom";
+import {
+  FiFacebook,
+  FiInstagram,
+  FiTwitter,
+  FiArrowRight,
+} from "react-icons/fi";
 
 const DesktopFooter = () => {
   return (
@@ -9,17 +14,20 @@ const DesktopFooter = () => {
         {/* Brand Column */}
         <div className="space-y-6">
           <Link to="/" className="flex items-center gap-2">
-            <span className="text-2xl font-black tracking-tight text-white uppercase">Saara</span>
+            <span className="text-2xl font-black tracking-tight text-white uppercase">
+              Porutkal
+            </span>
             <span className="w-2 h-2 rounded-full bg-pink-500 mt-1.5" />
           </Link>
           <p className="text-sm text-slate-400 font-medium leading-relaxed">
-            Your premium marketplace for multi-vendor apparel, beauty, electronics, and fashion accessories.
+            Your premium marketplace for multi-vendor apparel, beauty,
+            electronics, and fashion accessories.
           </p>
           <div className="flex gap-4">
             {[
               { icon: FiFacebook, link: "#" },
               { icon: FiInstagram, link: "#" },
-              { icon: FiTwitter, link: "#" }
+              { icon: FiTwitter, link: "#" },
             ].map((social, idx) => (
               <a
                 key={idx}
@@ -34,16 +42,21 @@ const DesktopFooter = () => {
 
         {/* Categories Column */}
         <div className="space-y-6">
-          <h4 className="text-sm font-bold uppercase text-white tracking-widest">Shop Categories</h4>
+          <h4 className="text-sm font-bold uppercase text-white tracking-widest">
+            Shop Categories
+          </h4>
           <ul className="space-y-3 text-sm font-medium">
             {[
               { name: "Men's Apparel", path: "/categories" },
               { name: "Women's Fashion", path: "/categories" },
               { name: "Beauty & Grooming", path: "/categories" },
-              { name: "Gadgets & Gear", path: "/categories" }
+              { name: "Gadgets & Gear", path: "/categories" },
             ].map((link, idx) => (
               <li key={idx}>
-                <Link to={link.path} className="hover:text-white hover:underline transition-all">
+                <Link
+                  to={link.path}
+                  className="hover:text-white hover:underline transition-all"
+                >
                   {link.name}
                 </Link>
               </li>
@@ -53,16 +66,21 @@ const DesktopFooter = () => {
 
         {/* Support Column */}
         <div className="space-y-6">
-          <h4 className="text-sm font-bold uppercase text-white tracking-widest">Customer Care</h4>
+          <h4 className="text-sm font-bold uppercase text-white tracking-widest">
+            Customer Care
+          </h4>
           <ul className="space-y-3 text-sm font-medium">
             {[
               { name: "Help Center", path: "/policy/support" },
               { name: "Returns & Refund Policy", path: "/policy/return" },
               { name: "Seller Terms & Conditions", path: "/policy/seller" },
-              { name: "FAQ", path: "/policy/support" }
+              { name: "FAQ", path: "/policy/support" },
             ].map((link, idx) => (
               <li key={idx}>
-                <Link to={link.path} className="hover:text-white hover:underline transition-all">
+                <Link
+                  to={link.path}
+                  className="hover:text-white hover:underline transition-all"
+                >
                   {link.name}
                 </Link>
               </li>
@@ -72,9 +90,12 @@ const DesktopFooter = () => {
 
         {/* Newsletter / Contact Column */}
         <div className="space-y-6">
-          <h4 className="text-sm font-bold uppercase text-white tracking-widest">Join Our Newsletter</h4>
+          <h4 className="text-sm font-bold uppercase text-white tracking-widest">
+            Join Our Newsletter
+          </h4>
           <p className="text-sm text-slate-400 font-medium">
-            Subscribe to get notifications about new releases, special sales, and vendor events.
+            Subscribe to get notifications about new releases, special sales,
+            and vendor events.
           </p>
           <div className="flex gap-2">
             <input
@@ -92,11 +113,16 @@ const DesktopFooter = () => {
       {/* Bottom Bar */}
       <div className="max-w-[1440px] mx-auto px-12 mt-16 pt-8 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6">
         <p className="text-xs text-slate-500 font-semibold">
-          © {new Date().getFullYear()} Saara Marketplace. All rights reserved. Developed with ❤️.
+          © {new Date().getFullYear()} Porutkal Marketplace. All rights
+          reserved. Developed with ❤️.
         </p>
         <div className="flex items-center gap-6 text-xs text-slate-500 font-bold uppercase tracking-wider">
-          <span className="hover:text-white cursor-pointer transition-colors">Privacy Policy</span>
-          <span className="hover:text-white cursor-pointer transition-colors">Terms of Service</span>
+          <span className="hover:text-white cursor-pointer transition-colors">
+            Privacy Policy
+          </span>
+          <span className="hover:text-white cursor-pointer transition-colors">
+            Terms of Service
+          </span>
         </div>
       </div>
     </footer>
