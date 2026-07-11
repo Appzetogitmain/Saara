@@ -80,15 +80,22 @@ export const initializePayment = asyncHandler(async (req, res) => {
         }
         const vendorId = String(product.vendorId);
 
+        const variantKey = item.variantKey || null;
+        const variantImage =
+            variantKey && product.variants?.imageMap
+                ? String((product.variants.imageMap instanceof Map || typeof product.variants.imageMap.get === 'function' ? product.variants.imageMap.get(variantKey) : product.variants.imageMap[variantKey]) || '').trim()
+                : '';
+
         enrichedItems.push({
             productId: product._id,
             name: product.name,
+            image: variantImage || product.image || '',
             price,
             quantity,
             vendorId: product.vendorId,
             taxRate: product.taxRate,
             taxIncluded: product.taxIncluded,
-            variantKey: item.variantKey || null,
+            variantKey,
         });
 
         if (!vendorMap[vendorId]) {
