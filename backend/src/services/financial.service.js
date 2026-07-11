@@ -2,7 +2,7 @@
  * Centralized financial calculator for order checkout and settlements.
  * Enforces:
  * - Coupon cap business rule (couponDiscount = min(couponDiscount, subtotal))
- * - Proportional coupon discount distribution across order items
+ * - Proportional coupon discount distribution across vendors first, then items
  * - Reuses item-specific tax rates on the discounted item subtotal
  * - Commission calculated on discounted subtotal (vendor-funded coupons)
  * - Vendor Earnings = effective subtotal - commission
@@ -10,111 +10,156 @@
  * - Settlement Amount = Vendor Earnings
  * - Platform Revenue = Commission
  * - Immediate two-decimal-place rounding
+ * - Exact reconciliation across all vendor-wise splits
  */
 export const calculateOrderFinancials = ({
     items, // array of { productId, price, quantity, taxRate, vendorId }
     couponDiscount,
     shipping, // total shipping
-    vendorCommissions // object of { [vendorId]: commissionRate }
+    vendorCommissions, // object of { [vendorId]: commissionRate }
+    vendorShippings = {} // object of { [vendorId]: shippingAmount }
 }) => {
     const rawCouponDiscount = Number(couponDiscount || 0);
     const rawShipping = Number(shipping || 0);
 
-    // 1. Sort items deterministically and calculate original subtotals
+    // 1. Sort items deterministically
     const sortedItems = [...items].sort((a, b) =>
         String(a.productId).localeCompare(String(b.productId))
     );
 
+    // Calculate original subtotals
     let originalSubtotal = 0;
     const itemSubtotals = sortedItems.map(item => {
-        const sub = (item.price || 0) * (item.quantity || 1);
-        originalSubtotal += sub;
+        const price = Number(item.price || 0);
+        const quantity = Number(item.quantity || 1);
+        const sub = parseFloat((price * quantity).toFixed(2));
+        originalSubtotal = parseFloat((originalSubtotal + sub).toFixed(2));
         return { ...item, sub };
     });
 
-    originalSubtotal = parseFloat(originalSubtotal.toFixed(2));
     const actualCouponDiscount = parseFloat(Math.min(rawCouponDiscount, originalSubtotal).toFixed(2));
     const discountedSubtotal = parseFloat((originalSubtotal - actualCouponDiscount).toFixed(2));
 
-    // 2. Distribute coupon discount share across items proportionally
-    let distributedDiscountSum = 0;
-    let totalTax = 0;
-    
-    const itemsWithDiscount = itemSubtotals.map((item, index) => {
-        let discountShare = 0;
-        if (actualCouponDiscount > 0 && originalSubtotal > 0) {
-            if (index === itemSubtotals.length - 1) {
-                discountShare = parseFloat((actualCouponDiscount - distributedDiscountSum).toFixed(2));
-            } else {
-                discountShare = parseFloat(((actualCouponDiscount * item.sub) / originalSubtotal).toFixed(2));
-                distributedDiscountSum = parseFloat((distributedDiscountSum + discountShare).toFixed(2));
-            }
-        }
-        
-        const discountedItemSubtotal = parseFloat((item.sub - discountShare).toFixed(2));
-
-        // Backward tax extraction for taxIncluded products (Refinement #13)
-        // If tax is included in price: extract it backwards instead of adding 0
-        let itemTax;
-        let commissionBase; // commission is calculated on pre-tax base price
-        if (item.taxIncluded) {
-            const rate = Number(item.taxRate !== undefined ? item.taxRate : 18);
-            // Extract: base = discounted / (1 + rate/100), tax = discounted - base
-            const base = parseFloat((discountedItemSubtotal / (1 + rate / 100)).toFixed(2));
-            itemTax = parseFloat((discountedItemSubtotal - base).toFixed(2));
-            commissionBase = base; // commission on base price only
-        } else {
-            const rate = Number(item.taxRate !== undefined ? item.taxRate : 18);
-            itemTax = parseFloat(((discountedItemSubtotal * rate) / 100).toFixed(2));
-            commissionBase = discountedItemSubtotal;
-        }
-        totalTax = parseFloat((totalTax + itemTax).toFixed(2));
-
-        return {
-            ...item,
-            discountShare,
-            discountedItemSubtotal,
-            commissionBase, // used in vendor grouping for correct commission calculation
-            itemTax
-        };
-    });
-
-    // 3. Group by vendor
+    // 2. Group items by vendor to compute vendor subtotals
     const vendorMap = {};
-    itemsWithDiscount.forEach(item => {
+    itemSubtotals.forEach(item => {
         const vid = String(item.vendorId);
         if (!vendorMap[vid]) {
             vendorMap[vid] = {
                 vendorId: vid,
                 subtotal: 0,
-                discountShare: 0,
-                effectiveSubtotal: 0,
-                commissionRate: vendorCommissions[vid] || 10,
-                commission: 0,
-                vendorEarnings: 0
+                items: []
             };
         }
         vendorMap[vid].subtotal = parseFloat((vendorMap[vid].subtotal + item.sub).toFixed(2));
-        vendorMap[vid].discountShare = parseFloat((vendorMap[vid].discountShare + item.discountShare).toFixed(2));
-        // Use commissionBase (pre-tax price for taxIncluded items, discounted price otherwise)
-        const base = item.commissionBase !== undefined ? item.commissionBase : item.discountedItemSubtotal;
-        vendorMap[vid].effectiveSubtotal = parseFloat((vendorMap[vid].effectiveSubtotal + base).toFixed(2));
+        vendorMap[vid].items.push(item);
     });
 
+    const sortedVendors = Object.values(vendorMap).sort((a, b) =>
+        String(a.vendorId).localeCompare(String(b.vendorId))
+    );
+
+    // 3. Proportional Coupon Distribution across Vendors
+    let distributedDiscountSum = 0;
+    sortedVendors.forEach((v, index) => {
+        let discountShare = 0;
+        if (actualCouponDiscount > 0 && originalSubtotal > 0) {
+            if (index === sortedVendors.length - 1) {
+                discountShare = parseFloat((actualCouponDiscount - distributedDiscountSum).toFixed(2));
+            } else {
+                discountShare = parseFloat(((actualCouponDiscount * v.subtotal) / originalSubtotal).toFixed(2));
+                distributedDiscountSum = parseFloat((distributedDiscountSum + discountShare).toFixed(2));
+            }
+        }
+        v.discountShare = discountShare;
+    });
+
+    // 4. Proportional Coupon Distribution across items under each vendor, and tax calculation
+    const itemsWithDiscount = [];
+    let totalTax = 0;
+
+    sortedVendors.forEach(v => {
+        let itemDiscountSum = 0;
+        let vendorEffectiveSubtotal = 0;
+
+        v.items.forEach((item, index) => {
+            let itemDiscountShare = 0;
+            if (v.discountShare > 0 && v.subtotal > 0) {
+                if (index === v.items.length - 1) {
+                    itemDiscountShare = parseFloat((v.discountShare - itemDiscountSum).toFixed(2));
+                } else {
+                    itemDiscountShare = parseFloat(((v.discountShare * item.sub) / v.subtotal).toFixed(2));
+                    itemDiscountSum = parseFloat((itemDiscountSum + itemDiscountShare).toFixed(2));
+                }
+            }
+
+            const discountedItemSubtotal = parseFloat((item.sub - itemDiscountShare).toFixed(2));
+            const rate = Number(item.taxRate !== undefined ? item.taxRate : 18);
+
+            let itemTax;
+            let commissionBase;
+            if (item.taxIncluded) {
+                // Backward tax extraction: base = discounted / (1 + rate/100), tax = discounted - base
+                const base = parseFloat((discountedItemSubtotal / (1 + rate / 100)).toFixed(2));
+                itemTax = parseFloat((discountedItemSubtotal - base).toFixed(2));
+                commissionBase = base;
+            } else {
+                itemTax = parseFloat(((discountedItemSubtotal * rate) / 100).toFixed(2));
+                commissionBase = discountedItemSubtotal;
+            }
+            totalTax = parseFloat((totalTax + itemTax).toFixed(2));
+            vendorEffectiveSubtotal = parseFloat((vendorEffectiveSubtotal + commissionBase).toFixed(2));
+
+            itemsWithDiscount.push({
+                ...item,
+                discountShare: itemDiscountShare,
+                discountedItemSubtotal,
+                commissionBase,
+                itemTax
+            });
+        });
+
+        v.effectiveSubtotal = vendorEffectiveSubtotal;
+    });
+
+    // Sort itemsWithDiscount back to match original sortedItems order
+    itemsWithDiscount.sort((a, b) =>
+        String(a.productId).localeCompare(String(b.productId))
+    );
+
+    // 5. Vendor final calculations (commission, earnings, tax, total paid by customer)
     let totalCommission = 0;
     let totalVendorEarnings = 0;
 
-    const vendorCalculations = Object.values(vendorMap).map(v => {
-        const commission = parseFloat(((v.effectiveSubtotal * v.commissionRate) / 100).toFixed(2));
+    const vendorCalculations = sortedVendors.map(v => {
+        const commissionRate = vendorCommissions[v.vendorId] || 10;
+        const commission = parseFloat(((v.effectiveSubtotal * commissionRate) / 100).toFixed(2));
         const vendorEarnings = parseFloat((v.effectiveSubtotal - commission).toFixed(2));
 
         totalCommission = parseFloat((totalCommission + commission).toFixed(2));
         totalVendorEarnings = parseFloat((totalVendorEarnings + vendorEarnings).toFixed(2));
 
+        // Calculate vendor tax from itemTax
+        const vendorTax = parseFloat(
+            itemsWithDiscount
+                .filter(item => String(item.vendorId) === String(v.vendorId))
+                .reduce((sum, item) => sum + item.itemTax, 0)
+                .toFixed(2)
+        );
+
+        const vendorShipping = Number(vendorShippings[v.vendorId] || 0);
+        const vendorTotalPaidByCustomer = parseFloat((v.effectiveSubtotal + vendorShipping + vendorTax).toFixed(2));
+
         return {
-            ...v,
+            vendorId: v.vendorId,
+            subtotal: v.subtotal,
+            discountShare: v.discountShare,
+            effectiveSubtotal: v.effectiveSubtotal,
+            commissionRate,
             commission,
-            vendorEarnings
+            vendorEarnings,
+            vendorTax,
+            vendorTotalPaidByCustomer
         };
     });
 

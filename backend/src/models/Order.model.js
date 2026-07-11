@@ -25,6 +25,10 @@ const vendorItemGroupSchema = new mongoose.Schema({
         enum: ['pending', 'processing', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled'],
         default: 'pending',
     },
+    commissionRate: { type: Number, default: 0 },
+    commissionAmount: { type: Number, default: 0 },
+    vendorEarnings: { type: Number, default: 0 },
+    isOnHoldBalanceAdded: { type: Boolean, default: false }
 });
 
 const orderSchema = new mongoose.Schema(
@@ -120,7 +124,7 @@ const orderSchema = new mongoose.Schema(
         deliverySequence: { type: Number, default: 0 },
         escrowStatus: {
             type: String,
-            enum: ["held", "processing", "release_pending", "released", "refund_processing", "refunded"],
+            enum: ["held", "processing", "release_pending", "partially_released", "released", "refund_processing", "refunded"],
             default: "held"
         },
         escrowReleaseDate: { type: Date, default: null },

@@ -356,7 +356,8 @@ export const placeOrder = asyncHandler(async (req, res) => {
         items: enrichedItems,
         couponDiscount,
         shipping,
-        vendorCommissions
+        vendorCommissions,
+        vendorShippings: shippingByVendor
     });
 
     // Update enrichedItems tax with calculated itemTax from financials
@@ -390,6 +391,10 @@ export const placeOrder = asyncHandler(async (req, res) => {
             tax: parseFloat(vTax.toFixed(2)),
             discount: vCalc.discountShare || 0,
             status: 'pending',
+            commissionRate: vCalc.commissionRate || 10,
+            commissionAmount: vCalc.commission || 0,
+            vendorEarnings: vCalc.vendorEarnings || 0,
+            isOnHoldBalanceAdded: false
         };
     });
 
@@ -503,6 +508,20 @@ export const placeOrder = asyncHandler(async (req, res) => {
                     commissionRate: vc.commissionRate,
                     commission: vc.commission,
                     vendorEarnings: vc.vendorEarnings,
+                    // Step 12 financial snapshot & lifecycle fields
+                    vendorSubtotal: vc.subtotal,
+                    vendorCouponDiscount: vc.discountShare,
+                    vendorDiscountedSubtotal: vc.effectiveSubtotal,
+                    vendorTax: vc.vendorTax,
+                    vendorTotalPaidByCustomer: vc.vendorTotalPaidByCustomer,
+                    commissionAmount: vc.commission,
+                    vendorNetEarnings: vc.vendorEarnings,
+                    escrowAmount: vc.vendorEarnings,
+                    walletCredit: 0,
+                    escrowStatus: 'held',
+                    settlementStatus: 'pending',
+                    releasedAt: null,
+                    escrowReleaseDate: null,
                     ...(appliedCoupon ? {
                         couponId: appliedCoupon._id,
                         couponCode: appliedCoupon.code,

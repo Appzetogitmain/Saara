@@ -13,213 +13,152 @@ export const releaseEscrowPayments = async () => {
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     try {
-        // Find delivered orders held in escrow delivered more than 7 days ago
-        // For COD/Cash orders, they MUST also be cash-settled by the admin first
-        const orders = await Order.find({
-            status: 'delivered',
-            escrowStatus: 'held',
-            deliveredAt: { $lte: sevenDaysAgo },
-            $or: [
-                { paymentMethod: { $nin: ['cod', 'cash'] } },
-                { paymentMethod: { $in: ['cod', 'cash'] }, isCashSettled: true }
-            ]
-        });
+        // Find all commissions held in escrow
+        const commissions = await Commission.find({
+            status: { $in: ['pending', 'awaiting_settlement'] },
+            escrowStatus: 'held'
+        }).populate('orderId');
 
-        console.log(`[Escrow Cron] Found ${orders.length} eligible orders for release evaluation.`);
+        console.log(`[Escrow Cron] Found ${commissions.length} commission records held in escrow.`);
 
-        for (const order of orders) {
+        for (const comm of commissions) {
             const session = await mongoose.startSession();
             try {
-                let isSkipped = false;
                 await session.withTransaction(async () => {
-                    // Concurrency Lock: Atomically reserve order for escrow release
-                    const reservedOrder = await Order.findOneAndUpdate(
-                        { _id: order._id, escrowStatus: 'held' },
-                        { $set: { escrowStatus: 'processing' } },
-                        { session, new: true }
-                    );
-
-                    if (!reservedOrder) {
-                        console.log(`[Escrow Cron] Order ${order.orderId} skipped: Locked by another worker.`);
-                        isSkipped = true;
+                    const order = comm.orderId;
+                    if (!order || order.isDeleted) {
+                        console.log(`[Escrow Cron] Skip: Order not found or deleted for commission ${comm._id}`);
                         return;
                     }
 
-                    // Check for active returns, exchanges, or disputes
+                    // Check COD/Cash order cash-settlement condition (remote change)
+                    const isCodOrCash = ['cod', 'cash'].includes(order.paymentMethod);
+                    if (isCodOrCash && !order.isCashSettled) {
+                        console.log(`[Escrow Cron] Skip: COD/Cash order ${order.orderId} is not cash-settled yet.`);
+                        return;
+                    }
+
+                    // Check release date eligibility
+                    const releaseDate = comm.escrowReleaseDate;
+                    const isEligible = releaseDate 
+                        ? releaseDate <= now 
+                        : (order.status === 'delivered' && order.deliveredAt && order.deliveredAt <= sevenDaysAgo);
+
+                    if (!isEligible) {
+                        return;
+                    }
+
+                    // Check for active returns, exchanges, or disputes for this vendor and order
                     const activeReturn = await ReturnRequest.findOne({
                         orderId: order._id,
+                        vendorId: comm.vendorId,
                         status: { 
                             $in: ['pending', 'approved', 'pickup_pending', 'pickup_assigned', 'picked_up', 'delivered_to_vendor', 'replacement_preparing', 'replacement_ready', 'replacement_assigned', 'out_for_delivery'] 
                         }
                     }).session(session);
 
                     if (activeReturn) {
-                        console.log(`[Escrow Cron] Order ${order.orderId} skipped: Active Return/Exchange in progress.`);
-                        await Order.updateOne({ _id: order._id }, { $set: { escrowStatus: 'held' } }, { session });
-                        isSkipped = true;
+                        console.log(`[Escrow Cron] Commission ${comm._id} (Order ${order.orderId}, Vendor ${comm.vendorId}) skipped: Active Return/Exchange in progress.`);
                         return;
                     }
 
-                    // Find all completed return requests for this order
-                    const completedReturns = await ReturnRequest.find({
-                        orderId: order._id,
-                        status: 'completed'
-                    }).session(session);
+                    // Retrieve payout earnings
+                    const netPayout = Number(comm.vendorNetEarnings !== undefined ? comm.vendorNetEarnings : comm.vendorEarnings || 0);
 
-                    // Collect returned product IDs
-                    const returnedProductIds = new Set();
-                    for (const ret of completedReturns) {
-                        if (Array.isArray(ret.items)) {
-                            for (const retItem of ret.items) {
-                                returnedProductIds.add(String(retItem.productId || retItem.id || ''));
-                            }
-                        }
+                    if (netPayout <= 0) {
+                        // Update commission record and skip wallet update
+                        comm.escrowStatus = 'released';
+                        comm.status = 'paid';
+                        comm.settlementStatus = 'paid';
+                        comm.paidAt = now;
+                        comm.releasedAt = now;
+                        comm.walletCredit = 0;
+                        await comm.save({ session });
+                        return;
                     }
 
-                    // Group item payouts by vendor (excluding returned products)
-                    const payouts = {};
-                    for (const item of order.items) {
-                        const productIdStr = String(item.productId || item.id || '');
-                        if (returnedProductIds.has(productIdStr)) {
-                            console.log(`[Escrow Cron] Excluding returned product ${productIdStr} from vendor payout.`);
-                            continue;
+                    const vendor = await Vendor.findById(comm.vendorId).session(session);
+                    if (vendor) {
+                        const walletBalanceBefore = vendor.walletBalance || 0;
+
+                        // 1. Update vendor wallet balances (using parseFloat to prevent floating point issues)
+                        vendor.walletBalance = parseFloat((walletBalanceBefore + netPayout).toFixed(2));
+                        
+                        // onHoldBalance accounting with error logging for shortfalls
+                        if ((vendor.onHoldBalance || 0) < netPayout) {
+                            console.error(`[ACCOUNTING_ERROR] onHoldBalance shortfall for vendor:${vendor._id} order:${order._id}. Expected: ${netPayout}, Have: ${vendor.onHoldBalance || 0}`);
                         }
-                        const vId = String(item.vendorId);
-                        if (!payouts[vId]) payouts[vId] = 0;
-                        payouts[vId] += item.price * item.quantity;
-                    }
+                        vendor.onHoldBalance = parseFloat(Math.max(0, (vendor.onHoldBalance || 0) - netPayout).toFixed(2));
 
-                    // Distribute funds to vendors
-                    for (const [vendorId, amount] of Object.entries(payouts)) {
-                        if (amount <= 0) continue; // skip zero payouts
-                        const vendor = await Vendor.findById(vendorId).session(session);
-                        if (vendor) {
-                            // Find matching pending commissions
-                            const commissions = await Commission.find({
-                                orderId: order._id,
-                                vendorId: vendor._id,
-                                status: { $in: ['pending', 'awaiting_settlement'] }
-                            }).session(session);
+                        await vendor.save({ session });
 
-                            const netPayout = commissions.reduce(
-                                (sum, commission) => sum + Number(commission.vendorEarnings || 0),
-                                0
-                            );
+                        // 2. Create Settlement document
+                        const settlement = await Settlement.create([{
+                            vendorId: vendor._id,
+                            commissionIds: [comm._id],
+                            amount: netPayout,
+                            paymentMethod: 'wallet',
+                            status: 'completed',
+                            notes: `Auto-release of escrow for Order #${order.orderId}`
+                        }], { session });
 
-                            if (netPayout <= 0) continue;
+                        // 3. Update Commission record
+                        comm.escrowStatus = 'released';
+                        comm.status = 'paid';
+                        comm.settlementStatus = 'paid';
+                        comm.paidAt = now;
+                        comm.releasedAt = now;
+                        comm.settlementId = settlement[0]._id;
+                        comm.walletCredit = netPayout;
+                        await comm.save({ session });
 
-                            const walletBalanceBefore = vendor.walletBalance || 0;
+                        // 4. Create ESCROW_RELEASE ledger entry for audit log (Refinement #8)
+                        await VendorWalletTransaction.create([{
+                            vendorId:            vendor._id,
+                            type:                'ESCROW_RELEASE',
+                            amount:              netPayout,
+                            referenceId:         `ESCROW_RELEASE_${order._id}_${vendor._id}_${comm._id}`, // unique per commission
+                            walletBalanceBefore: walletBalanceBefore,
+                            walletBalanceAfter:  vendor.walletBalance,
+                            performedBy:         { role: 'system', id: null },
+                            relatedOrderId:      order._id,
+                            notes:               `Escrow released for Order #${order.orderId} (Commission ${comm._id})`,
+                        }], { session });
 
-                            vendor.walletBalance = walletBalanceBefore + netPayout;
-
-                            // onHoldBalance accounting with error logging for shortfalls
-                            if ((vendor.onHoldBalance || 0) < netPayout) {
-                                console.error(`[ACCOUNTING_ERROR] onHoldBalance shortfall for vendor:${vendor._id} order:${order._id}. Expected: ${netPayout}, Have: ${vendor.onHoldBalance || 0}`);
-                            }
-                            vendor.onHoldBalance = Math.max(0, (vendor.onHoldBalance || 0) - netPayout);
-
-                            await vendor.save({ session });
-
-                            const commissionIds = commissions.map(c => c._id);
-
-                            if (commissionIds.length > 0) {
-                                // Create Settlement document
-                                const settlement = await Settlement.create(
-                                    [{
-                                        vendorId: vendor._id,
-                                        commissionIds,
-                                        amount: netPayout,
-                                        paymentMethod: 'wallet',
-                                        status: 'completed',
-                                        notes: `Auto-release of escrow for Order #${order.orderId}`
-                                    }],
-                                    { session }
-                                );
-
-                                // Link commissions to settlement and set status to paid
-                                await Commission.updateMany(
-                                    { _id: { $in: commissionIds } },
-                                    {
-                                        $set: {
-                                            status: 'paid',
-                                            paidAt: new Date(),
-                                            settlementId: settlement._id
-                                        }
-                                    },
-                                    { session }
-                                );
-
-                                // Create ESCROW_RELEASE ledger entry (Refinement #8 — multi-vendor safe referenceId)
-                                await VendorWalletTransaction.create([{
-                                    vendorId:            vendor._id,
-                                    type:                'ESCROW_RELEASE',
-                                    amount:              netPayout,
-                                    referenceId:         `ESCROW_RELEASE_${order._id}_${vendor._id}`,
-                                    walletBalanceBefore: walletBalanceBefore,
-                                    walletBalanceAfter:  vendor.walletBalance,
-                                    performedBy:         { role: 'system', id: null },
-                                    relatedOrderId:      order._id,
-                                    notes:               `Escrow released for Order #${order.orderId}`,
-                                }], { session });
-                            }
-                        }
-                    }
-
-                    // Transition escrowStatus to released at the very end of successful payout distribution
-                    await Order.updateOne({ _id: order._id }, { $set: { escrowStatus: 'released' } }, { session });
-                });
-
-                if (!isSkipped) {
-                    const committedOrder = await Order.findById(order._id);
-                    if (committedOrder && committedOrder.escrowStatus === 'released') {
-                        // Gather details for notifications
-                        const completedReturns = await ReturnRequest.find({
-                            orderId: order._id,
-                            status: 'completed'
-                        });
-                        const returnedProductIds = new Set();
-                        for (const ret of completedReturns) {
-                            if (Array.isArray(ret.items)) {
-                                for (const retItem of ret.items) {
-                                    returnedProductIds.add(String(retItem.productId || retItem.id || ''));
+                        // 5. Update the order's vendorItems array (for UI display status only, not for financials)
+                        const orderDoc = await Order.findById(order._id).session(session);
+                        if (orderDoc) {
+                            orderDoc.vendorItems = (orderDoc.vendorItems || []).map(vi => {
+                                if (String(vi.vendorId) === String(comm.vendorId)) {
+                                    vi.escrowStatus = 'released';
+                                    vi.settlementStatus = 'paid';
+                                    vi.releasedAt = now;
+                                    vi.walletCredit = netPayout;
                                 }
-                            }
-                        }
-
-                        const payouts = {};
-                        for (const item of order.items) {
-                            const productIdStr = String(item.productId || item.id || '');
-                            if (returnedProductIds.has(productIdStr)) continue;
-                            const vId = String(item.vendorId);
-                            if (!payouts[vId]) payouts[vId] = 0;
-                            payouts[vId] += item.price * item.quantity;
-                        }
-
-                        // Send vendor notifications
-                        for (const [vendorId, amount] of Object.entries(payouts)) {
-                            if (amount <= 0) continue;
-                            const commissions = await Commission.find({
-                                orderId: order._id,
-                                vendorId,
-                                status: 'paid'
+                                return vi;
                             });
-                            const netPayout = commissions.reduce(
-                                (sum, commission) => sum + Number(commission.vendorEarnings || 0),
-                                0
-                            );
-                            if (netPayout <= 0) continue;
 
-                            await createNotification({
-                                recipientId: vendorId,
-                                recipientType: 'vendor',
-                                title: 'Payment Released',
-                                message: `Payment of Rs.${netPayout} for Order #${order.orderId} has been released to your wallet.`,
-                                type: 'payment',
-                                data: { orderId: String(order.orderId), amount: netPayout }
-                            }).catch(() => {});
+                            // Reevaluate top-level order escrowStatus
+                            const allStatuses = orderDoc.vendorItems.map(vi => vi.escrowStatus || 'held');
+                            if (allStatuses.every(s => s === 'released')) {
+                                orderDoc.escrowStatus = 'released';
+                            } else {
+                                orderDoc.escrowStatus = 'partially_released';
+                            }
+                            await orderDoc.save({ session });
                         }
 
-                        // Send admin notifications
+                        // 6. Notify Vendor
+                        await createNotification({
+                            recipientId: vendor._id,
+                            recipientType: 'vendor',
+                            title: 'Payment Released',
+                            message: `Payment of Rs.${netPayout} for Order #${order.orderId} has been released to your wallet.`,
+                            type: 'payment',
+                            data: { orderId: String(order.orderId), amount: netPayout }
+                        }).catch(() => {});
+
+                        // 6. Notify Admins of release completion
                         const { default: Admin } = await import('../models/Admin.model.js');
                         const admins = await Admin.find({ isActive: true }).select('_id').lean();
                         for (const admin of admins) {
@@ -233,13 +172,11 @@ export const releaseEscrowPayments = async () => {
                             }).catch(() => {});
                         }
 
-                        console.log(`[Escrow Cron] Successfully released escrow for Order ${order.orderId}.`);
+                        console.log(`[Escrow Cron] Successfully released escrow for commission ${comm._id} (Order ${order.orderId}, Vendor ${vendor.storeName}, Payout: Rs.${netPayout}).`);
                     }
-                }
-            } catch (itemErr) {
-                console.error(`[Escrow Cron] Error releasing Order ${order.orderId}:`, itemErr);
-                // Since this uses a MongoDB transaction session, the entire transaction (including orderStatus processing)
-                // has been aborted automatically. No manual rollback is necessary as the DB returns to 'held'.
+                });
+            } catch (commErr) {
+                console.error(`[Escrow Cron] Error releasing commission ${comm._id}:`, commErr);
             } finally {
                 await session.endSession();
             }
@@ -248,3 +185,4 @@ export const releaseEscrowPayments = async () => {
         console.error('[Escrow Cron] Scanning error:', err);
     }
 };
+

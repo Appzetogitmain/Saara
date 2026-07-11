@@ -8,6 +8,7 @@ import Commission from '../../../models/Commission.model.js';
 import Product from '../../../models/Product.model.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
+import { handleOrderDeliveryBalances } from '../../../services/orderFinancialHelper.js';
 import mongoose from 'mongoose';
 import { processDeliveryBoyPayout } from '../../../services/deliveryPayout.service.js';
 
@@ -83,6 +84,10 @@ export const getOrderById = asyncHandler(async (req, res) => {
         .lean();
 
     if (!order) throw new ApiError(404, 'Order not found.');
+
+    const commissions = await Commission.find({ orderId: order._id }).lean();
+    order.commissions = commissions || [];
+
     res.status(200).json(new ApiResponse(200, order, 'Order fetched.'));
 });
 
@@ -129,6 +134,8 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
             await session.endSession();
         }
         const freshOrder = await Order.findById(order._id).populate('userId', 'name email');
+        await handleOrderDeliveryBalances(freshOrder);
+        await freshOrder.save();
         Object.assign(order, freshOrder.toObject());
     } else {
         order.status = nextStatus;
@@ -185,6 +192,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
             }
         }
 
+        await handleOrderDeliveryBalances(order);
         await order.save();
     }
     notifyOrderUpdate(order);
