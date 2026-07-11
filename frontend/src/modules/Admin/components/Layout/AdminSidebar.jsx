@@ -31,7 +31,7 @@ import adminMenu from "../../config/adminMenu.json";
 const iconMap = {
   Dashboard: FiHome,
   Orders: FiShoppingBag,
-  "Return Requests": FiRotateCcw,
+  "Returns & Exchanges": FiRotateCcw,
   Products: FiPackage,
   Categories: FiGrid,
   Brands: FiTag,
@@ -63,9 +63,6 @@ const getChildRoute = (parentRoute, childName) => {
     "/admin/categories": {
       "Manage Categories": "/admin/categories/manage-categories",
       "Category Order": "/admin/categories/category-order",
-    },
-    "/admin/brands": {
-      "Manage Brands": "/admin/brands/manage-brands",
     },
     "/admin/customers": {
       "View Customers": "/admin/customers/view-customers",

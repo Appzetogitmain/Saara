@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 import { FiPlus, FiSearch, FiEdit, FiTrash2, FiEye, FiEyeOff } from "react-icons/fi";
 import { motion } from "framer-motion";
-import { useBrandStore } from "../../../../shared/store/brandStore";
-import BrandForm from "../../components/Brands/BrandForm";
-import DataTable from "../../components/DataTable";
-import ExportButton from "../../components/ExportButton";
-import ConfirmModal from "../../components/ConfirmModal";
-import AnimatedSelect from "../../components/AnimatedSelect";
+import { useBrandStore } from "../../../shared/store/brandStore";
+import BrandForm from "../components/Brands/BrandForm";
+import DataTable from "../components/DataTable";
+import ExportButton from "../components/ExportButton";
+import ConfirmModal from "../components/ConfirmModal";
+import AnimatedSelect from "../components/AnimatedSelect";
 
-const ManageBrands = () => {
+const BrandManagement = () => {
   const { brands, initialize, deleteBrand, toggleBrandStatus } = useBrandStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
@@ -77,8 +77,9 @@ const ManageBrands = () => {
       sortable: true,
       render: (value) => (
         <span
-          className={`px-2 py-1 rounded text-xs font-medium ${value ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-            }`}>
+          className={`px-2 py-1 rounded text-xs font-medium ${
+            value ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+          }`}>
           {value ? "Active" : "Inactive"}
         </span>
       ),
@@ -118,10 +119,10 @@ const ManageBrands = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="lg:hidden">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-            Manage Brands
+            Brand Management
           </h1>
           <p className="text-sm sm:text-base text-gray-600">
-            View and manage product brands
+            Create, edit, and manage product brands.
           </p>
         </div>
         <button
@@ -211,4 +212,4 @@ const ManageBrands = () => {
   );
 };
 
-export default ManageBrands;
+export default BrandManagement;

@@ -46,7 +46,6 @@ const MobileOrderDetail = () => {
   const [evidencePreviews, setEvidencePreviews] = useState([]);
   const [isRetryingPayment, setIsRetryingPayment] = useState(false);
 
-
   const fetchDetailsForProduct = async (productId) => {
     if (productDetailsMap[productId]) return;
     try {
@@ -294,7 +293,6 @@ const MobileOrderDetail = () => {
   };
 
   // Phase 2.2 — Retry payment for payment_pending orders
-
 
   const loadRazorpay = () =>
     new Promise((resolve) => {
