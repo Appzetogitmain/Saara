@@ -573,6 +573,7 @@ export const createCampaign = asyncHandler(async (req, res) => {
 
     const campaign = await Campaign.create(payload);
     await syncCampaignBanner(campaign);
+    clearResponseCache();
     const campaignResponse = campaign.toObject ? campaign.toObject() : campaign;
     campaignResponse._reassignment = {
         movedCount: exclusivityResult.movedProducts.length,
@@ -611,6 +612,7 @@ export const updateCampaign = asyncHandler(async (req, res) => {
     } else {
         await deactivateCampaignBannersByRoutes([existing.route, campaign.route]);
     }
+    clearResponseCache();
 
     const campaignResponse = campaign.toObject ? campaign.toObject() : campaign;
     campaignResponse._reassignment = {
@@ -625,5 +627,6 @@ export const deleteCampaign = asyncHandler(async (req, res) => {
     const campaign = await Campaign.findByIdAndDelete(req.params.id);
     if (!campaign) throw new ApiError(404, 'Campaign not found');
     await deactivateCampaignBannersByRoutes([campaign.route]);
+    clearResponseCache();
     return res.status(200).json(new ApiResponse(200, null, 'Campaign deleted successfully'));
 });
