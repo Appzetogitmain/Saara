@@ -6,6 +6,7 @@ import {
   FiTruck,
   FiPackage,
   FiCheckCircle,
+  FiX,
 } from "react-icons/fi";
 import { motion } from "framer-motion";
 import DataTable from "../../components/DataTable";
@@ -165,8 +166,8 @@ const OrderTracking = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+      <div className={`grid grid-cols-1 ${selectedOrder ? 'lg:grid-cols-3' : ''} gap-6`}>
+        <div className={selectedOrder ? 'lg:col-span-2' : 'w-full'}>
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
             {isLoading ? (
               <div className="p-8 text-center text-gray-500">Loading orders...</div>
@@ -183,9 +184,18 @@ const OrderTracking = () => {
 
         {selectedOrder && (
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">
-              Tracking Details
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800">
+                Tracking Details
+              </h3>
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-450 hover:text-gray-600 transition-colors"
+                title="Close tracking details"
+              >
+                <FiX className="text-lg" />
+              </button>
+            </div>
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Order ID</p>

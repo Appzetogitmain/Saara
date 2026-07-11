@@ -18,7 +18,7 @@ import { calculateVendorShippingForGroups } from '../../../services/vendorShippi
 import { sendOrderConfirmationEmail } from '../../../services/email.service.js';
 import { uploadLocalFileToCloudinaryAndCleanup } from '../../../services/upload.service.js';
 import crypto from 'crypto';
-import { notifyOrderUpdate, notifyReturnUpdate } from '../../../services/socket.service.js';
+import { notifyOrderUpdate, notifyReturnUpdate, emitToRoom } from '../../../services/socket.service.js';
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
 import { initiateRefund } from '../../../services/payment.service.js';
 
