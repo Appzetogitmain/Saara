@@ -3,6 +3,9 @@ import asyncHandler from '../../../utils/asyncHandler.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
 import ApiError from '../../../utils/ApiError.js';
 import ReturnRequest from '../../../models/ReturnRequest.model.js';
+import Refund from '../../../models/Refund.model.js';
+import PaymentAttempt from '../../../models/PaymentAttempt.model.js';
+import Vendor from '../../../models/Vendor.model.js';
 import crypto from 'crypto';
 import Order from '../../../models/Order.model.js';
 import Product from '../../../models/Product.model.js';
@@ -10,6 +13,7 @@ import Commission from '../../../models/Commission.model.js';
 import User from '../../../models/User.model.js';
 import Admin from '../../../models/Admin.model.js';
 import { createNotification } from '../../../services/notification.service.js';
+import { initiateRefund } from '../../../services/payment.service.js';
 import { autoAssignReturnPickupPartner, autoAssignExchangeReplacementPartner } from '../../../services/assignmentService.js';
 import { notifyOrderUpdate, notifyReturnUpdate } from '../../../services/socket.service.js';
 
@@ -627,13 +631,16 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                         }
                     }
 
-                    // Reduce vendor onHoldBalance
-                    const Vendor = mongoose.model('Vendor');
-                    const vendor = await Vendor.findById(req.user.id);
-                    if (vendor) {
-                        vendor.onHoldBalance = Math.max(0, (vendor.onHoldBalance || 0) - (request.refundAmount || 0));
-                        await vendor.save();
-                    }
+                    // Reduce vendor onHoldBalance atomically (no read-modify-write race)
+                    await Vendor.findByIdAndUpdate(
+                        req.user.id,
+                        { $inc: { onHoldBalance: -(request.refundAmount || 0) } }
+                    );
+                    console.log('[FINANCIAL_EVENT] onHoldBalance decremented on return completion', {
+                        vendorId:  String(req.user.id),
+                        amount:    request.refundAmount || 0,
+                        timestamp: new Date().toISOString(),
+                    });
 
                     // 1. Retrieve all completed ReturnRequests for the order
                     const completedReturnRequests = await ReturnRequest.find({
@@ -678,7 +685,6 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                     }
 
                     // 4. Create Refund record with idempotency key (Refinement #3 / M-5 / 4.9)
-                    const Refund = mongoose.model('Refund');
                     const refundAmount = request.refundAmount || 0;
                     
                     const refund = (await Refund.create([{
@@ -698,14 +704,12 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                     // Auto-trigger Razorpay refund for online-paid orders
                     if (order.paymentStatus === 'paid' && refundAmount > 0) {
                         try {
-                            const PaymentAttempt = mongoose.model('PaymentAttempt');
                             const paidAttempt = await PaymentAttempt.findOne({
                                 orderId: order._id,
                                 status: 'paid',
                             }).session(session);
 
                             if (paidAttempt?.razorpayPaymentId) {
-                                const { initiateRefund } = await import('../../../services/payment.service.js');
                                 const rzpRefund = await initiateRefund(
                                     paidAttempt.razorpayPaymentId,
                                     refundAmount,

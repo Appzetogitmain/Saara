@@ -193,11 +193,13 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
         }
     }
 
-    const order = await Order.findById(request.orderId?._id || request.orderId);
     const session = await mongoose.startSession();
 
     try {
         await session.withTransaction(async () => {
+            // FIX CRIT-14: fetch order INSIDE transaction so we get a session-consistent read
+            const order = await Order.findById(request.orderId?._id || request.orderId).session(session);
+
             // ── On APPROVED ──
             if (status === 'approved') {
                 // Mark order as returned

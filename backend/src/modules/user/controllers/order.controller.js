@@ -685,6 +685,9 @@ export const cancelOrder = asyncHandler(async (req, res) => {
             if (!order) throw new ApiError(404, 'Order not found.');
             if (!['pending', 'processing', 'payment_pending'].includes(order.status)) throw new ApiError(400, 'Order cannot be cancelled at this stage.');
 
+            // FIX MED-01: preserve original status BEFORE overwriting so stock-restore check is correct
+            const originalStatus = order.status;
+
             order.status = 'cancelled';
             order.cancelledAt = new Date();
             order.cancellationReason = req.body.reason || 'Cancelled by customer';
@@ -694,6 +697,13 @@ export const cancelOrder = asyncHandler(async (req, res) => {
                     status: 'cancelled',
                 }));
             }
+
+            // FIX MED-02: expire all pending/created PaymentAttempts so no zombie payment can succeed
+            await PaymentAttempt.updateMany(
+                { orderId: order._id, status: { $in: ['created', 'processing'] } },
+                { $set: { status: 'failed', notes: 'Order cancelled by customer' } },
+                { session }
+            );
 
             // Queue refund for online-paid orders (COD = no refund, customer hasn't paid)
             if (order.paymentStatus === 'paid') {
@@ -715,7 +725,7 @@ export const cancelOrder = asyncHandler(async (req, res) => {
             await order.save({ session });
 
             // Restore stock and status (only for orders that had stock deducted — not payment_pending)
-            if (order.status !== 'payment_pending') {
+            if (originalStatus !== 'payment_pending') {
                 for (const item of order.items) {
                     const quantity = Number(item.quantity || 0);
                     if (quantity <= 0) continue;

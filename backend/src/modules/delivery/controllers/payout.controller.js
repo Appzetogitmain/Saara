@@ -50,6 +50,15 @@ export const requestWithdrawal = asyncHandler(async (req, res) => {
     const session = await mongoose.startSession();
     try {
         await session.withTransaction(async () => {
+            // IDEMPOTENCY GUARD: prevent concurrent duplicate withdrawals
+            const existingPending = await DeliveryWithdrawal.findOne({
+                deliveryBoyId: req.user.id,
+                status:        { $in: ['pending', 'processing'] },
+            }).session(session).lean();
+            if (existingPending) {
+                throw new ApiError(409, 'You already have a pending withdrawal request. Please wait for it to be processed.');
+            }
+
             const boy = await DeliveryBoy.findById(req.user.id).select('+payoutMethodDetails').session(session);
             if (!boy) throw new ApiError(404, 'Driver profile not found.');
 

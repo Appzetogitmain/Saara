@@ -133,13 +133,28 @@ export const updateWithdrawalStatus = asyncHandler(async (req, res) => {
 
             if (status === 'completed') {
                 // Adjust vendor tracking counters
-                // NO new VendorWalletTransaction — WITHDRAWAL_HOLD was created at request time (Refinement #9)
-                await Vendor.findByIdAndUpdate(
+                const vendor = await Vendor.findByIdAndUpdate(
                     withdrawal.vendorId,
                     { $inc: { pendingWithdrawal: -withdrawal.amount, totalWithdrawn: withdrawal.amount } },
-                    { session }
+                    { new: true, session }
                 );
+
+                // MED-11: Create WITHDRAWAL_COMPLETED ledger entry for full audit trail
+                if (vendor) {
+                    await VendorWalletTransaction.create([{
+                        vendorId:            withdrawal.vendorId,
+                        type:                'WITHDRAWAL_COMPLETED',
+                        amount:              -withdrawal.amount,   // negative = money left wallet
+                        referenceId:         `WITHDRAWAL_COMPLETED_${withdrawal._id}`,
+                        walletBalanceBefore: vendor.walletBalance,   // already deducted at HOLD time
+                        walletBalanceAfter:  vendor.walletBalance,   // no further change
+                        performedBy:         { role: 'admin', id: req.user?.id },
+                        relatedWithdrawalId: withdrawal._id,
+                        notes:               `Withdrawal completed. Transaction ref: ${transactionReference || 'N/A'}. ${notes || ''}`.trim(),
+                    }], { session });
+                }
             }
+
 
             if (status === 'rejected') {
                 // Atomically refund balance and clear pending hold

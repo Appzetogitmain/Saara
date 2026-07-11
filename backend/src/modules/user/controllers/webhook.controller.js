@@ -9,7 +9,9 @@ import Commission from '../../../models/Commission.model.js';
 import Coupon from '../../../models/Coupon.model.js';
 import Refund from '../../../models/Refund.model.js';
 import ReturnRequest from '../../../models/ReturnRequest.model.js';
+import Vendor from '../../../models/Vendor.model.js';
 import { verifyWebhookSignature, initiateRefund } from '../../../services/payment.service.js';
+import { calculateOrderFinancials } from '../../../services/financial.service.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { sendOrderConfirmationEmail } from '../../../services/email.service.js';
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
@@ -165,45 +167,73 @@ async function handlePaymentCaptured(payload) {
             }
 
             // ── All stock deducted successfully ──
-            // Create Commission records from the pre-calculated financials on Order
-            const { default: Vendor } = await import('../../../models/Vendor.model.js');
+            // FINANCIAL SNAPSHOT RULE: use stored order.items prices — not live product prices.
             const vendorIds = [...new Set(order.items.map(i => String(i.vendorId)).filter(Boolean))];
-            const vendors = await Vendor.find({ _id: { $in: vendorIds } }).select('_id commissionRate').session(session).lean();
+            const vendors = await Vendor.find({ _id: { $in: vendorIds } })
+                .select('_id commissionRate vendorName name')
+                .session(session)
+                .lean();
+
             const vendorCommissionMap = Object.fromEntries(vendors.map(v => [String(v._id), v.commissionRate || 10]));
+            const vendorNameMap       = Object.fromEntries(vendors.map(v => [String(v._id), v.vendorName || v.name || '']));
 
-            // Build per-vendor commission from order financials
-            const vendorItemMap = {};
-            for (const item of order.items) {
-                const vid = String(item.vendorId);
-                if (!vendorItemMap[vid]) vendorItemMap[vid] = { vendorId: item.vendorId, subtotal: 0 };
-                vendorItemMap[vid].subtotal += (item.price || 0) * (item.quantity || 0);
-            }
-
-            const commissionDocs = Object.values(vendorItemMap).map(v => {
-                const rate = vendorCommissionMap[String(v.vendorId)] || 10;
-                const commission = parseFloat(((v.subtotal * rate) / 100).toFixed(2));
-                const vendorEarnings = parseFloat((v.subtotal - commission).toFixed(2));
-                return {
-                    orderId:          order._id,
-                    vendorId:         v.vendorId,
-                    subtotal:         v.subtotal,
-                    effectiveSubtotal: v.subtotal,
-                    commissionRate:   rate,
-                    commission,
-                    vendorEarnings,
-                    discountShare:    0,
-                };
+            const financials = calculateOrderFinancials({
+                items: order.items.map(i => ({
+                    productId:   i.productId,
+                    price:       i.price,
+                    quantity:    i.quantity,
+                    taxRate:     i.taxRate     ?? 18,
+                    taxIncluded: i.taxIncluded ?? false,
+                    vendorId:    i.vendorId,
+                })),
+                couponDiscount:    order.couponDiscount || 0,
+                shipping:          order.shipping       || 0,
+                vendorCommissions: vendorCommissionMap,
             });
 
-            await Commission.insertMany(commissionDocs, { session });
+            // IDEMPOTENCY: only create commissions if none exist for this order yet
+            const existingCount = await Commission.countDocuments({ orderId: order._id }).session(session);
+            if (existingCount === 0) {
+                const commissionDocs = financials.vendorCalculations.map(vc => ({
+                    orderId:                   order._id,
+                    vendorId:                  vc.vendorId,
+                    vendorName:                vendorNameMap[String(vc.vendorId)] || '',
+                    subtotal:                  vc.subtotal,
+                    vendorSubtotal:            vc.subtotal,
+                    discountShare:             vc.discountShare,
+                    vendorCouponDiscount:      vc.discountShare,
+                    effectiveSubtotal:         vc.effectiveSubtotal,
+                    vendorDiscountedSubtotal:  vc.effectiveSubtotal,
+                    commissionRate:            vc.commissionRate,
+                    commission:                vc.commission,
+                    commissionAmount:          vc.commission,
+                    vendorEarnings:            vc.vendorEarnings,
+                    vendorNetEarnings:         vc.vendorEarnings,
+                    escrowAmount:              vc.vendorEarnings,
+                    walletCredit:              0,
+                    escrowStatus:              'held',
+                    settlementStatus:          'pending',
+                    vendorTax:                 vc.vendorTax || 0,
+                    vendorTotalPaidByCustomer: vc.vendorTotalPaidByCustomer || vc.subtotal,
+                    ...(order.couponId ? { couponId: order.couponId, couponCode: order.couponCode } : {}),
+                }));
+                await Commission.insertMany(commissionDocs, { session });
 
-            // Increment coupon usage if order had a coupon
+                console.log('[FINANCIAL_EVENT] Commission created via webhook', {
+                    orderId:         String(order._id),
+                    customerId:      String(order.userId),
+                    vendorCount:     commissionDocs.length,
+                    totalCommission: financials.commissionAmount,
+                    timestamp:       new Date().toISOString(),
+                });
+            }
+
+            // Increment coupon usage — use couponId (ObjectId) for precise lookup
             if (order.couponCode) {
-                await Coupon.updateOne(
-                    { code: order.couponCode },
-                    { $inc: { usedCount: 1 } },
-                    { session }
-                );
+                const couponFilter = order.couponId
+                    ? { _id: order.couponId }
+                    : { code: order.couponCode.toUpperCase() };
+                await Coupon.updateOne(couponFilter, { $inc: { usedCount: 1 } }, { session });
             }
 
             // Update Order status
@@ -229,12 +259,11 @@ async function handlePaymentCaptured(payload) {
         });
     } catch (err) {
         if (stockFailed) {
-            // Paid but stock exhausted — trigger auto-refund
+            // EXTERNAL API RULE: Razorpay refund called AFTER session ends, not inside transaction
             await PaymentAttempt.findByIdAndUpdate(attempt._id, { status: 'stock_failed_refunding' });
             await Payment.findByIdAndUpdate(attempt.paymentId, { status: 'refund_pending' });
             await Order.findByIdAndUpdate(order._id, { status: 'payment_failed', paymentStatus: 'failed' });
 
-            // Initiate Razorpay refund
             try {
                 const rzpRefund = await initiateRefund(razorpayPaymentId, order.total, { reason: 'stock_exhausted' });
                 await Refund.create({
@@ -247,16 +276,20 @@ async function handlePaymentCaptured(payload) {
                     paymentAttemptId: attempt._id,
                     notes:            'Auto-refund: stock exhausted after payment',
                 });
+                console.warn('[FINANCIAL_EVENT] Auto-refund triggered', {
+                    orderId: String(order._id), amount: order.total, timestamp: new Date().toISOString()
+                });
             } catch (refundErr) {
                 console.error('[REFUND_ERROR] Auto-refund failed:', refundErr.message);
             }
         } else {
-            await session.endSession();
+            // Non-stock error — let finally handle session cleanup, then rethrow
             throw err;
         }
     } finally {
-        if (session.inTransaction()) await session.abortTransaction();
-        await session.endSession();
+        // End session exactly once — safely ignore double-end errors
+        try { if (session.inTransaction()) await session.abortTransaction(); } catch (_) {}
+        try { await session.endSession(); } catch (_) {}
     }
 
     // ── Post-transaction notifications (fire-and-forget) ──
@@ -326,7 +359,7 @@ async function handleRefundProcessed(payload) {
     if (refund.userId) {
         await createNotification({
             recipientId:   refund.userId,
-            recipientType: 'customer',
+            recipientType: 'user',          // fix: was 'customer' — schema enum is 'user'
             title:         'Refund Processed',
             message:       `Your refund of ₹${refund.amount} has been successfully processed.`,
             type:          'refund',

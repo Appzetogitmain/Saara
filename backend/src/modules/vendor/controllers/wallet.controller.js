@@ -5,6 +5,10 @@ import Commission from '../../../models/Commission.model.js';
 import Settlement from '../../../models/Settlement.model.js';
 import Vendor from '../../../models/Vendor.model.js';
 import Order from '../../../models/Order.model.js';
+import Withdrawal from '../../../models/Withdrawal.model.js';
+import VendorWalletTransaction from '../../../models/VendorWalletTransaction.model.js';
+import Admin from '../../../models/Admin.model.js';
+import { createNotification } from '../../../services/notification.service.js';
 import mongoose from 'mongoose';
 
 // GET /api/vendor/wallet/stats
@@ -28,8 +32,8 @@ export const getWalletStats = asyncHandler(async (req, res) => {
     }).lean();
 
     const expectedCommMap = expectedCommissions.reduce((acc, comm) => {
-        const earnings = comm.vendorEarnings !== undefined 
-            ? comm.vendorEarnings 
+        const earnings = comm.vendorEarnings !== undefined
+            ? comm.vendorEarnings
             : parseFloat((comm.subtotal - comm.commission).toFixed(2));
         acc[String(comm.orderId)] = earnings;
         return acc;
@@ -60,8 +64,8 @@ export const getWalletStats = asyncHandler(async (req, res) => {
     }).lean();
 
     const recentCommMap = recentCommissions.reduce((acc, comm) => {
-        const earnings = comm.vendorEarnings !== undefined 
-            ? comm.vendorEarnings 
+        const earnings = comm.vendorEarnings !== undefined
+            ? comm.vendorEarnings
             : parseFloat((comm.subtotal - comm.commission).toFixed(2));
         acc[String(comm.orderId)] = earnings;
         return acc;
@@ -91,12 +95,15 @@ export const requestWithdrawal = asyncHandler(async (req, res) => {
     const { amount, bankDetails } = req.body;
     const vendorId = req.user.id;
 
-    if (!amount || amount <= 0) {
+    // SEC-07: Normalize amount — reject negative, non-numeric, or excessively precise values
+    const reqAmount = parseFloat(Number(amount).toFixed(2));
+    if (!amount || isNaN(reqAmount) || reqAmount <= 0) {
         throw new ApiError(400, 'Invalid withdrawal amount.');
     }
-
-    const { default: Withdrawal } = await import('../../../models/Withdrawal.model.js');
-    const VendorWalletTransaction = (await import('../../../models/VendorWalletTransaction.model.js')).default;
+    const MIN_WITHDRAWAL = 100;
+    if (reqAmount < MIN_WITHDRAWAL) {
+        throw new ApiError(400, `Minimum withdrawal amount is ₹${MIN_WITHDRAWAL}.`);
+    }
 
     // Resolve bank details outside the transaction
     const vendorForDetails = await Vendor.findById(vendorId).select('bankDetails storeName name walletBalance').lean();
@@ -117,20 +124,20 @@ export const requestWithdrawal = asyncHandler(async (req, res) => {
     let withdrawal;
     try {
         await session.withTransaction(async () => {
-            // STEP 1 — Check for existing pending withdrawal FIRST (Refinement #6)
+            // STEP 1 — Check for existing pending withdrawal FIRST (idempotency guard)
             const existingPending = await Withdrawal.findOne(
                 { vendorId, status: { $in: ['pending', 'approved', 'processing'] } },
                 null,
                 { session }
             );
             if (existingPending) {
-                throw new ApiError(400, 'You already have a pending withdrawal request. Please wait for it to be processed.');
+                throw new ApiError(409, 'You already have a pending withdrawal request. Please wait for it to be processed.');
             }
 
-            // STEP 2 — Atomic balance deduction (prevents race condition)
+            // STEP 2 — Atomic balance deduction (prevents race condition via filter on $gte)
             const vendor = await Vendor.findOneAndUpdate(
-                { _id: vendorId, walletBalance: { $gte: amount } },
-                { $inc: { walletBalance: -amount, pendingWithdrawal: amount } },
+                { _id: vendorId, walletBalance: { $gte: reqAmount } },
+                { $inc: { walletBalance: -reqAmount, pendingWithdrawal: reqAmount } },
                 { new: true, session }
             );
             if (!vendor) {
@@ -140,43 +147,41 @@ export const requestWithdrawal = asyncHandler(async (req, res) => {
             // STEP 3 — Create withdrawal record
             const [created] = await Withdrawal.create([{
                 vendorId,
-                amount,
+                amount: reqAmount,
                 bankDetails: payoutBankDetails,
                 status: 'pending',
             }], { session });
             withdrawal = created;
 
-            // STEP 4 — Create WITHDRAWAL_HOLD ledger entry (Refinement #9)
+            // STEP 4 — Create WITHDRAWAL_HOLD ledger entry
             await VendorWalletTransaction.create([{
                 vendorId,
                 type:                'WITHDRAWAL_HOLD',
-                amount:              -amount,
+                amount:              -reqAmount,
                 referenceId:         `WITHDRAWAL_HOLD_${withdrawal._id}`,
-                walletBalanceBefore: vendor.walletBalance + amount,
+                walletBalanceBefore: vendor.walletBalance + reqAmount,
                 walletBalanceAfter:  vendor.walletBalance,
                 performedBy:         { role: 'vendor', id: vendorId },
                 relatedWithdrawalId: withdrawal._id,
-                notes:               `Withdrawal request of ₹${amount}`,
+                notes:               `Withdrawal request of ₹${reqAmount}`,
             }], { session });
         });
     } finally {
         await session.endSession();
     }
 
-    // Notify Admins (outside transaction — fire and forget)
-    const { default: Admin } = await import('../../../models/Admin.model.js');
+    // Notify Admins (outside transaction — fire and forget, EXTERNAL API RULE)
     const admins = await Admin.find({ isActive: true }).select('_id').lean();
-    const { createNotification } = await import('../../../services/notification.service.js');
-    for (const admin of admins) {
-        await createNotification({
+    await Promise.allSettled(admins.map(admin =>
+        createNotification({
             recipientId:   admin._id,
             recipientType: 'admin',
             title:         'New Withdrawal Request',
-            message:       `Vendor "${vendorForDetails.storeName || vendorForDetails.name}" requested a payout of ₹${amount}.`,
+            message:       `Vendor "${vendorForDetails.storeName || vendorForDetails.name}" requested a payout of ₹${reqAmount}.`,
             type:          'payout',
             data:          { withdrawalId: String(withdrawal._id), vendorId: String(vendorId) },
-        }).catch(console.error);
-    }
+        }).catch(console.error)
+    ));
 
     res.status(201).json(new ApiResponse(201, withdrawal, 'Withdrawal request submitted successfully.'));
 });
@@ -186,8 +191,6 @@ export const getTransactionHistory = asyncHandler(async (req, res) => {
     const { page = 1, limit = 15 } = req.query;
     const vendorId = req.user.id;
     const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
-
-    const { default: Withdrawal } = await import('../../../models/Withdrawal.model.js');
 
     const withdrawals = await Withdrawal.find({ vendorId })
         .sort({ createdAt: -1 })

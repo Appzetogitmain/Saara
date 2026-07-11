@@ -7,6 +7,8 @@ import PaymentAttempt from '../../../models/PaymentAttempt.model.js';
 import Commission from '../../../models/Commission.model.js';
 import Product from '../../../models/Product.model.js';
 import Coupon from '../../../models/Coupon.model.js';
+import Vendor from '../../../models/Vendor.model.js';
+import ReturnRequest from '../../../models/ReturnRequest.model.js';
 import mongoose from 'mongoose';
 import { createRazorpayOrder } from '../../../services/payment.service.js';
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
@@ -28,6 +30,26 @@ export const initializePayment = asyncHandler(async (req, res) => {
 
     const userId = req.user?.id;
     const normalizedPaymentMethod = paymentMethod === 'cash' ? 'cod' : paymentMethod;
+
+    // 4.3 — Idempotency: if client sends a key, return the existing order if it was already created
+    if (idempotencyKey) {
+        const existing = await Order.findOne({
+            userId,
+            idempotencyKey,
+            status: { $in: ['payment_pending', 'processing', 'pending'] },
+        }).lean();
+        if (existing) {
+            const existingAttempt = await PaymentAttempt.findOne({ orderId: existing._id }).sort({ attemptNumber: -1 }).lean();
+            return res.status(200).json(new ApiResponse(200, {
+                orderId: existing.orderId,
+                razorpayOrderId: existingAttempt?.razorpayOrderId || null,
+                amount: existing.total,
+                currency: 'INR',
+                key: process.env.RAZORPAY_KEY_ID,
+                idempotent: true,
+            }, 'Returning existing payment session.'));
+        }
+    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
         throw new ApiError(400, 'Order items are required.');
@@ -52,7 +74,10 @@ export const initializePayment = asyncHandler(async (req, res) => {
         if (!Number.isFinite(basePrice)) throw new ApiError(400, `Invalid price for ${product.name}`);
 
         const price = basePrice;
-        const quantity = Number(item.quantity) || 1;
+        const quantity = Number(item.quantity);
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10000) {
+            throw new ApiError(400, `Invalid quantity for product ${item.productId}. Must be a positive integer between 1 and 10000.`);
+        }
         const vendorId = String(product.vendorId);
 
         enrichedItems.push({
@@ -105,7 +130,6 @@ export const initializePayment = asyncHandler(async (req, res) => {
     const shipping = shippingResult?.total || 0;
 
     // --- Vendor commissions map ---
-    const { default: Vendor } = await import('../../../models/Vendor.model.js');
     const vendorDocs = await Vendor.find({ _id: { $in: Object.keys(vendorMap) } })
         .select('_id commissionRate')
         .lean();
@@ -172,17 +196,34 @@ export const initializePayment = asyncHandler(async (req, res) => {
                     await Product.updateOne({ _id: updatedProduct._id }, { $set: { stock: nextStock } }, { session });
                 }
 
-                // Create commissions
+                // Create commissions — all required Commission schema fields populated
                 const commissionDocs = financials.vendorCalculations.map(vc => ({
-                    orderId: order._id,
-                    vendorId: vc.vendorId,
-                    vendorName: vendorMap[String(vc.vendorId)]?.vendorName || '',
-                    subtotal: vc.subtotal,
-                    discountShare: vc.discountShare,
-                    effectiveSubtotal: vc.effectiveSubtotal,
-                    commissionRate: vc.commissionRate,
-                    commission: vc.commission,
-                    vendorEarnings: vc.vendorEarnings,
+                    orderId:                   order._id,
+                    vendorId:                  vc.vendorId,
+                    vendorName:                vendorMap[String(vc.vendorId)]?.vendorName || '',
+                    subtotal:                  vc.subtotal,
+                    vendorSubtotal:            vc.subtotal,
+                    discountShare:             vc.discountShare,
+                    vendorCouponDiscount:      vc.discountShare,
+                    effectiveSubtotal:         vc.effectiveSubtotal,
+                    vendorDiscountedSubtotal:  vc.effectiveSubtotal,
+                    commissionRate:            vc.commissionRate,
+                    commission:                vc.commission,
+                    commissionAmount:          vc.commission,
+                    vendorEarnings:            vc.vendorEarnings,
+                    vendorNetEarnings:         vc.vendorEarnings,
+                    escrowAmount:              vc.vendorEarnings,
+                    walletCredit:              0,
+                    escrowStatus:              'held',
+                    settlementStatus:          'pending',
+                    vendorTax:                 vc.vendorTax || 0,
+                    vendorTotalPaidByCustomer: vc.vendorTotalPaidByCustomer || vc.subtotal,
+                    ...(appliedCoupon ? {
+                        couponId:    appliedCoupon._id,
+                        couponCode:  appliedCoupon.code,
+                        couponType:  appliedCoupon.type,
+                        couponValue: appliedCoupon.value,
+                    } : {}),
                 }));
                 await Commission.insertMany(commissionDocs, { session });
 
@@ -294,6 +335,12 @@ export const retryPayment = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'This order is not awaiting payment. Cannot retry.');
     }
 
+    // 4.10 — Max 5 payment attempts per order guard
+    const attemptCount = await PaymentAttempt.countDocuments({ orderId: order._id });
+    if (attemptCount >= 5) {
+        throw new ApiError(429, 'Maximum payment attempts (5) reached for this order. Please cancel and create a new order.');
+    }
+
     const payment = await Payment.findOne({ orderId: order._id }).lean();
     if (!payment) throw new ApiError(404, 'Payment record not found.');
 
@@ -336,7 +383,6 @@ export const exchangeUpgradePayment = asyncHandler(async (req, res) => {
     const { returnRequestId } = req.params;
     const userId = req.user?.id;
 
-    const { default: ReturnRequest } = await import('../../../models/ReturnRequest.model.js');
     const request = await ReturnRequest.findOne({ _id: returnRequestId, userId }).lean();
     if (!request) throw new ApiError(404, 'Return request not found.');
     if (request.requestType !== 'exchange') throw new ApiError(400, 'Not an exchange request.');
@@ -345,6 +391,22 @@ export const exchangeUpgradePayment = asyncHandler(async (req, res) => {
     const priceDeltaStatus = request.exchangeDetails?.priceDeltaStatus;
     if (!priceDelta || priceDelta <= 0) throw new ApiError(400, 'No upgrade payment required.');
     if (priceDeltaStatus !== 'pending') throw new ApiError(400, `Price delta already ${priceDeltaStatus}.`);
+
+    // 4.9 — Idempotency: prevent duplicate exchange upgrade attempts
+    const existingAttempt = await PaymentAttempt.findOne({
+        relatedReturnId: request._id,
+        purpose: 'EXCHANGE_UPGRADE',
+        status: { $in: ['created', 'processing'] },
+    }).lean();
+    if (existingAttempt) {
+        return res.status(200).json(new ApiResponse(200, {
+            razorpayOrderId: existingAttempt.razorpayOrderId,
+            amount: priceDelta,
+            currency: 'INR',
+            key: process.env.RAZORPAY_KEY_ID,
+            idempotent: true,
+        }, 'Returning existing exchange upgrade payment.'));
+    }
 
     const order = await Order.findById(request.orderId).lean();
     const payment = await Payment.findOne({ orderId: order._id }).lean();
