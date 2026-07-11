@@ -128,18 +128,32 @@ export const initializePayment = asyncHandler(async (req, res) => {
     }
 
     // --- Shipping calculation ---
-    const vendorGroups = Object.values(vendorMap).map(v => ({
-        vendorId: v.vendorId,
-        items: v.items,
-        shippingOption: shippingOption || 'standard',
-    }));
-    const shippingResult = await calculateVendorShippingForGroups(vendorGroups, shippingAddress);
-    const shipping = shippingResult?.total || 0;
-
-    // --- Vendor commissions map ---
     const vendorDocs = await Vendor.find({ _id: { $in: Object.keys(vendorMap) } })
-        .select('_id commissionRate')
+        .select('_id commissionRate shippingEnabled defaultShippingRate freeShippingThreshold storeName name')
         .lean();
+    const vendorDocsMap = Object.fromEntries(vendorDocs.map(v => [String(v._id), v]));
+
+    const vendorShippingInput = Object.values(vendorMap).map(v => {
+        const doc = vendorDocsMap[String(v.vendorId)] || {};
+        const vSubtotal = v.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        return {
+            vendorId: v.vendorId,
+            subtotal: vSubtotal,
+            shippingEnabled: doc.shippingEnabled !== false,
+            defaultShippingRate: doc.defaultShippingRate,
+            freeShippingThreshold: doc.freeShippingThreshold,
+        };
+    });
+
+    const shippingResult = await calculateVendorShippingForGroups({
+        vendorGroups: vendorShippingInput,
+        shippingAddress,
+        shippingOption: shippingOption || 'standard',
+        couponType: appliedCoupon?.type || null,
+    });
+    const shipping = shippingResult?.totalShipping || 0;
+    const shippingByVendor = shippingResult?.shippingByVendor || {};
+
     const vendorCommissions = Object.fromEntries(vendorDocs.map(v => [String(v._id), v.commissionRate || 10]));
 
     // --- Calculate financials server-side ---
@@ -152,6 +166,39 @@ export const initializePayment = asyncHandler(async (req, res) => {
 
     const { finalTotal: total, discountedSubtotal: subtotal, tax } = financials;
 
+    // Create populated vendorItems array with full financials, commissions, and item details (names, images)
+    const vendorItems = financials.vendorCalculations.map(vc => {
+        const vendorIdStr = String(vc.vendorId);
+        const doc = vendorDocsMap[vendorIdStr] || {};
+        const groupItems = enrichedItems
+            .filter(item => String(item.vendorId) === vendorIdStr)
+            .map(item => ({
+                productId: item.productId,
+                vendorId: item.vendorId,
+                name: item.name,
+                image: item.image,
+                price: item.price,
+                quantity: item.quantity,
+                variant: item.variantKey ? { variantKey: item.variantKey } : {},
+                variantKey: item.variantKey || undefined,
+            }));
+
+        return {
+            vendorId: vc.vendorId,
+            vendorName: doc.storeName || doc.name || '',
+            items: groupItems,
+            subtotal: vc.subtotal,
+            shipping: Number(shippingByVendor[vendorIdStr] || 0),
+            tax: vc.vendorTax,
+            discount: vc.discountShare,
+            status: 'pending',
+            commissionRate: vc.commissionRate,
+            commissionAmount: vc.commission,
+            vendorEarnings: vc.vendorEarnings,
+            isOnHoldBalanceAdded: false,
+        };
+    });
+
     // ─── COD: Create order immediately with stock deduction ───────────────────
     if (normalizedPaymentMethod === 'cod') {
         const session = await mongoose.startSession();
@@ -163,9 +210,10 @@ export const initializePayment = asyncHandler(async (req, res) => {
                     orderId,
                     userId,
                     items: enrichedItems,
-                    vendorItems: Object.values(vendorMap).map(v => ({ vendorId: v.vendorId, items: v.items, status: 'pending' })),
+                    vendorItems,
                     shippingAddress,
                     paymentMethod: 'cod',
+
                     status: 'processing',
                     paymentStatus: 'pending',
                     subtotal,
@@ -260,7 +308,8 @@ export const initializePayment = asyncHandler(async (req, res) => {
                 orderId,
                 userId,
                 items: enrichedItems,
-                vendorItems: Object.values(vendorMap).map(v => ({ vendorId: v.vendorId, items: v.items, status: 'pending' })),
+                vendorItems,
+
                 shippingAddress,
                 paymentMethod: normalizedPaymentMethod,
                 status: 'payment_pending',  // No stock deducted yet
