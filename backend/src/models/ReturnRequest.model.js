@@ -114,6 +114,10 @@ const returnRequestSchema = new mongoose.Schema(
         customerDeliveryOtpAttempts: { type: Number, default: 0 },
         customerDeliveryOtpDebug: { type: String, default: null },
         customerDeliveryOtpVerified: { type: Boolean, default: false },
+        returnPickupPayoutProcessed: { type: Boolean, default: false, index: true },
+        returnPickupPayoutProcessedAt: Date,
+        replacementPayoutProcessed: { type: Boolean, default: false, index: true },
+        replacementPayoutProcessedAt: Date,
     },
     { timestamps: true }
 );

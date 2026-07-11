@@ -2,6 +2,9 @@ import asyncHandler from '../../../utils/asyncHandler.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
 import ApiError from '../../../utils/ApiError.js';
 import ReturnRequest from '../../../models/ReturnRequest.model.js';
+import DeliveryWalletTransaction from '../../../models/DeliveryWalletTransaction.model.js';
+import DeliveryBoy from '../../../models/DeliveryBoy.model.js';
+import mongoose from 'mongoose';
 import Vendor from '../../../models/Vendor.model.js';
 import Order from '../../../models/Order.model.js';
 import crypto from 'crypto';
@@ -134,7 +137,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
     const allowed = ['picked_up', 'delivered_to_vendor', 'out_for_delivery', 'completed'];
     if (!allowed.includes(status)) throw new ApiError(400, `Status must be one of: ${allowed.join(', ')}`);
 
-    const returnRequest = await ReturnRequest.findOne({
+    let returnRequest = await ReturnRequest.findOne({
         _id: req.params.id,
         deliveryBoyId: req.user.id
     }).populate('orderId', 'orderId').populate('vendorId', 'storeName');
@@ -235,8 +238,83 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
         returnRequest.vendorHandoffOtpDebug = vendorOtp;
     }
 
-    returnRequest.status = status;
-    await returnRequest.save();
+    const isDeliveredToVendor = status === 'delivered_to_vendor';
+    const isCompleted = status === 'completed';
+
+    if (isDeliveredToVendor || isCompleted) {
+        const session = await mongoose.startSession();
+        try {
+            await session.withTransaction(async () => {
+                const payoutType = isDeliveredToVendor ? 'returnPickupPayoutProcessed' : 'replacementPayoutProcessed';
+                const refPrefix = isDeliveredToVendor ? 'RETURN_PICKUP' : 'REPLACEMENT_DELIVERY';
+                const payoutAmount = 40; // Flat fee for return/exchange legs
+
+                // 1. Lock the payout atomically to prevent double payouts
+                const updateQuery = { _id: returnRequest._id };
+                updateQuery[payoutType] = { $ne: true };
+
+                const updateFields = { status };
+                updateFields[payoutType] = true;
+                updateFields[payoutType + 'At'] = new Date();
+                if (isDeliveredToVendor) {
+                    updateFields.riderPickupPhotos = returnRequest.riderPickupPhotos;
+                    updateFields.vendorHandoffOtpHash = returnRequest.vendorHandoffOtpHash;
+                    updateFields.vendorHandoffOtpExpiresAt = returnRequest.vendorHandoffOtpExpiresAt;
+                    updateFields.vendorHandoffOtpAttempts = returnRequest.vendorHandoffOtpAttempts;
+                    updateFields.vendorHandoffOtpVerified = returnRequest.vendorHandoffOtpVerified;
+                    updateFields.vendorHandoffOtpDebug = returnRequest.vendorHandoffOtpDebug;
+                }
+
+                const updateReturnResult = await ReturnRequest.updateOne(
+                    updateQuery,
+                    { $set: updateFields },
+                    { session }
+                );
+
+                if (updateReturnResult.modifiedCount === 0) {
+                    throw new Error('Payout already processed for this return leg.');
+                }
+
+                // 2. Fetch driver and get balances
+                const boy = await DeliveryBoy.findById(req.user.id).session(session);
+                if (!boy) throw new Error('Driver profile not found.');
+
+                const walletBefore = boy.walletBalance;
+                const cashBefore = boy.cashInHand;
+
+                // 3. Update balances
+                boy.walletBalance = parseFloat((boy.walletBalance + payoutAmount).toFixed(2));
+                await boy.save({ session });
+
+                // 4. Log ledger transaction
+                await DeliveryWalletTransaction.create(
+                    [{
+                        deliveryBoyId: req.user.id,
+                        type: 'DELIVERY_EARNING',
+                        amount: payoutAmount,
+                        referenceId: `${refPrefix}_PAYOUT_REQUEST_${returnRequest._id}`,
+                        performedBy: { role: 'system' },
+                        walletBalanceBefore: walletBefore,
+                        walletBalanceAfter: boy.walletBalance,
+                        cashInHandBefore: cashBefore,
+                        cashInHandAfter: boy.cashInHand,
+                        notes: `Earned ₹${payoutAmount} for completing ${refPrefix.toLowerCase().replace('_', ' ')} Leg`
+                    }],
+                    { session }
+                );
+            });
+        } finally {
+            await session.endSession();
+        }
+        // Fetch fresh copy to notify socket properly
+        const freshRequest = await ReturnRequest.findById(returnRequest._id);
+        if (freshRequest) {
+            returnRequest = freshRequest;
+        }
+    } else {
+        returnRequest.status = status;
+        await returnRequest.save();
+    }
     notifyReturnUpdate(returnRequest);
 
     // Send notifications based on the new status

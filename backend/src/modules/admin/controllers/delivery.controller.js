@@ -6,6 +6,9 @@ import { asyncHandler } from '../../../utils/asyncHandler.js';
 import { sendEmail } from '../../../services/email.service.js';
 import { createNotification } from '../../../services/notification.service.js';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
+import CashSettlement from '../../../models/CashSettlement.model.js';
+import DeliveryWalletTransaction from '../../../models/DeliveryWalletTransaction.model.js';
 
 const DOC_TOKEN_TTL_MS = 10 * 60 * 1000;
 const DOC_TOKEN_QUERY_KEY = 'docToken';
@@ -396,6 +399,7 @@ export const deleteDeliveryBoy = asyncHandler(async (req, res) => {
  * @access  Private (Admin)
  */
 export const settleCash = asyncHandler(async (req, res) => {
+    const { receiptPhoto, notes, paymentMode = 'cash' } = req.body;
     const boy = await DeliveryBoy.findById(req.params.id);
     if (!boy) {
         throw new ApiError(404, 'Delivery boy not found');
@@ -409,42 +413,91 @@ export const settleCash = asyncHandler(async (req, res) => {
         isDeleted: { $ne: true },
     };
 
-    const unsettledStats = await Order.aggregate([
-        { $match: baseFilter },
-        {
-            $group: {
-                _id: null,
-                count: { $sum: 1 },
-                totalAmount: { $sum: '$total' },
-            },
-        },
-    ]);
+    const session = await mongoose.startSession();
+    let settledAmount = 0;
+    let modifiedCount = 0;
 
-    const unsettledCount = unsettledStats?.[0]?.count || 0;
-    const settledAmount = Number(unsettledStats?.[0]?.totalAmount || 0);
+    try {
+        await session.withTransaction(async () => {
+            const pendingOrders = await Order.find(baseFilter).session(session).select('_id total').lean();
 
-    if (unsettledCount === 0) {
+            if (pendingOrders.length === 0) {
+                return;
+            }
+
+            const orderIds = pendingOrders.map((o) => o._id);
+            settledAmount = parseFloat(pendingOrders.reduce((sum, o) => sum + Number(o.total || 0), 0).toFixed(2));
+
+            // 1. Create CashSettlement document
+            const [settlement] = await CashSettlement.create(
+                [{
+                    deliveryBoyId: req.params.id,
+                    amount: settledAmount,
+                    collectedByAdmin: req.user.id,
+                    orders: orderIds,
+                    paymentMode,
+                    receiptPhoto,
+                    notes: notes || `Settlement for ${orderIds.length} orders`
+                }],
+                { session }
+            );
+
+            // 2. Mark orders as settled
+            const result = await Order.updateMany(
+                { _id: { $in: orderIds }, isCashSettled: { $ne: true } },
+                {
+                    $set: { isCashSettled: true, settledAt: new Date(), cashSettlementId: settlement._id }
+                },
+                { session }
+            );
+            modifiedCount = result.modifiedCount;
+
+            if (modifiedCount !== orderIds.length) {
+                throw new Error('Some orders in this session have already been settled.');
+            }
+
+            // 3. Update rider balances
+            const freshBoy = await DeliveryBoy.findById(req.params.id).session(session);
+            const walletBefore = freshBoy.walletBalance;
+            const cashBefore = freshBoy.cashInHand;
+
+            freshBoy.cashCollected = parseFloat((freshBoy.cashCollected + settledAmount).toFixed(2));
+            freshBoy.cashInHand = parseFloat((freshBoy.cashInHand - settledAmount).toFixed(2));
+            await freshBoy.save({ session });
+
+            // 4. Log ledger transaction
+            await DeliveryWalletTransaction.create(
+                [{
+                    deliveryBoyId: req.params.id,
+                    type: 'COD_SETTLEMENT',
+                    amount: -settledAmount,
+                    referenceId: `COD_SETTLEMENT_SESSION_${settlement._id}`,
+                    performedBy: { role: 'admin', id: req.user.id },
+                    settlementId: settlement._id,
+                    walletBalanceBefore: walletBefore,
+                    walletBalanceAfter: freshBoy.walletBalance,
+                    cashInHandBefore: cashBefore,
+                    cashInHandAfter: freshBoy.cashInHand,
+                    notes: notes || `Settled COD cash collections of ₹${settledAmount}`
+                }],
+                { session }
+            );
+        });
+    } finally {
+        await session.endSession();
+    }
+
+    if (settledAmount === 0) {
         return res.status(200).json(
             new ApiResponse(200, { modifiedCount: 0, settledAmount: 0 }, 'No pending cash to settle')
         );
     }
 
-    const result = await Order.updateMany(
-        baseFilter,
-        {
-            $set: { isCashSettled: true, settledAt: new Date() }
-        }
-    );
-
-    await DeliveryBoy.findByIdAndUpdate(req.params.id, {
-        $inc: { cashCollected: settledAmount },
-    });
-
     res.status(200).json(
         new ApiResponse(
             200,
-            { modifiedCount: result.modifiedCount, settledAmount },
-            `Settled cash for ${result.modifiedCount} orders`
+            { modifiedCount, settledAmount },
+            `Settled cash for ${modifiedCount} orders`
         )
     );
 });

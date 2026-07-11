@@ -113,7 +113,7 @@ const orderSchema = new mongoose.Schema(
         deliverySequence: { type: Number, default: 0 },
         escrowStatus: {
             type: String,
-            enum: ["held", "release_pending", "partially_released", "released", "refund_processing", "refunded"],
+            enum: ["held", "processing", "release_pending", "partially_released", "released", "refund_processing", "refunded"],
             default: "held"
         },
         escrowReleaseDate: { type: Date, default: null },
@@ -128,6 +128,10 @@ const orderSchema = new mongoose.Schema(
             bankName: String
         },
         upiId: String,
+        distance: { type: Number, default: 0 },
+        deliveryPayoutProcessed: { type: Boolean, default: false, index: true },
+        deliveryPayoutProcessedAt: Date,
+        cashSettlementId: { type: mongoose.Schema.Types.ObjectId, ref: 'CashSettlement' },
     },
     { timestamps: true }
 );
@@ -148,6 +152,7 @@ orderSchema.index(
 orderSchema.index({ isDeleted: 1, createdAt: -1 });
 orderSchema.index({ isDeleted: 1, status: 1, createdAt: -1 });
 orderSchema.index({ 'vendorItems.vendorId': 1, createdAt: -1 });
+orderSchema.index({ status: 1, escrowStatus: 1, deliveredAt: 1 });
 
 orderSchema.pre('save', function (next) {
     if (this.isModified('status')) {
