@@ -493,6 +493,16 @@ export const settleCash = asyncHandler(async (req, res) => {
         );
     }
 
+    // Notify delivery boy of cash settlement
+    createNotification({
+        recipientId:   req.params.id,
+        recipientType: 'delivery',
+        title:         'Cash Collected by Admin',
+        message:       `Admin collected \u20b9${settledAmount} COD cash from you for ${modifiedCount} order(s). Your cashInHand has been updated.`,
+        type:          'wallet',
+        data:          { settledAmount, modifiedCount },
+    }).catch(console.error);
+
     res.status(200).json(
         new ApiResponse(
             200,

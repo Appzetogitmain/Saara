@@ -2,20 +2,32 @@ import Commission from '../models/Commission.model.js';
 import Vendor from '../models/Vendor.model.js';
 
 /**
- * Calculate commission for a vendor order item group
+ * Calculate commission for a vendor order item group.
+ * 4.2 — Unified with financial.service.js logic:
+ *   - Commission is applied to the PRE-TAX base price only (not tax-inclusive subtotal).
+ *   - Matches the calculation done in calculateOrderFinancials().
+ *
  * @param {string} vendorId
- * @param {number} subtotal
+ * @param {number} subtotal        - Tax-inclusive subtotal for this vendor group
+ * @param {number} [taxRate=18]    - Blended tax rate for the group (default 18%)
+ * @param {boolean} [taxIncluded]  - Whether tax is already baked into the subtotal
  * @returns {{ commission, vendorEarnings, commissionRate }}
  */
-export const calculateCommission = async (vendorId, subtotal) => {
+export const calculateCommission = async (vendorId, subtotal, taxRate = 18, taxIncluded = false) => {
     const vendor = await Vendor.findById(vendorId).select('commissionRate');
     if (!vendor) throw new Error(`Vendor not found: ${vendorId}`);
 
     const commissionRate = vendor.commissionRate || 10;
-    const commission = parseFloat(((subtotal * commissionRate) / 100).toFixed(2));
-    const vendorEarnings = parseFloat((subtotal - commission).toFixed(2));
 
-    return { commissionRate, commission, vendorEarnings };
+    // If tax is baked in, extract the pre-tax base (backward extraction)
+    const commissionBase = taxIncluded
+        ? parseFloat((subtotal / (1 + taxRate / 100)).toFixed(2))
+        : subtotal;
+
+    const commission     = parseFloat(((commissionBase * commissionRate) / 100).toFixed(2));
+    const vendorEarnings = parseFloat((commissionBase - commission).toFixed(2));
+
+    return { commissionRate, commission, vendorEarnings, commissionBase };
 };
 
 /**

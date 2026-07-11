@@ -13,6 +13,8 @@ import userRoutes from './modules/user/routes/user.routes.js';
 import adminRoutes from './modules/admin/routes/admin.routes.js';
 import vendorRoutes from './modules/vendor/routes/vendor.routes.js';
 import deliveryRoutes from './modules/delivery/routes/delivery.routes.js';
+import webhookRouter from './modules/user/routes/webhook.routes.js';
+import paymentRouter from './modules/user/routes/payment.routes.js';
 
 // Middleware imports
 import { apiLimiter } from './middlewares/rateLimiter.js';
@@ -64,6 +66,9 @@ app.use(cors({
 // Compress JSON responses to reduce payload transfer time.
 app.use(compression());
 
+// ─── Webhook Route (MUST be before express.json to preserve raw body for HMAC) ─
+app.use('/api/webhook', express.raw({ type: 'application/json' }), webhookRouter);
+
 // ─── Body Parsing ────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -104,11 +109,12 @@ app.use(
     },
     express.static(uploadsRoot)
 );
-app.use('/api', publicRoutes);            // Public: products, categories, brands, coupons, banners
-app.use('/api/user', userRoutes);         // Customer: auth, addresses, wishlist, reviews, orders
-app.use('/api/admin', adminRoutes);       // Admin: auth, vendors, orders, catalog, analytics
-app.use('/api/vendor', vendorRoutes);     // Vendor: auth, products, orders, earnings
-app.use('/api/delivery', deliveryRoutes); // Delivery: auth, orders
+app.use('/api', publicRoutes);                       // Public: products, categories, brands, coupons, banners
+app.use('/api/user', userRoutes);                    // Customer: auth, addresses, wishlist, reviews, orders
+app.use('/api/user/payment', paymentRouter);         // Payment: initialize, retry, exchange-upgrade
+app.use('/api/admin', adminRoutes);                  // Admin: auth, vendors, orders, catalog, analytics
+app.use('/api/vendor', vendorRoutes);                // Vendor: auth, products, orders, earnings
+app.use('/api/delivery', deliveryRoutes);            // Delivery: auth, orders
 
 // ─── Error Handling ──────────────────────────────────────────────────────────
 app.use(notFound);

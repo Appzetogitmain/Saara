@@ -47,12 +47,22 @@ const orderSchema = new mongoose.Schema(
         paymentMethod: { type: String, enum: ['card', 'cash', 'bank', 'wallet', 'upi', 'cod'] },
         paymentStatus: {
             type: String,
-            enum: ['pending', 'paid', 'failed', 'refunded'],
+            enum: ['pending', 'paid', 'failed', 'refunded', 'partially_refunded'],
             default: 'pending',
         },
         status: {
             type: String,
-            enum: ['pending', 'processing', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled', 'returned'],
+            enum: [
+                'payment_pending',   // online order created, awaiting payment confirmation
+                'payment_failed',    // payment failed or stock exhausted after payment
+                'pending',           // COD order awaiting delivery assignment
+                'processing',
+                'ready_for_pickup',
+                'shipped',
+                'delivered',
+                'cancelled',
+                'returned',
+            ],
             default: 'pending',
             index: true,
         },
@@ -61,6 +71,7 @@ const orderSchema = new mongoose.Schema(
         tax: { type: Number, default: 0 },
         discount: { type: Number, default: 0 },
         total: { type: Number, default: 0 },
+        couponId: { type: mongoose.Schema.Types.ObjectId, ref: 'Coupon' }, // stored for webhook-time coupon increment
         couponCode: { type: String },
         couponDiscount: { type: Number, default: 0 },
         discountedSubtotal: { type: Number, default: 0 },

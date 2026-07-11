@@ -25,7 +25,12 @@ const returnRequestSchema = new mongoose.Schema(
                 size: String,
                 color: String,
                 variantKey: String,
-            }
+            },
+            newProductPrice:   { type: Number },
+            oldProductPrice:   { type: Number },
+            priceDelta:        { type: Number }, // positive = customer owes extra; negative = customer gets refund
+            priceDeltaStatus:  { type: String, enum: ['pending', 'collected', 'refunded', 'waived'], default: 'pending' },
+            exchangePaymentId: { type: mongoose.Schema.Types.ObjectId, ref: 'PaymentAttempt' },
         },
         evidenceImages: [
             {
@@ -118,6 +123,17 @@ const returnRequestSchema = new mongoose.Schema(
         returnPickupPayoutProcessedAt: Date,
         replacementPayoutProcessed: { type: Boolean, default: false, index: true },
         replacementPayoutProcessedAt: Date,
+        refundDetails: {
+            method:      { type: String, enum: ['bank', 'upi'] },
+            bankDetails: {
+                accountHolder: String,
+                accountNumber: String,
+                ifsc:          String,
+                bankName:      String,
+            },
+            upiId: { type: String },
+        },
+        refundId: { type: mongoose.Schema.Types.ObjectId, ref: 'Refund' },
     },
     { timestamps: true }
 );

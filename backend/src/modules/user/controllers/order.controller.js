@@ -7,6 +7,9 @@ import Coupon from '../../../models/Coupon.model.js';
 import Commission from '../../../models/Commission.model.js';
 import ReturnRequest from '../../../models/ReturnRequest.model.js';
 import Admin from '../../../models/Admin.model.js';
+import Payment from '../../../models/Payment.model.js';
+import PaymentAttempt from '../../../models/PaymentAttempt.model.js';
+import Refund from '../../../models/Refund.model.js';
 import { generateOrderId } from '../../../utils/generateOrderId.js';
 import { generateTrackingNumber } from '../../../utils/generateTrackingNumber.js';
 import mongoose from 'mongoose';
@@ -17,6 +20,7 @@ import { uploadLocalFileToCloudinaryAndCleanup } from '../../../services/upload.
 import crypto from 'crypto';
 import { notifyOrderUpdate, notifyReturnUpdate } from '../../../services/socket.service.js';
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
+import { initiateRefund } from '../../../services/payment.service.js';
 
 
 const normalizeVariantPart = (value) => String(value || '').trim().toLowerCase();
@@ -249,6 +253,14 @@ export const placeOrder = asyncHandler(async (req, res) => {
         if (product.stock === 'out_of_stock') throw new ApiError(400, `${product.name} is out of stock.`);
         if (product.stockQuantity < item.quantity) throw new ApiError(400, `Only ${product.stockQuantity} units of ${product.name} available.`);
 
+        // 4.8 — Enforce minimumOrderQuantity and totalAllowedQuantity (per-product limits)
+        if (product.minimumOrderQuantity && item.quantity < product.minimumOrderQuantity) {
+            throw new ApiError(400, `Minimum order quantity for "${product.name}" is ${product.minimumOrderQuantity}.`);
+        }
+        if (product.totalAllowedQuantity && item.quantity > product.totalAllowedQuantity) {
+            throw new ApiError(400, `Maximum order quantity for "${product.name}" is ${product.totalAllowedQuantity}.`);
+        }
+
         // Always trust server-side product pricing; never trust client-sent item.price.
         const { price: itemPrice, variantKey, hasVariantAxes } = resolveVariantSelection(product, item.variant);
         const variantStockValue = variantKey ? Number(product?.variants?.stockMap?.get?.(variantKey) ?? product?.variants?.stockMap?.[variantKey]) : null;
@@ -449,14 +461,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
                 if (variantPath) {
                     baseFilter[variantPath] = { $gte: Number(item.quantity || 0) };
                 }
-                console.log("DEBUG STOCK CHECK:", {
-                    name: item.name,
-                    productId: item.productId,
-                    variantKey: item.variantKey,
-                    variantPath,
-                    baseFilter,
-                    updatePayload: { $inc: { stockQuantity: -Number(item.quantity || 0), ...(variantPath ? { [variantPath]: -Number(item.quantity || 0) } : {}) } }
-                });
+
 
                 const updatePayload = { $inc: { stockQuantity: -Number(item.quantity || 0) } };
                 if (variantPath) {
@@ -654,11 +659,12 @@ export const getOrderDetail = asyncHandler(async (req, res) => {
 export const cancelOrder = asyncHandler(async (req, res) => {
     const session = await mongoose.startSession();
     let order = null;
+    let shouldRefund = null;
     try {
         await session.withTransaction(async () => {
             order = await Order.findOne({ orderId: req.params.id, userId: req.user.id }).session(session);
             if (!order) throw new ApiError(404, 'Order not found.');
-            if (!['pending', 'processing'].includes(order.status)) throw new ApiError(400, 'Order cannot be cancelled at this stage.');
+            if (!['pending', 'processing', 'payment_pending'].includes(order.status)) throw new ApiError(400, 'Order cannot be cancelled at this stage.');
 
             order.status = 'cancelled';
             order.cancelledAt = new Date();
@@ -669,37 +675,57 @@ export const cancelOrder = asyncHandler(async (req, res) => {
                     status: 'cancelled',
                 }));
             }
+
+            // Queue refund for online-paid orders (COD = no refund, customer hasn't paid)
+            if (order.paymentStatus === 'paid') {
+                const paidAttempt = await PaymentAttempt.findOne({
+                    orderId: order._id, status: 'paid',
+                }).session(session);
+                if (paidAttempt?.razorpayPaymentId) {
+                    shouldRefund = {
+                        razorpayPaymentId: paidAttempt.razorpayPaymentId,
+                        amount: order.total,
+                        orderId: order._id,
+                        paymentId: paidAttempt.paymentId,
+                    };
+                }
+                order.paymentStatus = 'refunded';
+            }
+            // COD cancellation: no refund needed (customer has not paid yet)
+
             await order.save({ session });
 
-            // Restore stock and status
-            for (const item of order.items) {
-                const quantity = Number(item.quantity || 0);
-                if (quantity <= 0) continue;
+            // Restore stock and status (only for orders that had stock deducted — not payment_pending)
+            if (order.status !== 'payment_pending') {
+                for (const item of order.items) {
+                    const quantity = Number(item.quantity || 0);
+                    if (quantity <= 0) continue;
 
-                const productSnapshot = await Product.findById(item.productId)
-                    .select('variants.stockMap variants.prices')
-                    .session(session)
-                    .lean();
-                const variantKey = resolveOrderItemVariantKey(productSnapshot, item);
+                    const productSnapshot = await Product.findById(item.productId)
+                        .select('variants.stockMap variants.prices')
+                        .session(session)
+                        .lean();
+                    const variantKey = resolveOrderItemVariantKey(productSnapshot, item);
 
-                const incUpdate = { stockQuantity: quantity };
-                if (variantKey) {
-                    incUpdate[`variants.stockMap.${variantKey}`] = quantity;
+                    const incUpdate = { stockQuantity: quantity };
+                    if (variantKey) {
+                        incUpdate[`variants.stockMap.${variantKey}`] = quantity;
+                    }
+
+                    const product = await Product.findByIdAndUpdate(item.productId, { $inc: incUpdate }, { new: true, session });
+                    if (!product) continue;
+
+                    const nextStockState =
+                        product.stockQuantity <= 0
+                            ? 'out_of_stock'
+                            : (product.stockQuantity <= product.lowStockThreshold ? 'low_stock' : 'in_stock');
+
+                    await Product.updateOne(
+                        { _id: product._id },
+                        { $set: { stock: nextStockState } },
+                        { session }
+                    );
                 }
-
-                const product = await Product.findByIdAndUpdate(item.productId, { $inc: incUpdate }, { new: true, session });
-                if (!product) continue;
-
-                const nextStockState =
-                    product.stockQuantity <= 0
-                        ? 'out_of_stock'
-                        : (product.stockQuantity <= product.lowStockThreshold ? 'low_stock' : 'in_stock');
-
-                await Product.updateOne(
-                    { _id: product._id },
-                    { $set: { stock: nextStockState } },
-                    { session }
-                );
             }
 
             // Reverse vendor earnings visibility for this order.
@@ -720,6 +746,29 @@ export const cancelOrder = asyncHandler(async (req, res) => {
         });
     } finally {
         await session.endSession();
+    }
+
+    // After transaction: initiate Razorpay refund for online-paid orders
+    if (shouldRefund) {
+        try {
+            const rzpRefund = await initiateRefund(shouldRefund.razorpayPaymentId, shouldRefund.amount, {
+                reason: 'customer_cancellation',
+            });
+            await Refund.create({
+                orderId:          shouldRefund.orderId,
+                amount:           shouldRefund.amount,
+                referenceId:      `ORDER_CANCEL_REFUND_${shouldRefund.orderId}`, // unique — prevents double refund
+                method:           'razorpay_auto',
+                status:           'processing',
+                razorpayRefundId: rzpRefund.id,
+                paymentAttemptId: shouldRefund.paymentId,
+                notes:            'Refund: customer cancelled order',
+            });
+            await Payment.findOneAndUpdate({ orderId: shouldRefund.orderId }, { status: 'refunded' });
+        } catch (refundErr) {
+            // Log but don't fail the cancel — order is already cancelled
+            console.error('[CANCEL_REFUND_ERROR]', shouldRefund.orderId, refundErr.message);
+        }
     }
 
     if (order) {
@@ -1085,13 +1134,16 @@ export const regenerateReturnPickupOtp = asyncHandler(async (req, res) => {
     returnRequest.returnPickupOtpExpiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
     returnRequest.returnPickupOtpAttempts = 0;
     returnRequest.returnPickupOtpVerified = false;
-    returnRequest.returnPickupOtpDebug = otp;
+
+    // 5.1 — Only store/return plain-text OTP in non-production environments
+    const isDev = process.env.NODE_ENV !== 'production';
+    returnRequest.returnPickupOtpDebug = isDev ? otp : null;
 
     await returnRequest.save();
     notifyReturnUpdate(returnRequest);
 
     return res.status(200).json(new ApiResponse(200, {
-        otpDebug: otp,
+        ...(isDev && { otpDebug: otp }),   // never exposed in production
         expiresAt: returnRequest.returnPickupOtpExpiresAt,
         returnRequest: normalizeReturnRequest(returnRequest)
     }, 'OTP regenerated successfully.'));

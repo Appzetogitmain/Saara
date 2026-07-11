@@ -95,51 +95,87 @@ export const requestWithdrawal = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Invalid withdrawal amount.');
     }
 
-    const vendor = await Vendor.findById(vendorId);
-    if (!vendor) throw new ApiError(404, 'Vendor not found.');
-
-    if (vendor.walletBalance < amount) {
-        throw new ApiError(400, 'Insufficient balance in wallet.');
-    }
-
     const { default: Withdrawal } = await import('../../../models/Withdrawal.model.js');
-    
+    const VendorWalletTransaction = (await import('../../../models/VendorWalletTransaction.model.js')).default;
+
+    // Resolve bank details outside the transaction
+    const vendorForDetails = await Vendor.findById(vendorId).select('bankDetails storeName name walletBalance').lean();
+    if (!vendorForDetails) throw new ApiError(404, 'Vendor not found.');
+
     const payoutBankDetails = bankDetails || {
-        accountHolder: vendor.bankDetails?.accountName || '',
-        accountNumber: vendor.bankDetails?.accountNumber || '',
-        ifsc: vendor.bankDetails?.ifscCode || '',
-        bankName: vendor.bankDetails?.bankName || ''
+        accountHolder: vendorForDetails.bankDetails?.accountName || '',
+        accountNumber: vendorForDetails.bankDetails?.accountNumber || '',
+        ifsc:          vendorForDetails.bankDetails?.ifscCode || '',
+        bankName:      vendorForDetails.bankDetails?.bankName || '',
     };
 
     if (!payoutBankDetails.accountNumber || !payoutBankDetails.accountHolder) {
         throw new ApiError(400, 'Bank details are required to process withdrawals. Please update store profile first.');
     }
 
-    const withdrawal = await Withdrawal.create({
-        vendorId,
-        amount,
-        bankDetails: payoutBankDetails,
-        status: 'pending'
-    });
+    const session = await mongoose.startSession();
+    let withdrawal;
+    try {
+        await session.withTransaction(async () => {
+            // STEP 1 — Check for existing pending withdrawal FIRST (Refinement #6)
+            const existingPending = await Withdrawal.findOne(
+                { vendorId, status: { $in: ['pending', 'approved', 'processing'] } },
+                null,
+                { session }
+            );
+            if (existingPending) {
+                throw new ApiError(400, 'You already have a pending withdrawal request. Please wait for it to be processed.');
+            }
 
-    // Update vendor balances
-    vendor.walletBalance -= amount;
-    vendor.pendingWithdrawal = (vendor.pendingWithdrawal || 0) + amount;
-    await vendor.save();
+            // STEP 2 — Atomic balance deduction (prevents race condition)
+            const vendor = await Vendor.findOneAndUpdate(
+                { _id: vendorId, walletBalance: { $gte: amount } },
+                { $inc: { walletBalance: -amount, pendingWithdrawal: amount } },
+                { new: true, session }
+            );
+            if (!vendor) {
+                throw new ApiError(400, 'Insufficient balance in wallet.');
+            }
 
-    // Notify Admins
+            // STEP 3 — Create withdrawal record
+            const [created] = await Withdrawal.create([{
+                vendorId,
+                amount,
+                bankDetails: payoutBankDetails,
+                status: 'pending',
+            }], { session });
+            withdrawal = created;
+
+            // STEP 4 — Create WITHDRAWAL_HOLD ledger entry (Refinement #9)
+            await VendorWalletTransaction.create([{
+                vendorId,
+                type:                'WITHDRAWAL_HOLD',
+                amount:              -amount,
+                referenceId:         `WITHDRAWAL_HOLD_${withdrawal._id}`,
+                walletBalanceBefore: vendor.walletBalance + amount,
+                walletBalanceAfter:  vendor.walletBalance,
+                performedBy:         { role: 'vendor', id: vendorId },
+                relatedWithdrawalId: withdrawal._id,
+                notes:               `Withdrawal request of ₹${amount}`,
+            }], { session });
+        });
+    } finally {
+        await session.endSession();
+    }
+
+    // Notify Admins (outside transaction — fire and forget)
     const { default: Admin } = await import('../../../models/Admin.model.js');
     const admins = await Admin.find({ isActive: true }).select('_id').lean();
     const { createNotification } = await import('../../../services/notification.service.js');
     for (const admin of admins) {
         await createNotification({
-            recipientId: admin._id,
+            recipientId:   admin._id,
             recipientType: 'admin',
-            title: 'New Withdrawal Request',
-            message: `Vendor "${vendor.storeName || vendor.name}" requested a payout of Rs.${amount}.`,
-            type: 'payout',
-            data: { withdrawalId: String(withdrawal._id), vendorId: String(vendor._id) }
-        });
+            title:         'New Withdrawal Request',
+            message:       `Vendor "${vendorForDetails.storeName || vendorForDetails.name}" requested a payout of ₹${amount}.`,
+            type:          'payout',
+            data:          { withdrawalId: String(withdrawal._id), vendorId: String(vendorId) },
+        }).catch(console.error);
     }
 
     res.status(201).json(new ApiResponse(201, withdrawal, 'Withdrawal request submitted successfully.'));

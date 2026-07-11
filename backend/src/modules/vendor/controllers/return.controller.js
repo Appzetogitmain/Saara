@@ -611,23 +611,61 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                         }
                     }
 
-                    // 4. Update order and escrow status accordingly
+                    // 4. Create Refund record with idempotency key (Refinement #3 / M-5 / 4.9)
+                    const Refund = mongoose.model('Refund');
+                    const refundAmount = request.refundAmount || 0;
+                    
+                    const refund = (await Refund.create([{
+                        orderId: order._id,
+                        returnRequestId: request._id,
+                        userId: request.userId?._id || request.userId,
+                        amount: refundAmount,
+                        referenceId: `RETURN_REFUND_${request._id}`, // unique — prevents double refund
+                        method: request.refundDetails?.method === 'upi' ? 'upi' : 'bank_transfer',
+                        bankDetails: request.refundDetails?.bankDetails,
+                        upiId: request.refundDetails?.upiId,
+                        status: 'requested',
+                    }], { session }))[0];
+
+                    request.refundId = refund._id;
+
+                    // Auto-trigger Razorpay refund for online-paid orders
+                    if (order.paymentStatus === 'paid' && refundAmount > 0) {
+                        try {
+                            const PaymentAttempt = mongoose.model('PaymentAttempt');
+                            const paidAttempt = await PaymentAttempt.findOne({
+                                orderId: order._id,
+                                status: 'paid',
+                            }).session(session);
+
+                            if (paidAttempt?.razorpayPaymentId) {
+                                const { initiateRefund } = await import('../../../services/payment.service.js');
+                                const rzpRefund = await initiateRefund(
+                                    paidAttempt.razorpayPaymentId,
+                                    refundAmount,
+                                    { reason: 'return_approved' }
+                                );
+                                await Refund.findByIdAndUpdate(refund._id, {
+                                    razorpayRefundId: rzpRefund.id,
+                                    status: 'processing',
+                                    paymentAttemptId: paidAttempt._id,
+                                }, { session });
+                            }
+                        } catch (rzpErr) {
+                            console.error('[VENDOR_RETURN_REFUND_ERROR]', request._id, rzpErr.message);
+                        }
+                    }
+
+                    // Update order and escrow status accordingly
                     if (allItemsReturned) {
                         if (order.status !== 'cancelled') {
                             order.status = 'returned';
                         }
-                        order.paymentStatus = 'refunded';
                         order.escrowStatus = 'refunded';
                     } else {
                         // Partial return
                         order.status = 'delivered';
                         order.escrowStatus = 'held';
-
-                        const paymentStatusPath = Order.schema.path('paymentStatus');
-                        const enumValues = (paymentStatusPath && paymentStatusPath.enumValues) || [];
-                        if (enumValues.includes('partially_refunded')) {
-                            order.paymentStatus = 'partially_refunded';
-                        }
                     }
                     await order.save();
                     notifyOrderUpdate(order);

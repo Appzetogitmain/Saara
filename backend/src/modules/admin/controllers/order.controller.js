@@ -89,7 +89,7 @@ export const getOrderById = asyncHandler(async (req, res) => {
 // PATCH /api/admin/orders/:id/status
 export const updateOrderStatus = asyncHandler(async (req, res) => {
     const { status } = req.body;
-    const allowed = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'];
+    const allowed = ['pending', 'processing', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled', 'returned'];
     if (!allowed.includes(status)) throw new ApiError(400, `Status must be one of: ${allowed.join(', ')}`);
 
     const order = await Order.findOne({
@@ -103,18 +103,19 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     const nextStatus = String(status || '').toLowerCase();
 
     const allowedTransitions = {
-        pending: ['processing', 'cancelled'],
-        processing: ['shipped', 'cancelled'],
-        shipped: ['delivered', 'cancelled', 'returned'],
-        delivered: ['returned'],
-        cancelled: [],
-        returned: [],
+        pending:          ['processing', 'cancelled'],
+        processing:       ['ready_for_pickup', 'shipped', 'cancelled'],
+        ready_for_pickup: ['shipped', 'cancelled'],
+        shipped:          ['delivered', 'cancelled', 'returned'],
+        delivered:        ['returned'],
+        cancelled:        [],
+        returned:         [],
     };
 
     if (previousStatus !== nextStatus) {
         const nextAllowed = allowedTransitions[previousStatus] || [];
         if (!nextAllowed.includes(nextStatus)) {
-            throw new ApiError(409, `Cannot move order from ${previousStatus} to ${nextStatus}.`);
+            throw new ApiError(409, `Cannot move order from '${previousStatus}' to '${nextStatus}'.`);
         }
     }
 

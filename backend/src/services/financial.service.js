@@ -52,14 +52,29 @@ export const calculateOrderFinancials = ({
         }
         
         const discountedItemSubtotal = parseFloat((item.sub - discountShare).toFixed(2));
-        const taxRate = Number(item.taxRate !== undefined ? item.taxRate : 18);
-        const itemTax = parseFloat(((discountedItemSubtotal * taxRate) / 100).toFixed(2));
+
+        // Backward tax extraction for taxIncluded products (Refinement #13)
+        // If tax is included in price: extract it backwards instead of adding 0
+        let itemTax;
+        let commissionBase; // commission is calculated on pre-tax base price
+        if (item.taxIncluded) {
+            const rate = Number(item.taxRate !== undefined ? item.taxRate : 18);
+            // Extract: base = discounted / (1 + rate/100), tax = discounted - base
+            const base = parseFloat((discountedItemSubtotal / (1 + rate / 100)).toFixed(2));
+            itemTax = parseFloat((discountedItemSubtotal - base).toFixed(2));
+            commissionBase = base; // commission on base price only
+        } else {
+            const rate = Number(item.taxRate !== undefined ? item.taxRate : 18);
+            itemTax = parseFloat(((discountedItemSubtotal * rate) / 100).toFixed(2));
+            commissionBase = discountedItemSubtotal;
+        }
         totalTax = parseFloat((totalTax + itemTax).toFixed(2));
 
         return {
             ...item,
             discountShare,
             discountedItemSubtotal,
+            commissionBase, // used in vendor grouping for correct commission calculation
             itemTax
         };
     });
@@ -81,7 +96,9 @@ export const calculateOrderFinancials = ({
         }
         vendorMap[vid].subtotal = parseFloat((vendorMap[vid].subtotal + item.sub).toFixed(2));
         vendorMap[vid].discountShare = parseFloat((vendorMap[vid].discountShare + item.discountShare).toFixed(2));
-        vendorMap[vid].effectiveSubtotal = parseFloat((vendorMap[vid].effectiveSubtotal + item.discountedItemSubtotal).toFixed(2));
+        // Use commissionBase (pre-tax price for taxIncluded items, discounted price otherwise)
+        const base = item.commissionBase !== undefined ? item.commissionBase : item.discountedItemSubtotal;
+        vendorMap[vid].effectiveSubtotal = parseFloat((vendorMap[vid].effectiveSubtotal + base).toFixed(2));
     });
 
     let totalCommission = 0;

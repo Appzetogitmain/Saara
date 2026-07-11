@@ -6,9 +6,9 @@ const withdrawalSchema = new mongoose.Schema(
         amount: { type: Number, required: true },
         status: {
             type: String,
-            enum: ["pending", "approved", "processing", "completed", "rejected"],
-            default: "pending",
-            index: true
+            enum: ['pending', 'approved', 'processing', 'completed', 'failed', 'rejected'],
+            default: 'pending',
+            index: true,
         },
         bankDetails: {
             accountHolder: String,
@@ -17,7 +17,11 @@ const withdrawalSchema = new mongoose.Schema(
             bankName: String
         },
         requestedAt: { type: Date, default: Date.now },
-        processedAt: Date
+        processedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+        processedAt: { type: Date },
+        rejectionReason: { type: String },
+        transactionReference: { type: String }, // bank/UPI transfer reference from admin
+        notes: { type: String },
     },
     { timestamps: true }
 );

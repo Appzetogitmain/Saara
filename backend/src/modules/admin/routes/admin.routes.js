@@ -78,24 +78,15 @@ router.post('/auth/logout', validate(logoutSchema), authController.logout);
 router.get('/auth/profile', ...adminAuth, authController.getProfile);
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
-router.get('/analytics/dashboard', ...adminAuth, analyticsController.getDashboardStats);
-router.get('/analytics/revenue', ...adminAuth, analyticsController.getRevenueData);
-router.get('/analytics/order-status', ...adminAuth, analyticsController.getOrderStatusBreakdown);
-router.get('/analytics/top-products', ...adminAuth, analyticsController.getTopProducts);
-router.get('/analytics/customer-growth', ...adminAuth, analyticsController.getCustomerGrowth);
-router.get('/analytics/recent-orders', ...adminAuth, analyticsController.getRecentOrders);
-router.get('/analytics/sales', ...adminAuth, analyticsController.getSalesData);
-
-// ─── Analytics ────────────────────────────────────────────────────────────────
-router.get('/analytics/dashboard', ...adminAuth, analyticsController.getDashboardStats);
-router.get('/analytics/revenue', ...adminAuth, analyticsController.getRevenueData);
-router.get('/analytics/order-status', ...adminAuth, analyticsController.getOrderStatusBreakdown);
-router.get('/analytics/top-products', ...adminAuth, analyticsController.getTopProducts);
-router.get('/analytics/customer-growth', ...adminAuth, analyticsController.getCustomerGrowth);
-router.get('/analytics/recent-orders', ...adminAuth, analyticsController.getRecentOrders);
-router.get('/analytics/sales', ...adminAuth, analyticsController.getSalesData);
-router.get('/analytics/finance-summary', ...adminAuth, analyticsController.getFinancialSummary);
-router.get('/analytics/inventory-stats', ...adminAuth, analyticsController.getInventoryStats);
+router.get('/analytics/dashboard',      ...adminAuth, analyticsController.getDashboardStats);
+router.get('/analytics/revenue',        ...adminAuth, analyticsController.getRevenueData);
+router.get('/analytics/order-status',   ...adminAuth, analyticsController.getOrderStatusBreakdown);
+router.get('/analytics/top-products',   ...adminAuth, analyticsController.getTopProducts);
+router.get('/analytics/customer-growth',...adminAuth, analyticsController.getCustomerGrowth);
+router.get('/analytics/recent-orders',  ...adminAuth, analyticsController.getRecentOrders);
+router.get('/analytics/sales',          ...adminAuth, analyticsController.getSalesData);
+router.get('/analytics/finance-summary',...adminAuth, analyticsController.getFinancialSummary);
+router.get('/analytics/inventory-stats',...adminAuth, analyticsController.getInventoryStats);
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 router.get('/orders', ...adminAuth, orderController.getAllOrders);
@@ -153,11 +144,11 @@ router.put('/delivery-boys/:id', ...adminAuth, validate(deliveryBoyIdParamSchema
 router.delete('/delivery-boys/:id', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), deliveryController.deleteDeliveryBoy);
 router.patch('/delivery-boys/:id/status', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), validate(updateDeliveryStatusSchema), deliveryController.updateDeliveryBoyStatus);
 router.patch('/delivery-boys/:id/application-status', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), validate(updateDeliveryApplicationStatusSchema), deliveryController.updateDeliveryBoyApplicationStatus);
-router.post('/delivery-boys/:id/settle-cash', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), validate(settleCashSchema), deliveryController.settleCash);
-router.post('/delivery-boys/:id/adjustment', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), adminPayoutController.adjustWalletBalance);
+router.post('/delivery-boys/:id/settle-cash', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), validate(settleCashSchema), audit('SETTLE_COD_CASH', 'DeliveryBoy'), deliveryController.settleCash);
+router.post('/delivery-boys/:id/adjustment', ...adminAuth, validate(deliveryBoyIdParamSchema, 'params'), audit('WALLET_ADJUSTMENT', 'DeliveryBoy'), adminPayoutController.adjustWalletBalance);
 
 router.get('/delivery/payout-requests', ...adminAuth, adminPayoutController.getWithdrawalRequests);
-router.patch('/delivery/payout-requests/:id/status', ...adminAuth, adminPayoutController.updateWithdrawalStatus);
+router.patch('/delivery/payout-requests/:id/status', ...adminAuth, audit('PROCESS_DELIVERY_PAYOUT', 'DeliveryWithdrawal'), adminPayoutController.updateWithdrawalStatus);
 
 // ─── Return Requests ──────────────────────────────────────────────────────────
 router.get('/return-requests', ...adminAuth, returnController.getAllReturnRequests);
@@ -224,8 +215,8 @@ router.get('/affiliates/payouts/pending', ...adminAuth, affiliateController.getP
 router.patch('/affiliates/:id/payouts/:payoutId', ...adminAuth, audit('PROCESS_AFFILIATE_PAYOUT', 'Affiliate'), affiliateController.completePayout);
 
 // ─── Escrow & Payout Management ──────────────────────────────────────────────
-router.get('/escrow/summary', ...adminAuth, escrowController.getEscrowSummary);
-router.get('/escrow/withdrawals', ...adminAuth, escrowController.getWithdrawalRequests);
-router.patch('/escrow/withdrawals/:id/status', ...adminAuth, escrowController.updateWithdrawalStatus);
+router.get('/escrow/summary',                  ...adminAuth, escrowController.getEscrowSummary);
+router.get('/escrow/withdrawals',              ...adminAuth, escrowController.getWithdrawalRequests);
+router.patch('/escrow/withdrawals/:id/status', ...adminAuth, audit('PROCESS_VENDOR_WITHDRAWAL', 'Withdrawal'), escrowController.updateWithdrawalStatus);
 
 export default router;

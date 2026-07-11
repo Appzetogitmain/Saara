@@ -4,6 +4,8 @@ import ApiError from '../../../utils/ApiError.js';
 import Order from '../../../models/Order.model.js';
 import Vendor from '../../../models/Vendor.model.js';
 import Withdrawal from '../../../models/Withdrawal.model.js';
+import VendorWalletTransaction from '../../../models/VendorWalletTransaction.model.js';
+import mongoose from 'mongoose';
 import { createNotification } from '../../../services/notification.service.js';
 
 // GET /api/admin/escrow/summary
@@ -100,70 +102,99 @@ export const getWithdrawalRequests = asyncHandler(async (req, res) => {
 // PATCH /api/admin/escrow/withdrawals/:id/status
 export const updateWithdrawalStatus = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    const { status } = req.body; // 'approved', 'processing', 'completed', 'rejected'
+    const { status, transactionReference, rejectionReason, notes } = req.body;
 
     if (!['approved', 'processing', 'completed', 'rejected'].includes(status)) {
-        throw new ApiError(400, 'Invalid status update request.');
+        throw new ApiError(400, 'Invalid status. Must be: approved, processing, completed, or rejected.');
     }
 
-    const withdrawal = await Withdrawal.findById(id);
-    if (!withdrawal) throw new ApiError(404, 'Withdrawal request not found.');
+    const session = await mongoose.startSession();
+    let withdrawal;
+    try {
+        await session.withTransaction(async () => {
+            // Atomic status lock — prevents double-approval (H-5, H-6 fix)
+            withdrawal = await Withdrawal.findOneAndUpdate(
+                { _id: id, status: { $nin: ['completed', 'rejected', 'failed'] } },
+                {
+                    $set: {
+                        status,
+                        processedBy:          req.user?.id,
+                        processedAt:          new Date(),
+                        ...(transactionReference && { transactionReference }),
+                        ...(rejectionReason    && { rejectionReason }),
+                        ...(notes             && { notes }),
+                    }
+                },
+                { new: true, session }
+            );
+            if (!withdrawal) {
+                throw new ApiError(400, 'Withdrawal already finalized or not found.');
+            }
 
-    if (withdrawal.status === 'completed' || withdrawal.status === 'rejected') {
-        throw new ApiError(400, 'This withdrawal request has already been finalized.');
-    }
+            if (status === 'completed') {
+                // Adjust vendor tracking counters
+                // NO new VendorWalletTransaction — WITHDRAWAL_HOLD was created at request time (Refinement #9)
+                await Vendor.findByIdAndUpdate(
+                    withdrawal.vendorId,
+                    { $inc: { pendingWithdrawal: -withdrawal.amount, totalWithdrawn: withdrawal.amount } },
+                    { session }
+                );
+            }
 
-    const vendor = await Vendor.findById(withdrawal.vendorId);
-    if (!vendor) throw new ApiError(404, 'Associated vendor not found.');
+            if (status === 'rejected') {
+                // Atomically refund balance and clear pending hold
+                const vendor = await Vendor.findByIdAndUpdate(
+                    withdrawal.vendorId,
+                    { $inc: { pendingWithdrawal: -withdrawal.amount, walletBalance: withdrawal.amount } },
+                    { new: true, session }
+                );
 
-    const oldStatus = withdrawal.status;
-    withdrawal.status = status;
-    if (status === 'completed' || status === 'rejected') {
-        withdrawal.processedAt = new Date();
-    }
-    await withdrawal.save();
-
-    // Adjust vendor account balances if status changes
-    if (status === 'completed') {
-        vendor.pendingWithdrawal = Math.max(0, (vendor.pendingWithdrawal || 0) - withdrawal.amount);
-        vendor.totalWithdrawn = (vendor.totalWithdrawn || 0) + withdrawal.amount;
-        await vendor.save();
-
-        // Notify Vendor
-        await createNotification({
-            recipientId: vendor._id,
-            recipientType: 'vendor',
-            title: 'Withdrawal Completed',
-            message: `Your withdrawal of Rs.${withdrawal.amount} has been successfully completed & sent to your bank.`,
-            type: 'wallet',
-            data: { withdrawalId: String(withdrawal._id), amount: withdrawal.amount }
+                if (vendor) {
+                    // Create WITHDRAWAL_REFUND ledger entry
+                    await VendorWalletTransaction.create([{
+                        vendorId:            withdrawal.vendorId,
+                        type:                'WITHDRAWAL_REFUND',
+                        amount:              withdrawal.amount,   // positive = credit back
+                        referenceId:         `WITHDRAWAL_REFUND_${withdrawal._id}`,
+                        walletBalanceBefore: vendor.walletBalance - withdrawal.amount,
+                        walletBalanceAfter:  vendor.walletBalance,
+                        performedBy:         { role: 'admin', id: req.user?.id },
+                        relatedWithdrawalId: withdrawal._id,
+                        notes:               rejectionReason || 'Withdrawal request rejected',
+                    }], { session });
+                }
+            }
         });
-    } else if (status === 'rejected') {
-        // Return funds to vendor's wallet balance
-        vendor.pendingWithdrawal = Math.max(0, (vendor.pendingWithdrawal || 0) - withdrawal.amount);
-        vendor.walletBalance = (vendor.walletBalance || 0) + withdrawal.amount;
-        await vendor.save();
-
-        // Notify Vendor
-        await createNotification({
-            recipientId: vendor._id,
-            recipientType: 'vendor',
-            title: 'Withdrawal Rejected',
-            message: `Your withdrawal request of Rs.${withdrawal.amount} was rejected. Funds returned to your balance.`,
-            type: 'wallet',
-            data: { withdrawalId: String(withdrawal._id), amount: withdrawal.amount }
-        });
-    } else if (status === 'approved' && oldStatus === 'pending') {
-        // Notify Vendor of approval
-        await createNotification({
-            recipientId: vendor._id,
-            recipientType: 'vendor',
-            title: 'Withdrawal Approved',
-            message: `Your withdrawal of Rs.${withdrawal.amount} was approved and is being processed.`,
-            type: 'wallet',
-            data: { withdrawalId: String(withdrawal._id), amount: withdrawal.amount }
-        });
+    } finally {
+        await session.endSession();
     }
 
-    res.status(200).json(new ApiResponse(200, withdrawal, `Withdrawal request status updated to ${status}.`));
+    // Notifications (outside transaction)
+    const vendor = await Vendor.findById(withdrawal.vendorId).select('_id storeName').lean();
+    if (vendor) {
+        let notifTitle, notifMsg;
+        if (status === 'completed') {
+            notifTitle = 'Withdrawal Completed';
+            notifMsg   = `Your withdrawal of ₹${withdrawal.amount} has been successfully processed and sent to your bank.`;
+        } else if (status === 'rejected') {
+            notifTitle = 'Withdrawal Rejected';
+            notifMsg   = `Your withdrawal of ₹${withdrawal.amount} was rejected. Funds returned to your wallet.${rejectionReason ? ' Reason: ' + rejectionReason : ''}`;
+        } else if (status === 'approved') {
+            notifTitle = 'Withdrawal Approved';
+            notifMsg   = `Your withdrawal of ₹${withdrawal.amount} is approved and is being processed.`;
+        }
+
+        if (notifTitle) {
+            await createNotification({
+                recipientId:   vendor._id,
+                recipientType: 'vendor',
+                title:         notifTitle,
+                message:       notifMsg,
+                type:          'wallet',
+                data:          { withdrawalId: String(withdrawal._id), amount: withdrawal.amount },
+            }).catch(console.error);
+        }
+    }
+
+    res.status(200).json(new ApiResponse(200, withdrawal, `Withdrawal status updated to '${status}'.`));
 });

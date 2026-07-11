@@ -4,6 +4,7 @@ import Vendor from '../models/Vendor.model.js';
 import ReturnRequest from '../models/ReturnRequest.model.js';
 import Commission from '../models/Commission.model.js';
 import Settlement from '../models/Settlement.model.js';
+import VendorWalletTransaction from '../models/VendorWalletTransaction.model.js';
 import { createNotification } from '../services/notification.service.js';
 
 export const releaseEscrowPayments = async () => {
@@ -107,12 +108,16 @@ export const releaseEscrowPayments = async () => {
 
                             if (netPayout <= 0) continue;
 
-                            vendor.walletBalance = (vendor.walletBalance || 0) + netPayout;
-                            if (vendor.onHoldBalance >= netPayout) {
-                                vendor.onHoldBalance -= netPayout;
-                            } else {
-                                vendor.onHoldBalance = 0;
+                            const walletBalanceBefore = vendor.walletBalance || 0;
+
+                            vendor.walletBalance = walletBalanceBefore + netPayout;
+
+                            // onHoldBalance accounting with error logging for shortfalls
+                            if ((vendor.onHoldBalance || 0) < netPayout) {
+                                console.error(`[ACCOUNTING_ERROR] onHoldBalance shortfall for vendor:${vendor._id} order:${order._id}. Expected: ${netPayout}, Have: ${vendor.onHoldBalance || 0}`);
                             }
+                            vendor.onHoldBalance = Math.max(0, (vendor.onHoldBalance || 0) - netPayout);
+
                             await vendor.save({ session });
 
                             const commissionIds = commissions.map(c => c._id);
@@ -143,6 +148,19 @@ export const releaseEscrowPayments = async () => {
                                     },
                                     { session }
                                 );
+
+                                // Create ESCROW_RELEASE ledger entry (Refinement #8 — multi-vendor safe referenceId)
+                                await VendorWalletTransaction.create([{
+                                    vendorId:            vendor._id,
+                                    type:                'ESCROW_RELEASE',
+                                    amount:              netPayout,
+                                    referenceId:         `ESCROW_RELEASE_${order._id}_${vendor._id}`,
+                                    walletBalanceBefore: walletBalanceBefore,
+                                    walletBalanceAfter:  vendor.walletBalance,
+                                    performedBy:         { role: 'system', id: null },
+                                    relatedOrderId:      order._id,
+                                    notes:               `Escrow released for Order #${order.orderId}`,
+                                }], { session });
                             }
                         }
                     }

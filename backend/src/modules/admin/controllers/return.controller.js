@@ -2,7 +2,14 @@ import ReturnRequest from '../../../models/ReturnRequest.model.js';
 import Order from '../../../models/Order.model.js';
 import User from '../../../models/User.model.js';
 import Product from '../../../models/Product.model.js';
+import Commission from '../../../models/Commission.model.js';
+import Vendor from '../../../models/Vendor.model.js';
+import VendorWalletTransaction from '../../../models/VendorWalletTransaction.model.js';
+import Refund from '../../../models/Refund.model.js';
+import PaymentAttempt from '../../../models/PaymentAttempt.model.js';
+import mongoose from 'mongoose';
 import { createNotification } from '../../../services/notification.service.js';
+import { initiateRefund } from '../../../services/payment.service.js';
 import { ApiError } from '../../../utils/ApiError.js';
 import { ApiResponse } from '../../../utils/ApiResponse.js';
 import { asyncHandler } from '../../../utils/asyncHandler.js';
@@ -152,122 +159,213 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
 
     const request = await ReturnRequest.findById(req.params.id)
         .populate('userId', 'name email phone')
-        .populate('orderId', 'orderId total items');
+        .populate('orderId', 'orderId total items paymentStatus escrowStatus');
 
     if (!request) {
         throw new ApiError(404, 'Return request not found');
     }
 
-    const allowedStatuses = ['pending', 'approved', 'processing', 'rejected', 'completed'];
-    const allowedRefundStatuses = ['pending', 'processed', 'failed'];
+    // H-8 fix: Removed invalid 'processing' status — approved → pickup_pending or completed
+    const allowedStatuses = ['pending', 'approved', 'pickup_pending', 'rejected', 'completed'];
     const statusTransitions = {
-        pending: ['approved', 'rejected'],
-        approved: ['processing', 'completed'],
-        processing: ['completed'],
-        rejected: [],
-        completed: [],
-    };
-    const refundTransitions = {
-        pending: ['processed', 'failed'],
-        failed: ['processed'],
-        processed: [],
+        pending:        ['approved', 'rejected'],
+        approved:       ['pickup_pending', 'completed'],
+        pickup_pending: ['completed'],
+        rejected:       [],
+        completed:      [],
     };
 
     if (status && !allowedStatuses.includes(status)) {
         throw new ApiError(400, `Status must be one of: ${allowedStatuses.join(', ')}`);
     }
-    if (refundStatus && !allowedRefundStatuses.includes(refundStatus)) {
-        throw new ApiError(400, `Refund status must be one of: ${allowedRefundStatuses.join(', ')}`);
-    }
 
-    const nextStatus = status || request.status;
-    const nextRefundStatus = refundStatus || request.refundStatus;
-    const nextAdminNote = adminNote !== undefined ? adminNote : request.adminNote;
     const statusUnchanged = !status || status === request.status;
-    const refundUnchanged = !refundStatus || refundStatus === request.refundStatus;
     const adminNoteUnchanged = adminNote === undefined || adminNote === request.adminNote;
-    if (statusUnchanged && refundUnchanged && adminNoteUnchanged) {
-        const normalizedNoop = {
-            ...request._doc,
-            id: request._id,
-            customer: request.userId ? {
-                name: request.userId.name,
-                email: request.userId.email,
-                phone: request.userId.phone
-            } : { name: 'Guest', email: 'N/A' },
-            orderId: request.orderId?.orderId || 'N/A',
-            requestDate: request.createdAt
-        };
+    if (statusUnchanged && adminNoteUnchanged) {
+        const normalizedNoop = normalizeReturnRequest(request);
         return res.status(200).json(new ApiResponse(200, normalizedNoop, 'No changes applied.'));
     }
 
     if (status && status !== request.status) {
         const allowedNext = statusTransitions[request.status] || [];
         if (!allowedNext.includes(status)) {
-            throw new ApiError(409, `Cannot move return request from ${request.status} to ${status}.`);
+            throw new ApiError(409, `Cannot move return request from '${request.status}' to '${status}'.`);
         }
     }
 
-    const currentRefundStatus = request.refundStatus || 'pending';
-    if (refundStatus && refundStatus !== request.refundStatus) {
-        const allowedRefundNext = refundTransitions[currentRefundStatus] || [];
-        if (!allowedRefundNext.includes(refundStatus)) {
-            throw new ApiError(409, `Cannot move refund status from ${currentRefundStatus} to ${refundStatus}.`);
-        }
-    }
+    const order = await Order.findById(request.orderId?._id || request.orderId);
+    const session = await mongoose.startSession();
 
-    request.status = nextStatus;
-    request.adminNote = nextAdminNote;
-    if (refundStatus) request.refundStatus = nextRefundStatus;
-
-    await request.save();
-
-    // Return lifecycle side-effects:
-    // - On approval, mark linked order as returned (if not terminal).
-    // - On completion, restore stock for requested items once.
-    if (status === 'approved' || status === 'completed') {
-        const linkedOrderId = request.orderId?._id || request.orderId;
-        if (linkedOrderId) {
-            const order = await Order.findById(linkedOrderId);
-            if (order && order.isDeleted !== true) {
-                if (status === 'approved' && !['cancelled', 'returned'].includes(order.status)) {
-                    order.status = 'returned';
-                    await order.save();
+    try {
+        await session.withTransaction(async () => {
+            // ── On APPROVED ──
+            if (status === 'approved') {
+                // Mark order as returned
+                if (order && !['cancelled', 'returned'].includes(order.status)) {
+                    await Order.findByIdAndUpdate(order._id, { status: 'returned' }, { session });
                 }
 
-                if (status === 'completed') {
-                    const stockRestores = (request.items || []).map(async (item) => {
-                        const qty = Number(item?.quantity || 0);
-                        if (!item?.productId || qty <= 0) return;
-                        const product = await Product.findById(item.productId);
-                        if (!product) return;
-
-                        product.stockQuantity += qty;
-                        if (product.stockQuantity <= 0) product.stock = 'out_of_stock';
-                        else if (product.stockQuantity <= product.lowStockThreshold) product.stock = 'low_stock';
-                        else product.stock = 'in_stock';
-                        await product.save();
-                    });
-                    await Promise.all(stockRestores);
+                // H-4 fix + Refinement #6: Cancel only the RETURNING VENDOR's commission
+                // Not all commissions — other vendors on same order are unaffected
+                if (request.vendorId) {
+                    await Commission.updateMany(
+                        {
+                            orderId:  request.orderId?._id || request.orderId,
+                            vendorId: request.vendorId,   // scoped to returning vendor only
+                            status:   { $ne: 'cancelled' },
+                        },
+                        {
+                            $set: { status: 'cancelled', paidAt: null },
+                        },
+                        { session }
+                    );
                 }
             }
-        }
+
+            // ── On COMPLETED ──
+            if (status === 'completed') {
+                // L-1 fix: Restore stock including variant stock
+                for (const item of (request.items || [])) {
+                    const qty = Number(item?.quantity || 0);
+                    if (!item?.productId || qty <= 0) continue;
+
+                    const incUpdate = { stockQuantity: qty };
+                    // Also restore variant stock if applicable
+                    if (item.variantKey) {
+                        incUpdate[`variants.stockMap.${item.variantKey}`] = qty;
+                    }
+
+                    // L-2: Check if stock was <= 0 before the increment
+                    const productBefore = await Product.findById(item.productId).session(session);
+                    const wasOutOfStock = productBefore ? productBefore.stockQuantity <= 0 : false;
+
+                    const product = await Product.findByIdAndUpdate(
+                        item.productId,
+                        { $inc: incUpdate },
+                        { new: true, session }
+                    );
+                    if (product) {
+                        const nextStock = product.stockQuantity <= 0 ? 'out_of_stock'
+                            : product.stockQuantity <= (product.lowStockThreshold || 5) ? 'low_stock'
+                            : 'in_stock';
+                        await Product.updateOne({ _id: product._id }, { $set: { stock: nextStock } }, { session });
+                    }
+                }
+
+                // Create Refund record with idempotency key (Refinement #3)
+                const refund = (await Refund.create([{
+                    orderId:         request.orderId?._id || request.orderId,
+                    returnRequestId: request._id,
+                    userId:          request.userId?._id || request.userId,
+                    amount:          request.refundAmount || 0,
+                    referenceId:     `RETURN_REFUND_${request._id}`,   // unique — prevents double refund
+                    method:          request.refundDetails?.method === 'upi' ? 'upi' : 'bank_transfer',
+                    bankDetails:     request.refundDetails?.bankDetails,
+                    upiId:           request.refundDetails?.upiId,
+                    status:          'requested',
+                }], { session }))[0];
+
+                // Auto-trigger Razorpay refund for online-paid orders
+                if (order?.paymentStatus === 'paid') {
+                    try {
+                        const paidAttempt = await PaymentAttempt.findOne({
+                            orderId: order._id, status: 'paid',
+                        });
+                        if (paidAttempt?.razorpayPaymentId && refund.amount > 0) {
+                            const rzpRefund = await initiateRefund(
+                                paidAttempt.razorpayPaymentId,
+                                refund.amount,
+                                { reason: 'return_approved' }
+                            );
+                            await Refund.findByIdAndUpdate(refund._id, {
+                                razorpayRefundId: rzpRefund.id,
+                                status: 'processing',
+                                paymentAttemptId: paidAttempt._id,
+                            }, { session });
+                        }
+                    } catch (rzpErr) {
+                        console.error('[RETURN_REFUND_ERROR]', request._id, rzpErr.message);
+                        // Don't fail the return — admin can manually process
+                    }
+                }
+
+                // Update ReturnRequest with refundId back-link
+                request.refundId = refund._id;
+
+                // C-6 + Refinement #7: Vendor clawback ONLY if escrow already released
+                // Fetch commission by orderId + vendorId for exact amount (not full order commission)
+                if (order?.escrowStatus === 'released' && request.vendorId) {
+                    const commission = await Commission.findOne({
+                        orderId:  order._id,
+                        vendorId: request.vendorId,
+                    }).session(session);
+
+                    const clawbackAmount = commission?.vendorEarnings || 0;
+
+                    if (clawbackAmount > 0) {
+                        // Allow negative balance (Refinement #8) — do NOT block return
+                        const vendor = await Vendor.findByIdAndUpdate(
+                            request.vendorId,
+                            { $inc: { walletBalance: -clawbackAmount } },
+                            { new: true, session }
+                        );
+
+                        if (vendor) {
+                            const txn = (await VendorWalletTransaction.create([{
+                                vendorId:            request.vendorId,
+                                type:                'RETURN_CLAWBACK',
+                                amount:              -clawbackAmount,
+                                referenceId:         `RETURN_CLAWBACK_${request._id}`,
+                                walletBalanceBefore: vendor.walletBalance + clawbackAmount,
+                                walletBalanceAfter:  vendor.walletBalance,  // may be negative
+                                performedBy:         { role: 'admin', id: req.user?.id },
+                                relatedOrderId:      order._id,
+                                relatedRefundId:     refund._id,
+                            }], { session }))[0];
+
+                            // Cross-link refund to vendor transaction
+                            await Refund.findByIdAndUpdate(refund._id,
+                                { vendorTransactionId: txn._id },
+                                { session }
+                            );
+
+                            if (vendor.walletBalance < 0) {
+                                // Fire-and-forget admin notification
+                                createNotification({
+                                    recipientType: 'admin',
+                                    title:         'Vendor Negative Balance',
+                                    message:       `Vendor ${vendor.storeName || vendor._id} balance is ₹${vendor.walletBalance.toFixed(2)} after return clawback on order ${order?.orderId}.`,
+                                    type:          'alert',
+                                }).catch(console.error);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Save the request status update
+            request.status = status || request.status;
+            if (adminNote !== undefined) request.adminNote = adminNote;
+            await request.save({ session });
+        });
+    } finally {
+        await session.endSession();
     }
 
+    // Notifications
     const notificationTasks = [];
     if (request.userId?._id) {
         notificationTasks.push(
             createNotification({
-                recipientId: request.userId._id,
+                recipientId:   request.userId._id,
                 recipientType: 'user',
-                title: 'Return request updated',
-                message: `Your return request for order ${request.orderId?.orderId || request.orderId} is now ${request.status}.`,
-                type: 'order',
+                title:         'Return request updated',
+                message:       `Your return request for order ${request.orderId?.orderId || request.orderId} is now ${request.status}.`,
+                type:          'order',
                 data: {
                     returnRequestId: String(request._id),
-                    orderId: String(request.orderId?.orderId || request.orderId || ''),
-                    status: String(request.status || ''),
-                    refundStatus: String(request.refundStatus || ''),
+                    orderId:         String(request.orderId?.orderId || request.orderId || ''),
+                    status:          String(request.status || ''),
                 },
             })
         );
@@ -276,26 +374,22 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
     if (request.vendorId) {
         notificationTasks.push(
             createNotification({
-                recipientId: request.vendorId,
+                recipientId:   request.vendorId,
                 recipientType: 'vendor',
-                title: 'Return request updated by admin',
-                message: `Return request for order ${request.orderId?.orderId || request.orderId} is now ${request.status}.`,
-                type: 'order',
+                title:         'Return request updated by admin',
+                message:       `Return request for order ${request.orderId?.orderId || request.orderId} is now ${request.status}.`,
+                type:          'order',
                 data: {
                     returnRequestId: String(request._id),
-                    orderId: String(request.orderId?.orderId || request.orderId || ''),
-                    status: String(request.status || ''),
-                    refundStatus: String(request.refundStatus || ''),
+                    orderId:         String(request.orderId?.orderId || request.orderId || ''),
+                    status:          String(request.status || ''),
                 },
             })
         );
     }
 
-    if (notificationTasks.length > 0) {
-        await Promise.allSettled(notificationTasks);
-    }
+    if (notificationTasks.length > 0) await Promise.allSettled(notificationTasks);
 
     const normalized = normalizeReturnRequest(request);
-
     res.status(200).json(new ApiResponse(200, normalized, 'Return request status updated successfully'));
 });
