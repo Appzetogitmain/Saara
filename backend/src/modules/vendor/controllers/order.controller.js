@@ -9,6 +9,7 @@ import mongoose from 'mongoose';
 import { createNotification } from '../../../services/notification.service.js';
 import { autoAssignDeliveryPartner } from '../../../services/assignmentService.js';
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
+import { buildVendorItemsSummary } from '../../../utils/notificationProductFormatter.js';
 
 const deriveTopLevelOrderStatus = (vendorItems = [], fallback = 'pending') => {
     const statuses = (vendorItems || [])
@@ -212,9 +213,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     }
 
     const notificationTasks = [];
-    const vItemsSummary = (vendorItem.items || [])
-        .map((item) => `${item.name} (x${item.quantity})`)
-        .join(', ');
+    const vItemsText = buildVendorItemsSummary(vendorItem.items);
 
     if (order.userId) {
         notificationTasks.push(
@@ -222,7 +221,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
                 recipientId: order.userId,
                 recipientType: 'user',
                 title: 'Order item status updated',
-                message: `An item [${vItemsSummary}] in your order ${order.orderId || order._id} is now ${status}.`,
+                message: `An item in your order ${order.orderId || order._id} is now ${status}.${vItemsText}`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId || order._id),
@@ -238,7 +237,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
             recipientId: req.user.id,
             recipientType: 'vendor',
             title: 'Order status updated',
-            message: `Order ${order.orderId || order._id} containing [${vItemsSummary}] moved to ${status}.`,
+            message: `Order ${order.orderId || order._id} moved to ${status}.${vItemsText}`,
             type: 'order',
             data: {
                 orderId: String(order.orderId || order._id),
@@ -420,9 +419,7 @@ export const verifyPickup = asyncHandler(async (req, res) => {
 
     // Trigger notification tasks
     const notificationTasks = [];
-    const vItemsSummary = (vendorItem.items || [])
-        .map((item) => `${item.name} (x${item.quantity})`)
-        .join(', ');
+    const vItemsText = buildVendorItemsSummary(vendorItem.items);
 
     if (order.userId) {
         notificationTasks.push(
@@ -430,7 +427,7 @@ export const verifyPickup = asyncHandler(async (req, res) => {
                 recipientId: order.userId,
                 recipientType: 'user',
                 title: 'Order item status updated',
-                message: `An item [${vItemsSummary}] in your order ${order.orderId || order._id} is now shipped.`,
+                message: `An item in your order ${order.orderId || order._id} is now shipped.${vItemsText}`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId || order._id),
@@ -446,7 +443,7 @@ export const verifyPickup = asyncHandler(async (req, res) => {
             recipientId: req.user.id,
             recipientType: 'vendor',
             title: 'Package picked up successfully',
-            message: `Order ${order.orderId || order._id} containing [${vItemsSummary}] has been handed over to the courier.`,
+            message: `Order ${order.orderId || order._id} has been handed over to the courier.${vItemsText}`,
             type: 'order',
             data: {
                 orderId: String(order.orderId || order._id),
@@ -461,7 +458,7 @@ export const verifyPickup = asyncHandler(async (req, res) => {
                 recipientId: order.deliveryBoyId,
                 recipientType: 'delivery',
                 title: 'Pickup verified successfully',
-                message: `Pickup for order ${order.orderId || order._id} has been verified. You can now proceed to deliver the items.`,
+                message: `Pickup for order ${order.orderId || order._id} has been verified. You can now proceed to deliver the items.${vItemsText}`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId || order._id),

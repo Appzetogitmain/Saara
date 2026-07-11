@@ -261,6 +261,20 @@ const MobileOrderDetail = () => {
     });
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '—';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
   const handleReorder = () => {
     order.items.forEach((item) => {
       addItem({
@@ -937,6 +951,14 @@ const MobileOrderDetail = () => {
                     <span>Order Date:</span>
                     <span className="font-semibold text-gray-800">{formatDate(order.date)}</span>
                   </div>
+                  {order.status === 'delivered' && (
+                    <div className="flex justify-between">
+                      <span>Delivered On:</span>
+                      <span className="font-semibold text-gray-800">
+                        {order.deliveredAt ? formatDateTime(order.deliveredAt) : '—'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

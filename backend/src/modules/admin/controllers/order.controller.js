@@ -8,6 +8,7 @@ import Commission from '../../../models/Commission.model.js';
 import Product from '../../../models/Product.model.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
+import { buildOrderItemsSummary, buildVendorItemsSummary } from '../../../utils/notificationProductFormatter.js';
 import { handleOrderDeliveryBalances } from '../../../services/orderFinancialHelper.js';
 import mongoose from 'mongoose';
 import { processDeliveryBoyPayout } from '../../../services/deliveryPayout.service.js';
@@ -216,6 +217,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     }
 
     const notificationTasks = [];
+    const itemsText = buildOrderItemsSummary(order.items);
 
     if (order.userId) {
         notificationTasks.push(
@@ -223,7 +225,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
                 recipientId: order.userId,
                 recipientType: 'user',
                 title: 'Order status updated',
-                message: `Your order ${order.orderId} is now ${status}.`,
+                message: `Your order ${order.orderId} is now ${status}.${itemsText}`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId),
@@ -242,12 +244,15 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     ];
 
     vendorIds.forEach((vendorId) => {
+        const vendorGroup = (order.vendorItems || []).find((vg) => String(vg.vendorId) === String(vendorId));
+        const vItemsText = vendorGroup ? buildVendorItemsSummary(vendorGroup.items) : '';
+
         notificationTasks.push(
             createNotification({
                 recipientId: vendorId,
                 recipientType: 'vendor',
                 title: 'Order status updated by admin',
-                message: `Order ${order.orderId} was updated to ${status} by admin.`,
+                message: `Order ${order.orderId} was updated to ${status} by admin.${vItemsText}`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId),
@@ -263,7 +268,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
                 recipientId: order.deliveryBoyId,
                 recipientType: 'delivery',
                 title: 'Assigned order updated',
-                message: `Order ${order.orderId} is now ${status}.`,
+                message: `Order ${order.orderId} is now ${status}.${itemsText}`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId),

@@ -356,6 +356,21 @@ const OrderDetail = () => {
                                 {currentStatus.toUpperCase()}
                             </Badge>
                         </div>
+                        {currentStatus === 'delivered' && (
+                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                                <span className="text-gray-600 text-sm">Delivered On</span>
+                                <span className="font-semibold text-gray-800 text-sm">
+                                    {order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString('en-US', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hour12: true,
+                                    }) : '—'}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 </div>
 

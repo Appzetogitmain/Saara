@@ -14,6 +14,7 @@ import User from '../../../models/User.model.js';
 import Admin from '../../../models/Admin.model.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { initiateRefund } from '../../../services/payment.service.js';
+import { buildReturnItemsSummary, buildExchangeSummary } from '../../../utils/notificationProductFormatter.js';
 import { notifyOrderUpdate, notifyReturnUpdate } from '../../../services/socket.service.js';
 import {
     resolveOrderItemVariantKey,
@@ -561,12 +562,14 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
 
     notifyReturnUpdate(updatedRequest);
 
+    const itemsText = buildExchangeSummary(updatedRequest);
+
     const notificationTasks = [
         createNotification({
             recipientId: req.user.id,
             recipientType: 'vendor',
             title: 'Return request updated',
-            message: `Return request for order ${updatedRequest.orderId?.orderId || updatedRequest.orderId} updated to ${updatedRequest.status}.`,
+            message: `Return request for order ${updatedRequest.orderId?.orderId || updatedRequest.orderId} updated to ${updatedRequest.status}.${itemsText}`,
             type: 'order',
             data: {
                 returnRequestId: String(updatedRequest._id),
@@ -583,7 +586,7 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                 recipientId: updatedRequest.userId._id,
                 recipientType: 'user',
                 title: 'Return request status updated',
-                message: `Your return request for order ${updatedRequest.orderId?.orderId || updatedRequest.orderId} is now ${updatedRequest.status}.`,
+                message: `Your return request for order ${updatedRequest.orderId?.orderId || updatedRequest.orderId} is now ${updatedRequest.status}.${itemsText}`,
                 type: 'order',
                 data: {
                     returnRequestId: String(updatedRequest._id),
@@ -602,7 +605,7 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                 recipientId: admin._id,
                 recipientType: 'admin',
                 title: 'Return request updated',
-                message: `Return request for order ${updatedRequest.orderId?.orderId || updatedRequest.orderId} moved to ${updatedRequest.status}.`,
+                message: `Return request for order ${updatedRequest.orderId?.orderId || updatedRequest.orderId} moved to ${updatedRequest.status}.${itemsText}`,
                 type: 'order',
                 data: {
                     returnRequestId: String(updatedRequest._id),
@@ -667,12 +670,13 @@ export const verifyHandoffOtp = asyncHandler(async (req, res) => {
     // Trigger notification tasks
     const notificationTasks = [];
     if (request.userId) {
+        const itemsText = buildReturnItemsSummary(request.items);
         notificationTasks.push(
             createNotification({
                 recipientId: request.userId,
                 recipientType: 'user',
                 title: 'Returned items delivered to vendor',
-                message: `Rider has delivered the returned items for order ${request.orderId?.orderId || ''} to the vendor. Awaiting inspection.`,
+                message: `Rider has delivered the returned items for order ${request.orderId?.orderId || ''} to the vendor. Awaiting inspection.${itemsText}`,
                 type: 'order',
                 data: { returnRequestId: String(request._id), status: 'delivered_to_vendor' }
             })

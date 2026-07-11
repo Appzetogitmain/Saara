@@ -12,6 +12,7 @@ import { uploadLocalFileToCloudinaryAndCleanup } from '../../../services/upload.
 import { createNotification } from '../../../services/notification.service.js';
 import { autoAssignReturnPickupPartner, autoAssignExchangeReplacementPartner } from '../../../services/assignmentService.js';
 import { notifyReturnUpdate } from '../../../services/socket.service.js';
+import { buildReturnItemsSummary, buildExchangeSummary } from '../../../utils/notificationProductFormatter.js';
 
 // GET /api/delivery/returns
 export const getAssignedReturnPickups = asyncHandler(async (req, res) => {
@@ -66,6 +67,8 @@ export const acceptReturnPickup = asyncHandler(async (req, res) => {
     await returnRequest.save();
     notifyReturnUpdate(returnRequest);
 
+    const rItemsSummary = buildExchangeSummary(returnRequest);
+
     // Notify customer
     if (returnRequest.userId) {
         await createNotification({
@@ -73,8 +76,8 @@ export const acceptReturnPickup = asyncHandler(async (req, res) => {
             recipientType: 'user',
             title: isExchangeLeg2 ? 'Rider assigned for replacement delivery' : 'Rider assigned for return pickup',
             message: isExchangeLeg2
-                ? `A delivery partner has been assigned to deliver your replacement items for order ${returnRequest.orderId?.orderId || ''}.`
-                : `A delivery partner has been assigned to pick up your returned items for order ${returnRequest.orderId?.orderId || ''}.`,
+                ? `A delivery partner has been assigned to deliver your replacement items for order ${returnRequest.orderId?.orderId || ''}.${rItemsSummary}`
+                : `A delivery partner has been assigned to pick up your returned items for order ${returnRequest.orderId?.orderId || ''}.${rItemsSummary}`,
             type: 'order',
             data: { returnRequestId: String(returnRequest._id) }
         });
@@ -86,7 +89,7 @@ export const acceptReturnPickup = asyncHandler(async (req, res) => {
             recipientId: returnRequest.vendorId,
             recipientType: 'vendor',
             title: 'Replacement pickup OTP generated',
-            message: `A rider has accepted the replacement order for ${returnRequest.orderId?.orderId || ''}. Provide them with the Handover OTP to authorize pickup.`,
+            message: `A rider has accepted the replacement order for ${returnRequest.orderId?.orderId || ''}. Provide them with the Handover OTP to authorize pickup.${rItemsSummary}`,
             type: 'order',
             data: { returnRequestId: String(returnRequest._id) }
         });
@@ -319,6 +322,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
 
     // Send notifications based on the new status
     const notificationTasks = [];
+    const rItemsSummary = buildExchangeSummary(returnRequest);
 
     if (status === 'picked_up') {
         if (returnRequest.userId) {
@@ -327,7 +331,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
                     recipientId: returnRequest.userId,
                     recipientType: 'user',
                     title: 'Return items picked up',
-                    message: `Rider has picked up the return items for order ${returnRequest.orderId?.orderId || ''}.`,
+                    message: `Rider has picked up the return items for order ${returnRequest.orderId?.orderId || ''}.${rItemsSummary}`,
                     type: 'order',
                     data: { returnRequestId: String(returnRequest._id), status }
                 })
@@ -339,7 +343,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
                     recipientId: returnRequest.vendorId,
                     recipientType: 'vendor',
                     title: 'Return shipment out for delivery',
-                    message: `Rider has collected returned items for order ${returnRequest.orderId?.orderId || ''} and is delivering to your shop.`,
+                    message: `Rider has collected returned items for order ${returnRequest.orderId?.orderId || ''} and is delivering to your shop.${rItemsSummary}`,
                     type: 'order',
                     data: { returnRequestId: String(returnRequest._id), status }
                 })
@@ -354,7 +358,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
                     recipientId: returnRequest.userId,
                     recipientType: 'user',
                     title: 'Returned items delivered to vendor',
-                    message: `Rider has delivered the returned items for order ${returnRequest.orderId?.orderId || ''} to the vendor. Awaiting inspection.`,
+                    message: `Rider has delivered the returned items for order ${returnRequest.orderId?.orderId || ''} to the vendor. Awaiting inspection.${rItemsSummary}`,
                     type: 'order',
                     data: { returnRequestId: String(returnRequest._id), status }
                 })
@@ -366,7 +370,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
                     recipientId: returnRequest.vendorId,
                     recipientType: 'vendor',
                     title: 'Return items delivered',
-                    message: `Returned items for order ${returnRequest.orderId?.orderId || ''} have been delivered to your shop. Please inspect and confirm receipt.`,
+                    message: `Returned items for order ${returnRequest.orderId?.orderId || ''} have been delivered to your shop. Please inspect and confirm receipt.${rItemsSummary}`,
                     type: 'order',
                     data: { returnRequestId: String(returnRequest._id), status }
                 })
@@ -381,7 +385,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
                     recipientId: returnRequest.userId,
                     recipientType: 'user',
                     title: 'Replacement package out for delivery',
-                    message: `Rider is on the way to deliver your replacement items for order ${returnRequest.orderId?.orderId || ''}.`,
+                    message: `Rider is on the way to deliver your replacement items for order ${returnRequest.orderId?.orderId || ''}.${rItemsSummary}`,
                     type: 'order',
                     data: { returnRequestId: String(returnRequest._id), status }
                 })
@@ -393,7 +397,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
                     recipientId: returnRequest.vendorId,
                     recipientType: 'vendor',
                     title: 'Replacement package out with rider',
-                    message: `Rider picked up replacement items for order ${returnRequest.orderId?.orderId || ''} and is heading to the customer.`,
+                    message: `Rider picked up replacement items for order ${returnRequest.orderId?.orderId || ''} and is heading to the customer.${rItemsSummary}`,
                     type: 'order',
                     data: { returnRequestId: String(returnRequest._id), status }
                 })
@@ -408,7 +412,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
                     recipientId: returnRequest.userId,
                     recipientType: 'user',
                     title: 'Exchange completed',
-                    message: `Your replacement items for order ${returnRequest.orderId?.orderId || ''} have been successfully delivered.`,
+                    message: `Your replacement items for order ${returnRequest.orderId?.orderId || ''} have been successfully delivered.${rItemsSummary}`,
                     type: 'order',
                     data: { returnRequestId: String(returnRequest._id), status }
                 })
@@ -420,7 +424,7 @@ export const updateReturnPickupStatus = asyncHandler(async (req, res) => {
                     recipientId: returnRequest.vendorId,
                     recipientType: 'vendor',
                     title: 'Replacement delivered successfully',
-                    message: `Replacement items for order ${returnRequest.orderId?.orderId || ''} have been delivered to the customer.`,
+                    message: `Replacement items for order ${returnRequest.orderId?.orderId || ''} have been delivered to the customer.${rItemsSummary}`,
                     type: 'order',
                     data: { returnRequestId: String(returnRequest._id), status }
                 })

@@ -3,6 +3,7 @@ import DeliveryBoy from '../models/DeliveryBoy.model.js';
 import Vendor from '../models/Vendor.model.js';
 import ReturnRequest from '../models/ReturnRequest.model.js';
 import { createNotification } from './notification.service.js';
+import { buildOrderItemsSummary, buildReturnItemsSummary } from '../utils/notificationProductFormatter.js';
 
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
     if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
@@ -240,13 +241,11 @@ export const autoAssignDeliveryPartner = async (orderId) => {
 
         // Dispatch Notification
         // Generate detailed summaries of items and vendors for the notification alert
-        const itemsSummary = (order.items || [])
-            .map((item) => `${item.name} (x${item.quantity})`)
-            .join(', ');
+        const itemsText = buildOrderItemsSummary(order.items);
         const vendorsSummary = (order.vendorItems || [])
             .map((v) => v.vendorName)
             .join(', ');
-        const richOfferMessage = `You have been offered order ${order.orderId || order._id} containing [${itemsSummary}] from [${vendorsSummary}]. Please accept or reject within 5 minutes.`;
+        const richOfferMessage = `You have been offered order ${order.orderId || order._id} from [${vendorsSummary}]. Please accept or reject within 5 minutes.${itemsText}`;
 
         await createNotification({
             recipientId: selectedRider._id,
@@ -424,11 +423,12 @@ export const autoAssignReturnPickupPartner = async (returnRequestId) => {
         console.log(`[Auto Assign Return] Return request ${returnRequest._id} assigned to ${selectedRider.name} via ${assignmentMethod}`);
 
         // Dispatch notification to delivery partner
+        const itemsText = buildReturnItemsSummary(returnRequest.items);
         await createNotification({
             recipientId: selectedRider._id,
             recipientType: 'delivery',
             title: 'New return pickup offer',
-            message: `You have been offered a return pickup request from customer for vendor [${vendor.storeName || vendor.shopName}]. Please accept or reject within 5 minutes.`,
+            message: `You have been offered a return pickup request from customer for vendor [${vendor.storeName || vendor.shopName}]. Please accept or reject within 5 minutes.${itemsText}`,
             type: 'order',
             data: {
                 returnRequestId: String(returnRequest._id),
@@ -597,11 +597,12 @@ export const autoAssignExchangeReplacementPartner = async (returnRequestId) => {
         console.log(`[Auto Assign Replacement] Exchange replacement request ${returnRequest._id} assigned to ${selectedRider.name} via ${assignmentMethod}`);
 
         // Dispatch notification to delivery partner
+        const itemsText = buildReturnItemsSummary(returnRequest.items);
         await createNotification({
             recipientId: selectedRider._id,
             recipientType: 'delivery',
             title: 'New replacement delivery offer',
-            message: `You have been offered a replacement delivery request. Please pick up the product from vendor [${vendor.storeName || vendor.shopName}] and deliver to customer. Please accept or reject within 5 minutes.`,
+            message: `You have been offered a replacement delivery request. Please pick up the product from vendor [${vendor.storeName || vendor.shopName}] and deliver to customer. Please accept or reject within 5 minutes.${itemsText}`,
             type: 'order',
             data: {
                 returnRequestId: String(returnRequest._id),
