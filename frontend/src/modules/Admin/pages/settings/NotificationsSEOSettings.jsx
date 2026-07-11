@@ -10,12 +10,11 @@ const NotificationsSEOSettings = () => {
   const [emailData, setEmailData] = useState({});
   const [notificationsData, setNotificationsData] = useState({});
   const [seoData, setSeoData] = useState({});
-  const [activeSection, setActiveSection] = useState("email");
+  const [activeSection, setActiveSection] = useState("notifications");
 
   useEffect(() => {
     initialize();
     if (settings) {
-      if (settings.email) setEmailData(settings.email);
       if (settings.notifications) setNotificationsData(settings.notifications);
       if (settings.seo) setSeoData(settings.seo);
     }
@@ -23,19 +22,10 @@ const NotificationsSEOSettings = () => {
 
   useEffect(() => {
     if (settings) {
-      if (settings.email) setEmailData(settings.email);
       if (settings.notifications) setNotificationsData(settings.notifications);
       if (settings.seo) setSeoData(settings.seo);
     }
   }, [settings]);
-
-  const handleEmailChange = (e) => {
-    const { name, value } = e.target;
-    setEmailData({
-      ...emailData,
-      [name]: value,
-    });
-  };
 
   const handleNotificationToggle = (category, setting) => {
     setNotificationsData({
@@ -57,14 +47,12 @@ const NotificationsSEOSettings = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    updateSettings("email", emailData);
     updateSettings("notifications", notificationsData);
     updateSettings("seo", seoData);
     toast.success("Settings saved successfully");
   };
 
   const sections = [
-    { id: "email", label: "Email Settings", icon: FiMail },
     { id: "notifications", label: "Notifications", icon: FiBell },
     { id: "seo", label: "SEO Settings", icon: FiSearch },
   ];
@@ -106,91 +94,7 @@ const NotificationsSEOSettings = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-3 sm:p-4 md:p-6">
-          {/* Email Section */}
-          {activeSection === "email" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    SMTP Host
-                  </label>
-                  <input
-                    type="text"
-                    name="smtpHost"
-                    value={emailData.smtpHost || ""}
-                    onChange={handleEmailChange}
-                    placeholder="smtp.gmail.com"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    SMTP Port
-                  </label>
-                  <input
-                    type="number"
-                    name="smtpPort"
-                    value={emailData.smtpPort || 587}
-                    onChange={handleEmailChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    SMTP Username
-                  </label>
-                  <input
-                    type="text"
-                    name="smtpUser"
-                    value={emailData.smtpUser || ""}
-                    onChange={handleEmailChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    SMTP Password
-                  </label>
-                  <input
-                    type="password"
-                    name="smtpPassword"
-                    value={emailData.smtpPassword || ""}
-                    onChange={handleEmailChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    From Email
-                  </label>
-                  <input
-                    type="email"
-                    name="fromEmail"
-                    value={emailData.fromEmail || ""}
-                    onChange={handleEmailChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    From Name
-                  </label>
-                  <input
-                    type="text"
-                    name="fromName"
-                    value={emailData.fromName || ""}
-                    onChange={handleEmailChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Notifications Section */}
           {activeSection === "notifications" && (

@@ -256,57 +256,6 @@ const PaymentShippingSettings = () => {
                 </div>
               </div>
 
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">Payment Gateway</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">
-                      Gateway Provider
-                    </label>
-                    <AnimatedSelect
-                      name="paymentGateway"
-                      value={paymentData.paymentGateway || 'stripe'}
-                      onChange={handlePaymentChange}
-                      options={[
-                        { value: 'stripe', label: 'Stripe' },
-                        { value: 'paypal', label: 'PayPal' },
-                        { value: 'razorpay', label: 'Razorpay' },
-                      ]}
-                    />
-                  </div>
-
-                  {paymentData.paymentGateway === 'stripe' && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Stripe Public Key
-                        </label>
-                        <input
-                          type="text"
-                          name="stripePublicKey"
-                          value={paymentData.stripePublicKey || ''}
-                          onChange={handlePaymentChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                          placeholder="pk_test_..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Stripe Secret Key
-                        </label>
-                        <input
-                          type="password"
-                          name="stripeSecretKey"
-                          value={paymentData.stripeSecretKey || ''}
-                          onChange={handlePaymentChange}
-                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                          placeholder="sk_test_..."
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
 
               <div className="border-t border-gray-200 pt-6">
                 <h3 className="text-lg font-bold text-gray-800 mb-4">Company Payout Collection Details (COD Settlements)</h3>

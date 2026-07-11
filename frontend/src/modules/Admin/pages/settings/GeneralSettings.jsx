@@ -47,10 +47,6 @@ const GeneralSettings = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     const {
-      primaryColor,
-      secondaryColor,
-      accentColor,
-      fontFamily,
       socialMedia,
       storeDescription,
       ...generalData
@@ -62,20 +58,12 @@ const GeneralSettings = () => {
       storeDescription: storeDescription || "",
     });
 
-    updateSettings("theme", {
-      primaryColor: primaryColor || "#10B981",
-      secondaryColor: secondaryColor || "#3B82F6",
-      accentColor: accentColor || "#FFE11B",
-      fontFamily: fontFamily || "Inter",
-    });
-
     toast.success("Settings saved successfully");
   };
 
   const sections = [
     { id: "identity", label: "Store Identity", icon: FiSettings },
     { id: "contact", label: "Contact Info", icon: FiGlobe },
-    { id: "theme", label: "Theme & Colors", icon: FiImage },
     { id: "vendors", label: "Vendor Settings", icon: FiSettings },
   ];
 
@@ -354,120 +342,7 @@ const GeneralSettings = () => {
             </div>
           )}
 
-          {/* Theme & Colors Section */}
-          {activeSection === "theme" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Primary Color
-                  </label>
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <input
-                      type="color"
-                      name="primaryColor"
-                      value={formData.primaryColor || "#10B981"}
-                      onChange={handleChange}
-                      className="w-12 sm:w-16 h-9 sm:h-10 border border-gray-300 rounded cursor-pointer flex-shrink-0"
-                    />
-                    <input
-                      type="text"
-                      name="primaryColor"
-                      value={formData.primaryColor || "#10B981"}
-                      onChange={handleChange}
-                      className="flex-1 min-w-0 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                    />
-                  </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Secondary Color
-                  </label>
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <input
-                      type="color"
-                      name="secondaryColor"
-                      value={formData.secondaryColor || "#3B82F6"}
-                      onChange={handleChange}
-                      className="w-12 sm:w-16 h-9 sm:h-10 border border-gray-300 rounded cursor-pointer flex-shrink-0"
-                    />
-                    <input
-                      type="text"
-                      name="secondaryColor"
-                      value={formData.secondaryColor || "#3B82F6"}
-                      onChange={handleChange}
-                      className="flex-1 min-w-0 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Accent Color
-                  </label>
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <input
-                      type="color"
-                      name="accentColor"
-                      value={formData.accentColor || "#FFE11B"}
-                      onChange={handleChange}
-                      className="w-12 sm:w-16 h-9 sm:h-10 border border-gray-300 rounded cursor-pointer flex-shrink-0"
-                    />
-                    <input
-                      type="text"
-                      name="accentColor"
-                      value={formData.accentColor || "#FFE11B"}
-                      onChange={handleChange}
-                      className="flex-1 min-w-0 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Font Family
-                  </label>
-                  <AnimatedSelect
-                    name="fontFamily"
-                    value={formData.fontFamily || "Inter"}
-                    onChange={handleChange}
-                    options={[
-                      { value: "Inter", label: "Inter" },
-                      { value: "Roboto", label: "Roboto" },
-                      { value: "Open Sans", label: "Open Sans" },
-                      { value: "Poppins", label: "Poppins" },
-                      { value: "Lato", label: "Lato" },
-                    ]}
-                  />
-                </div>
-              </div>
-
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-2">Color Preview:</p>
-                <div className="flex gap-2">
-                  <div
-                    className="w-20 h-20 rounded-lg"
-                    style={{
-                      backgroundColor: formData.primaryColor || "#10B981",
-                    }}
-                  />
-                  <div
-                    className="w-20 h-20 rounded-lg"
-                    style={{
-                      backgroundColor: formData.secondaryColor || "#3B82F6",
-                    }}
-                  />
-                  <div
-                    className="w-20 h-20 rounded-lg"
-                    style={{
-                      backgroundColor: formData.accentColor || "#FFE11B",
-                    }}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Vendor Settings Section */}
           {activeSection === "vendors" && (
