@@ -348,6 +348,10 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
     notifyOrderUpdate(order);
 
     const statusNotificationTasks = [];
+    const itemsSummary = (order.items || [])
+        .map((item) => `${item.name} (x${item.quantity})`)
+        .join(', ');
+
     if (order.userId) {
         statusNotificationTasks.push(
             createNotification({
@@ -356,8 +360,8 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
                 title: status === 'delivered' ? 'Order delivered' : 'Order shipped',
                 message:
                     status === 'delivered'
-                        ? `Your order ${order.orderId} has been delivered.`
-                        : `Your order ${order.orderId} is out for delivery.`,
+                        ? `Your order ${order.orderId} containing [${itemsSummary}] has been delivered.`
+                        : `Your order ${order.orderId} containing [${itemsSummary}] is out for delivery.`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId || order._id),
@@ -375,12 +379,17 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
         ),
     ];
     vendorIds.forEach((vendorId) => {
+        const vendorGroup = (order.vendorItems || []).find((vg) => String(vg.vendorId) === String(vendorId));
+        const vItemsSummary = vendorGroup
+            ? (vendorGroup.items || []).map((item) => `${item.name} (x${item.quantity})`).join(', ')
+            : '';
+
         statusNotificationTasks.push(
             createNotification({
                 recipientId: vendorId,
                 recipientType: 'vendor',
                 title: 'Delivery status update',
-                message: `Order ${order.orderId} moved to ${status}.`,
+                message: `Order ${order.orderId} containing [${vItemsSummary}] moved to ${status}.`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId || order._id),

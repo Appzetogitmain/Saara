@@ -600,11 +600,14 @@ export const placeOrder = asyncHandler(async (req, res) => {
         }
 
         if (userId) {
+            const itemsSummary = (order.items || [])
+                .map((item) => `${item.name} (x${item.quantity})`)
+                .join(', ');
             createNotification({
                 recipientId: userId,
                 recipientType: 'user',
                 title: 'Order Placed!',
-                message: `Your order ${order.orderId} has been placed successfully.`,
+                message: `Your order ${order.orderId} containing [${itemsSummary}] has been placed successfully.`,
                 type: 'order',
                 data: { link: `/orders/${order.orderId}` },
             }).catch((err) => console.error('[Order Notification] Failed to create:', err.message));
@@ -612,11 +615,14 @@ export const placeOrder = asyncHandler(async (req, res) => {
 
         // Notify vendors and create database notifications
         (order.vendorItems || []).forEach((vGroup) => {
+            const vItemsSummary = (vGroup.items || [])
+                .map((item) => `${item.name} (x${item.quantity})`)
+                .join(', ');
             createNotification({
                 recipientId: vGroup.vendorId,
                 recipientType: 'vendor',
                 title: 'New Order Received!',
-                message: `You have received a new order ${order.orderId} for ${vGroup.items?.length || 0} item(s) totalling ₹${vGroup.subtotal}.`,
+                message: `You have received a new order ${order.orderId} containing [${vItemsSummary}] totalling ₹${vGroup.subtotal}.`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId || order._id),

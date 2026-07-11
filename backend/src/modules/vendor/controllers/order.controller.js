@@ -209,13 +209,17 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     }
 
     const notificationTasks = [];
+    const vItemsSummary = (vendorItem.items || [])
+        .map((item) => `${item.name} (x${item.quantity})`)
+        .join(', ');
+
     if (order.userId) {
         notificationTasks.push(
             createNotification({
                 recipientId: order.userId,
                 recipientType: 'user',
                 title: 'Order item status updated',
-                message: `An item in your order ${order.orderId || order._id} is now ${status}.`,
+                message: `An item [${vItemsSummary}] in your order ${order.orderId || order._id} is now ${status}.`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId || order._id),
@@ -231,7 +235,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
             recipientId: req.user.id,
             recipientType: 'vendor',
             title: 'Order status updated',
-            message: `Order ${order.orderId || order._id} moved to ${status}.`,
+            message: `Order ${order.orderId || order._id} containing [${vItemsSummary}] moved to ${status}.`,
             type: 'order',
             data: {
                 orderId: String(order.orderId || order._id),
@@ -413,13 +417,17 @@ export const verifyPickup = asyncHandler(async (req, res) => {
 
     // Trigger notification tasks
     const notificationTasks = [];
+    const vItemsSummary = (vendorItem.items || [])
+        .map((item) => `${item.name} (x${item.quantity})`)
+        .join(', ');
+
     if (order.userId) {
         notificationTasks.push(
             createNotification({
                 recipientId: order.userId,
                 recipientType: 'user',
                 title: 'Order item status updated',
-                message: `An item in your order ${order.orderId || order._id} is now shipped.`,
+                message: `An item [${vItemsSummary}] in your order ${order.orderId || order._id} is now shipped.`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId || order._id),
@@ -435,7 +443,7 @@ export const verifyPickup = asyncHandler(async (req, res) => {
             recipientId: req.user.id,
             recipientType: 'vendor',
             title: 'Package picked up successfully',
-            message: `Order ${order.orderId || order._id} has been handed over to the courier.`,
+            message: `Order ${order.orderId || order._id} containing [${vItemsSummary}] has been handed over to the courier.`,
             type: 'order',
             data: {
                 orderId: String(order.orderId || order._id),
