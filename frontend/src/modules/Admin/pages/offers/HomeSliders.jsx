@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { FiPlus, FiEdit, FiTrash2, FiUpload } from "react-icons/fi";
+import { FiPlus, FiEdit, FiTrash2, FiUpload, FiArrowUp, FiArrowDown, FiEye, FiEyeOff } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import DataTable from "../../components/DataTable";
 import ConfirmModal from "../../components/ConfirmModal";
@@ -8,8 +8,8 @@ import AnimatedSelect from "../../components/AnimatedSelect";
 import { useBannerStore } from "../../../../shared/store/bannerStore";
 import { getPlaceholderImage } from "../../../../shared/utils/helpers";
 import toast from "react-hot-toast";
-import { uploadAdminImage } from "../../services/adminService";
-import LinkPicker from "../../components/Banners/LinkPicker";
+import { uploadAdminImage, reorderBanners as reorderBannersApi } from "../../services/adminService";
+import BannerForm from "../../components/Banners/BannerForm";
 import { BannerTypes, SLIDER_TYPES } from "../../utils/bannerConstants";
 
 const SLIDER_IMAGE_PLACEHOLDER = getPlaceholderImage(64, 64, "Image");
@@ -17,7 +17,7 @@ const SLIDER_IMAGE_PLACEHOLDER = getPlaceholderImage(64, 64, "Image");
 const HomeSliders = () => {
   const location = useLocation();
   const isAppRoute = location.pathname.startsWith("/app");
-  const { banners, initialize, createBanner, updateBanner, deleteBanner, getBannersByTypes } =
+  const { banners, initialize, createBanner, updateBanner, deleteBanner, toggleBannerStatus, getBannersByTypes } =
     useBannerStore();
   const [selectedBannerType, setSelectedBannerType] = useState(BannerTypes.HOME_SLIDER);
 
@@ -31,7 +31,7 @@ const HomeSliders = () => {
           status: banner.isActive ? "active" : "inactive",
         }))
         .sort((a, b) => (a.order || 0) - (b.order || 0)),
-    [getBannersByTypes, selectedBannerType]
+    [banners, getBannersByTypes, selectedBannerType]
   );
 
   const [editingSlider, setEditingSlider] = useState(null);
@@ -46,6 +46,10 @@ const HomeSliders = () => {
     const payload = {
       title: sliderData.title,
       image: sliderData.image,
+      mobileImage: sliderData.mobileImage,
+      altText: sliderData.altText,
+      openInNewTab: sliderData.openInNewTab,
+      showButton: sliderData.showButton,
       link: sliderData.link,
       order: sliderData.order,
       isActive: sliderData.status === "active",
@@ -103,6 +107,46 @@ const HomeSliders = () => {
     }
   };
 
+  const handleMoveUp = async (slider) => {
+    const index = sliders.findIndex((s) => s._id === slider._id);
+    if (index <= 0) return;
+
+    const current = sliders[index];
+    const previous = sliders[index - 1];
+    const currentOrder = Number(current.order || 0);
+    const previousOrder = Number(previous.order || 0);
+
+    try {
+      await reorderBannersApi([
+        { id: current._id, order: previousOrder },
+        { id: previous._id, order: currentOrder },
+      ]);
+      await initialize();
+    } catch {
+      // Handled by api interceptor
+    }
+  };
+
+  const handleMoveDown = async (slider) => {
+    const index = sliders.findIndex((s) => s._id === slider._id);
+    if (index < 0 || index >= sliders.length - 1) return;
+
+    const current = sliders[index];
+    const next = sliders[index + 1];
+    const currentOrder = Number(current.order || 0);
+    const nextOrder = Number(next.order || 0);
+
+    try {
+      await reorderBannersApi([
+        { id: current._id, order: nextOrder },
+        { id: next._id, order: currentOrder },
+      ]);
+      await initialize();
+    } catch {
+      // Handled by api interceptor
+    }
+  };
+
   const columns = [
     {
       key: "image",
@@ -150,14 +194,32 @@ const HomeSliders = () => {
       ),
     },
     {
-      key: "type",
-      label: "Type",
+      key: "reorder",
+      label: "Move",
       sortable: false,
-      render: (value) => (
-        <span className="text-sm text-gray-700">
-          {value === BannerTypes.SIDE_BANNER ? "Side Banner" : "Home Slider"}
-        </span>
-      ),
+      render: (_, row) => {
+        const index = sliders.findIndex((s) => s._id === row._id);
+        return (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleMoveUp(row)}
+              disabled={index === 0}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Move Up"
+            >
+              <FiArrowUp />
+            </button>
+            <button
+              onClick={() => handleMoveDown(row)}
+              disabled={index === sliders.length - 1}
+              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Move Down"
+            >
+              <FiArrowDown />
+            </button>
+          </div>
+        );
+      }
     },
     {
       key: "actions",
@@ -165,6 +227,13 @@ const HomeSliders = () => {
       sortable: false,
       render: (_, row) => (
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => toggleBannerStatus(row._id)}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title={row.isActive ? "Deactivate" : "Activate"}
+          >
+            {row.isActive ? <FiEye /> : <FiEyeOff />}
+          </button>
           <button
             onClick={() => setEditingSlider(row)}
             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
@@ -199,8 +268,8 @@ const HomeSliders = () => {
             value={selectedBannerType}
             onChange={(e) => setSelectedBannerType(e.target.value)}
             options={[
-              { value: BannerTypes.HOME_SLIDER, label: "Home Sliders" },
-              { value: BannerTypes.SIDE_BANNER, label: "Side Banners" },
+              { value: BannerTypes.HOME_SLIDER, label: "Hero Slider" },
+              { value: BannerTypes.SIDE_BANNER, label: "Hero Side Banner" },
             ]}
             className="min-w-[170px]"
           />
@@ -209,6 +278,10 @@ const HomeSliders = () => {
               setEditingSlider({
                 title: "",
                 image: "",
+                mobileImage: "",
+                altText: "",
+                openInNewTab: false,
+                showButton: true,
                 link: "",
                 order: 1,
                 status: "active",
@@ -220,7 +293,7 @@ const HomeSliders = () => {
             <span>
               {selectedBannerType === BannerTypes.SIDE_BANNER
                 ? "Add Side Banner"
-                : "Add Slider"}
+                : "Add Hero Slide"}
             </span>
           </button>
         </div>
@@ -239,182 +312,15 @@ const HomeSliders = () => {
 
       <AnimatePresence>
         {editingSlider !== null && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              onClick={() => setEditingSlider(null)}
-              className="fixed inset-0 bg-black/50 z-[10000]"
-            />
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className={`fixed inset-0 z-[10000] flex ${
-                isAppRoute ? "items-start pt-[10px]" : "items-end"
-              } sm:items-center justify-center p-4 pointer-events-none`}>
-              <motion.div
-                variants={{
-                  hidden: {
-                    y: isAppRoute ? "-100%" : "100%",
-                    scale: 0.95,
-                    opacity: 0,
-                  },
-                  visible: {
-                    y: 0,
-                    scale: 1,
-                    opacity: 1,
-                    transition: {
-                      type: "spring",
-                      damping: 22,
-                      stiffness: 350,
-                      mass: 0.7,
-                    },
-                  },
-                  exit: {
-                    y: isAppRoute ? "-100%" : "100%",
-                    scale: 0.95,
-                    opacity: 0,
-                    transition: {
-                      type: "spring",
-                      damping: 30,
-                      stiffness: 400,
-                    },
-                  },
-                }}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                onClick={(e) => e.stopPropagation()}
-                className={`bg-white ${
-                  isAppRoute ? "rounded-b-3xl" : "rounded-t-3xl"
-                } sm:rounded-xl shadow-xl p-6 max-w-md w-full pointer-events-auto`}
-                style={{ willChange: "transform" }}>
-                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                  {editingSlider.id
-                    ? editingSlider.type === "side_banner"
-                      ? "Edit Side Banner"
-                      : "Edit Slider"
-                    : selectedBannerType === "side_banner"
-                    ? "Add Side Banner"
-                    : "Add Slider"}
-                </h3>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const formData = new FormData(e.target);
-                    handleSave({
-                      type: formData.get("type"),
-                      title: formData.get("title"),
-                      image: formData.get("image"),
-                      link: formData.get("link"),
-                      order: parseInt(formData.get("order"), 10),
-                      status: formData.get("status"),
-                    });
-                  }}
-                  className="space-y-4">
-                  <AnimatedSelect
-                    name="type"
-                    value={editingSlider.type || selectedBannerType}
-                    onChange={(e) =>
-                      setEditingSlider({
-                        ...editingSlider,
-                        type: e.target.value,
-                      })
-                    }
-                    options={[
-                      { value: BannerTypes.HOME_SLIDER, label: "Home Slider" },
-                      { value: BannerTypes.SIDE_BANNER, label: "Side Banner (Home Right)" },
-                    ]}
-                    required
-                  />
-                  <input
-                    type="text"
-                    name="title"
-                    defaultValue={editingSlider.title || ""}
-                    placeholder="Title"
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <input
-                    type="text"
-                    name="image"
-                    value={editingSlider.image || ""}
-                    onChange={(e) =>
-                      setEditingSlider({
-                        ...editingSlider,
-                        image: e.target.value,
-                      })
-                    }
-                    placeholder="Image URL"
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <label className={`inline-flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg transition-colors text-sm font-semibold ${isUploadingImage ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-gray-200"}`}>
-                    <FiUpload />
-                    {isUploadingImage ? "Uploading..." : "Upload to Cloudinary"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleSliderImageUpload}
-                      className="hidden"
-                      disabled={isUploadingImage}
-                    />
-                  </label>
-                  <div className="space-y-1">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider">
-                      Link Configuration
-                    </label>
-                    <LinkPicker
-                      value={editingSlider.link || ""}
-                      onChange={(val) => setEditingSlider({ ...editingSlider, link: val })}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <input
-                      type="number"
-                      name="order"
-                      defaultValue={editingSlider.order || 1}
-                      placeholder="Order"
-                      required
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                    <AnimatedSelect
-                      name="status"
-                      value={editingSlider.status || "active"}
-                      onChange={(e) =>
-                        setEditingSlider({
-                          ...editingSlider,
-                          status: e.target.value,
-                        })
-                      }
-                      options={[
-                        { value: "active", label: "Active" },
-                        { value: "inactive", label: "Inactive" },
-                      ]}
-                      required
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="submit"
-                      className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold">
-                      Save
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingSlider(null)}
-                      className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-semibold">
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            </motion.div>
-          </>
+          <BannerForm
+            banner={editingSlider.id ? editingSlider : null}
+            allowedTypes={[editingSlider.type || selectedBannerType]}
+            onClose={() => setEditingSlider(null)}
+            onSave={() => {
+              initialize();
+              setEditingSlider(null);
+            }}
+          />
         )}
       </AnimatePresence>
 

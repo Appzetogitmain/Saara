@@ -201,6 +201,31 @@ const resolveBannerLink = (banner) => {
 const isExternalLink = (target) => /^https?:\/\//i.test(String(target || "").trim());
 const isSafeInternalPath = (target) => String(target || "").startsWith("/");
 
+const getButtonStyleClasses = (style = "primary", isDarkBg = false) => {
+  const base = "inline-flex items-center justify-center gap-2 font-black py-2.5 px-6 md:py-3.5 md:px-8 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-[10px] md:text-sm active:scale-95";
+  if (isDarkBg) {
+    switch (style) {
+      case "secondary":
+        return `${base} bg-gray-800 text-white hover:bg-gray-700 border border-gray-700 hover:scale-[1.02]`;
+      case "outline":
+        return `${base} bg-transparent text-white border-2 border-white hover:bg-white/10 hover:scale-[1.02]`;
+      case "primary":
+      default:
+        return `${base} bg-white text-gray-900 hover:bg-gray-100 hover:scale-[1.02]`;
+    }
+  } else {
+    switch (style) {
+      case "secondary":
+        return `${base} bg-gray-100 hover:bg-gray-200 text-gray-800 hover:scale-[1.02]`;
+      case "outline":
+        return `${base} bg-transparent border-2 border-primary-600 text-primary-600 hover:bg-primary-50 hover:scale-[1.02]`;
+      case "primary":
+      default:
+        return `${base} bg-primary-600 hover:bg-primary-700 text-white hover:scale-[1.02]`;
+    }
+  }
+};
+
 const MobileHome = () => {
   const navigate = useNavigate();
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -340,6 +365,12 @@ const MobileHome = () => {
           .map((banner, index) => ({
             id: normalizeId(banner._id || banner.id || `home-slide-${index}`),
             image: banner.image,
+            mobileImage: banner.mobileImage,
+            altText: banner.altText || "",
+            openInNewTab: !!banner.openInNewTab,
+            showButton: banner.showButton !== false,
+            buttonText: banner.buttonText || "Shop Now",
+            buttonStyle: banner.buttonStyle || "primary",
             link: resolveBannerLink(banner),
             title: banner.title || "Shop Smart. Live Better.",
             subtitle: banner.subtitle || "BEST DEALS",
@@ -356,9 +387,15 @@ const MobileHome = () => {
             title: banner.title || "Special Offer",
             subtitle: banner.subtitle || "Limited Time",
             description: banner.description || "",
-            discount: banner.description || "Shop Now",
+            discount: banner.buttonText || banner.description || "Shop Now",
             link: resolveBannerLink(banner),
             image: banner.image,
+            mobileImage: banner.mobileImage,
+            altText: banner.altText || "",
+            openInNewTab: !!banner.openInNewTab,
+            showButton: banner.showButton !== false,
+            buttonText: banner.buttonText || "Shop Now",
+            buttonStyle: banner.buttonStyle || "primary",
             type: banner.type || "promotional",
           }));
         setPromoBanners(banners);
@@ -369,8 +406,15 @@ const MobileHome = () => {
           .map((banner, index) => ({
             id: normalizeId(banner._id || banner.id || `side-banner-${index}`),
             image: banner.image,
+            mobileImage: banner.mobileImage,
+            altText: banner.altText || "",
+            openInNewTab: !!banner.openInNewTab,
+            showButton: banner.showButton !== false,
+            buttonText: banner.buttonText || "Explore Now",
+            buttonStyle: banner.buttonStyle || "primary",
             title: banner.title || "PREMIUM",
             subtitle: banner.subtitle || "Exclusive Collection",
+            description: banner.description || "",
             link: resolveBannerLink(banner),
           }));
         setSideBanner(mapped[0] || null);
@@ -385,6 +429,12 @@ const MobileHome = () => {
             subtitle: focusBanner.subtitle,
             description: focusBanner.description,
             image: focusBanner.image,
+            mobileImage: focusBanner.mobileImage,
+            altText: focusBanner.altText || "",
+            openInNewTab: !!focusBanner.openInNewTab,
+            showButton: focusBanner.showButton !== false,
+            buttonText: focusBanner.buttonText || "Shop Now",
+            buttonStyle: focusBanner.buttonStyle || "primary",
             link: resolveBannerLink(focusBanner),
           });
         } else {
@@ -398,6 +448,12 @@ const MobileHome = () => {
           .map((banner) => ({
             name: banner.title,
             image: banner.image,
+            mobileImage: banner.mobileImage,
+            altText: banner.altText || "",
+            openInNewTab: !!banner.openInNewTab,
+            showButton: banner.showButton !== false,
+            buttonText: banner.buttonText || "Shop Now",
+            buttonStyle: banner.buttonStyle || "primary",
             link: resolveBannerLink(banner),
           }));
         setCategoryFocusItems(focusItems);
@@ -410,6 +466,12 @@ const MobileHome = () => {
             brand: banner.title,
             offer: banner.subtitle,
             image: banner.image,
+            mobileImage: banner.mobileImage,
+            altText: banner.altText || "",
+            openInNewTab: !!banner.openInNewTab,
+            showButton: banner.showButton !== false,
+            buttonText: banner.buttonText || "Shop Now",
+            buttonStyle: banner.buttonStyle || "primary",
             link: resolveBannerLink(banner),
           }));
         setDealItems(deals);
@@ -513,7 +575,7 @@ const MobileHome = () => {
     const target = String(slide?.link || "").trim();
     if (!target) return;
 
-    if (isExternalLink(target)) {
+    if (slide.openInNewTab || isExternalLink(target)) {
       window.open(target, "_blank", "noopener,noreferrer");
       return;
     }
@@ -522,16 +584,18 @@ const MobileHome = () => {
     }
   };
 
-  const handleBannerNavigation = (target) => {
-    const normalizedTarget = String(target || "").trim();
-    if (!normalizedTarget) return;
-    if (isExternalLink(normalizedTarget)) {
-      window.open(normalizedTarget, "_blank", "noopener,noreferrer");
+  const handleBannerNavigation = (banner) => {
+    if (!banner) return;
+    const target = typeof banner === "string" ? banner : String(banner?.link || banner?.linkUrl || "").trim();
+    if (!target) return;
+
+    const openInNewTab = typeof banner === "object" && banner !== null ? !!banner.openInNewTab : false;
+
+    if (openInNewTab || isExternalLink(target)) {
+      window.open(target, "_blank", "noopener,noreferrer");
       return;
     }
-    if (isSafeInternalPath(normalizedTarget) && isKnownInternalRoute(normalizedTarget)) {
-      navigate(normalizedTarget);
-    }
+    navigate(target);
   };
 
   // Pull to refresh handler
@@ -605,15 +669,18 @@ const MobileHome = () => {
                         height: "100%",
                         cursor: slide?.link ? "pointer" : "default",
                       }}>
-                      <LazyImage
-                        src={slide.image}
-                        alt={`Slide ${index + 1}`}
-                        className="w-full h-full object-cover pointer-events-none select-none"
-                        draggable={false}
-                        onError={(e) => {
-                          e.target.src = `https://via.placeholder.com/400x200?text=Slide+${index + 1}`;
-                        }}
-                      />
+                      <picture className="w-full h-full pointer-events-none select-none">
+                        {slide.mobileImage && <source media="(max-width: 640px)" srcSet={slide.mobileImage} />}
+                        <img
+                          src={slide.image}
+                          alt={slide.altText || `Slide ${index + 1}`}
+                          className="w-full h-full object-cover pointer-events-none select-none"
+                          draggable={false}
+                          onError={(e) => {
+                            e.target.src = `https://via.placeholder.com/400x200?text=Slide+${index + 1}`;
+                          }}
+                        />
+                      </picture>
 
                       {/* Text & Button overlays on the left */}
                       {slide.hasOverlay !== false && (
@@ -635,30 +702,32 @@ const MobileHome = () => {
                             </div>
 
                             {/* Action buttons */}
-                            <div className="flex items-center gap-3 md:gap-4 mt-4 md:mt-8">
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Avoid triggering parent click
-                                  handleSlideClick(slide);
-                                }}
-                                className="bg-primary-600 hover:bg-primary-700 text-white font-black py-2 md:py-3.5 px-4 md:px-8 rounded-xl flex items-center gap-2 hover:scale-[1.02] active:scale-95 transition-all text-[9px] md:text-sm shadow-md cursor-pointer select-none"
-                              >
-                                <span>Shop Now</span>
-                                <span>&rarr;</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation(); // Avoid triggering parent click
-                                  navigate("/offers");
-                                }}
-                                className="flex items-center gap-1.5 md:gap-2 text-gray-700 font-black text-[9px] md:text-sm hover:text-primary-600 transition-colors cursor-pointer select-none"
-                              >
-                                <span className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-white flex items-center justify-center shadow border border-gray-100 text-xs font-bold font-mono">&gt;</span>
-                                <span>Explore Deals</span>
-                              </button>
-                            </div>
+                            {slide.showButton !== false && (
+                              <div className="flex items-center gap-3 md:gap-4 mt-4 md:mt-8">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Avoid triggering parent click
+                                    handleSlideClick(slide);
+                                  }}
+                                  className={getButtonStyleClasses(slide.buttonStyle, false)}
+                                >
+                                  <span>{slide.buttonText || "Shop Now"}</span>
+                                  <span>&rarr;</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation(); // Avoid triggering parent click
+                                    navigate("/offers");
+                                  }}
+                                  className="flex items-center gap-1.5 md:gap-2 text-gray-700 font-black text-[9px] md:text-sm hover:text-primary-600 transition-colors cursor-pointer select-none"
+                                >
+                                  <span className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-white flex items-center justify-center shadow border border-gray-100 text-xs font-bold font-mono">&gt;</span>
+                                  <span>Explore Deals</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </>
                       )}
@@ -685,43 +754,48 @@ const MobileHome = () => {
 
               {/* Side Banner for Large Screens (Luxury Collection) */}
               <div
-                onClick={() => handleBannerNavigation(sideBanner?.link || "/search")}
+                onClick={() => handleBannerNavigation(sideBanner)}
                 className="hidden lg:flex lg:col-span-1 h-[400px] xl:h-[450px] rounded-3xl overflow-hidden relative bg-gradient-to-br from-[#111111] to-[#1e1e1e] p-8 border border-gray-800 cursor-pointer group shadow-lg"
               >
                 {/* Text and Actions (Left side) */}
                 <div className="flex-1 flex flex-col justify-between z-20 text-left h-full max-w-[55%]">
                   <div className="space-y-4">
                     <span className="text-yellow-500 font-extrabold text-xs tracking-widest uppercase">
-                      PREMIUM COLLECTION
+                      {sideBanner?.subtitle || "PREMIUM COLLECTION"}
                     </span>
                     <h3 className="text-white text-3xl font-black leading-tight tracking-tight drop-shadow-sm">
-                      Luxury that Defines You
+                      {sideBanner?.title || "Luxury that Defines You"}
                     </h3>
                     <p className="text-gray-400 text-sm font-semibold leading-relaxed">
-                      Exclusive watches for every occasion.
+                      {sideBanner?.description || "Exclusive watches for every occasion."}
                     </p>
                   </div>
 
-                  <button
-                    type="button"
-                    className="flex items-center justify-center gap-1.5 bg-white text-gray-900 font-black py-3 px-6 rounded-xl hover:bg-gray-100 transition-all self-start shadow-md text-sm mt-4 select-none whitespace-nowrap"
-                  >
-                    <span>Explore Now</span>
-                    <span>&rarr;</span>
-                  </button>
+                  {sideBanner?.showButton !== false && (
+                    <button
+                      type="button"
+                      className={getButtonStyleClasses(sideBanner?.buttonStyle, true)}
+                    >
+                      <span>{sideBanner?.buttonText || "Explore Now"}</span>
+                      <span>&rarr;</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Watch Image (Right side, absolute and offset) */}
                 <div className="absolute right-0 bottom-0 top-0 w-[55%] flex items-center justify-end z-10 select-none overflow-hidden">
-                  <img
-                    src={sideBanner?.image || stylishWatchImg}
-                    alt="Premium Watch"
-                    className="h-[110%] w-auto object-contain translate-x-[12%] group-hover:scale-105 group-hover:translate-x-[8%] transition-transform duration-700 pointer-events-none select-none"
-                    draggable={false}
-                    onError={(e) => {
-                      e.target.src = "https://via.placeholder.com/400x400?text=Premium+Watch";
-                    }}
-                  />
+                  <picture className="h-[110%] w-auto object-contain translate-x-[12%] group-hover:scale-105 group-hover:translate-x-[8%] transition-transform duration-700 pointer-events-none select-none">
+                    {sideBanner?.mobileImage && <source media="(max-width: 640px)" srcSet={sideBanner.mobileImage} />}
+                    <img
+                      src={sideBanner?.image || stylishWatchImg}
+                      alt={sideBanner?.altText || "Premium Watch"}
+                      className="h-full w-auto object-contain pointer-events-none select-none"
+                      draggable={false}
+                      onError={(e) => {
+                        e.target.src = "https://via.placeholder.com/400x400?text=Premium+Watch";
+                      }}
+                    />
+                  </picture>
                 </div>
               </div>
             </div>

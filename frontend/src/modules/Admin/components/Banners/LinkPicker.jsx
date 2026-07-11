@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FiLink, FiSearch, FiExternalLink, FiTag, FiShoppingBag, FiGlobe, FiX, FiFileText } from 'react-icons/fi';
+import { FiLink, FiSearch, FiExternalLink, FiTag, FiShoppingBag, FiGlobe, FiX, FiFileText, FiUser, FiZap } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getAllCategories, getAllBrands, getAllProducts } from '../../services/adminService';
+import { getAllCategories, getAllBrands, getAllProducts, getAllVendors, getAllCampaigns } from '../../services/adminService';
 import AnimatedSelect from '../AnimatedSelect';
 
 // Custom debounce implementation
@@ -44,12 +44,16 @@ const LinkPicker = ({ value, onChange }) => {
       return;
     }
 
-    if (value.startsWith('/category/')) {
-      setType('category');
-    } else if (value.startsWith('/product/')) {
+    if (value.startsWith('/product/')) {
       setType('product');
+    } else if (value.startsWith('/category/')) {
+      setType('category');
     } else if (value.startsWith('/brand/')) {
       setType('brand');
+    } else if (value.startsWith('/seller/')) {
+      setType('seller');
+    } else if (value.startsWith('/sale/')) {
+      setType('campaign');
     } else if (value.startsWith('/search?q=')) {
       setType('search');
       setQuery(decodeURIComponent(value.split('=')[1]));
@@ -59,15 +63,18 @@ const LinkPicker = ({ value, onChange }) => {
     } else if (STATIC_PAGES.some(p => p.value === value)) {
       setType('page');
       setQuery(value);
+    } else if (value.startsWith('/')) {
+      setType('custom');
+      setQuery(value);
     } else {
-      // Fallback for any unknown link, still show as custom search or similar
-      setType('search');
+      setType('custom');
+      setQuery(value);
     }
   }, [value]);
 
   const fetchSuggestions = useCallback(
     debounce(async (searchType, searchQuery) => {
-      if (!searchQuery && searchType === 'product') {
+      if (!searchQuery && ['product', 'seller', 'campaign'].includes(searchType)) {
         setSuggestions([]);
         return;
       }
@@ -77,19 +84,53 @@ const LinkPicker = ({ value, onChange }) => {
         let items = [];
         if (searchType === 'category') {
           const res = await getAllCategories();
-          items = res.data.map(c => ({ id: c._id, name: c.name, link: `/category/${c._id}` }));
+          const categoriesList = Array.isArray(res.data) ? res.data : [];
+          // Filter root categories (no parentId)
+          items = categoriesList
+            .filter(c => !c.parentId)
+            .map(c => ({ id: c._id, name: c.name, link: `/category/${c._id}` }));
+          if (searchQuery) {
+            items = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
+          }
+        } else if (searchType === 'subcategory') {
+          const res = await getAllCategories();
+          const categoriesList = Array.isArray(res.data) ? res.data : [];
+          // Filter sub-categories (has parentId)
+          items = categoriesList
+            .filter(c => c.parentId)
+            .map(c => {
+              const parent = categoriesList.find(p => p._id === c.parentId);
+              const displayName = parent ? `${parent.name} > ${c.name}` : c.name;
+              return { id: c._id, name: displayName, link: `/category/${c._id}` };
+            });
           if (searchQuery) {
             items = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
           }
         } else if (searchType === 'brand') {
           const res = await getAllBrands();
-          items = res.data.map(b => ({ id: b._id, name: b.name, link: `/brand/${b._id}` }));
+          const brandsList = Array.isArray(res.data) ? res.data : [];
+          items = brandsList.map(b => ({ id: b._id, name: b.name, link: `/brand/${b._id}` }));
           if (searchQuery) {
             items = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
           }
         } else if (searchType === 'product') {
           const res = await getAllProducts({ search: searchQuery, limit: 10 });
-          items = res.data.products.map(p => ({ id: p._id, name: p.name, link: `/product/${p._id}` }));
+          const productsList = Array.isArray(res.data?.products) ? res.data.products : [];
+          items = productsList.map(p => ({ id: p._id, name: p.name, link: `/product/${p._id}` }));
+        } else if (searchType === 'seller') {
+          const res = await getAllVendors({ search: searchQuery, limit: 20 });
+          const vendorsList = Array.isArray(res.data?.vendors) ? res.data.vendors : Array.isArray(res.data) ? res.data : [];
+          items = vendorsList.map(v => ({ id: v._id, name: v.storeName || v.name || 'Unknown Store', link: `/seller/${v._id}` }));
+          if (searchQuery) {
+            items = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
+          }
+        } else if (searchType === 'campaign') {
+          const res = await getAllCampaigns();
+          const campaignsList = Array.isArray(res.data) ? res.data : [];
+          items = campaignsList.map(c => ({ id: c._id, name: c.name, link: `/sale/${c.slug}` }));
+          if (searchQuery) {
+            items = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
+          }
         }
         setSuggestions(items);
       } catch (error) {
@@ -102,7 +143,7 @@ const LinkPicker = ({ value, onChange }) => {
   );
 
   useEffect(() => {
-    if (['category', 'brand', 'product'].includes(type)) {
+    if (['category', 'subcategory', 'brand', 'product', 'seller', 'campaign'].includes(type)) {
       fetchSuggestions(type, query);
     } else {
       setSuggestions([]);
@@ -141,17 +182,23 @@ const LinkPicker = ({ value, onChange }) => {
       onChange(val);
     } else if (type === 'page') {
       onChange(val);
+    } else if (type === 'custom') {
+      onChange(val);
     }
   };
 
   const getIcon = () => {
     switch (type) {
       case 'category': return <FiTag className="text-blue-500" />;
+      case 'subcategory': return <FiTag className="text-teal-500" />;
       case 'product': return <FiShoppingBag className="text-purple-500" />;
       case 'brand': return <FiGlobe className="text-green-500" />;
+      case 'seller': return <FiUser className="text-amber-500" />;
+      case 'campaign': return <FiZap className="text-rose-500" />;
       case 'search': return <FiSearch className="text-orange-500" />;
       case 'external': return <FiExternalLink className="text-indigo-500" />;
       case 'page': return <FiFileText className="text-cyan-500" />;
+      case 'custom': return <FiLink className="text-gray-500" />;
       default: return <FiLink className="text-gray-400" />;
     }
   };
@@ -171,9 +218,13 @@ const LinkPicker = ({ value, onChange }) => {
               { value: 'page', label: 'Static Page' },
               { value: 'product', label: 'Product' },
               { value: 'category', label: 'Category' },
+              { value: 'subcategory', label: 'Sub Category' },
               { value: 'brand', label: 'Brand' },
+              { value: 'seller', label: 'Vendor Store' },
+              { value: 'campaign', label: 'Campaign / Collection' },
               { value: 'search', label: 'Search Results' },
               { value: 'external', label: 'External URL' },
+              { value: 'custom', label: 'Custom Route' },
             ]}
           />
         </div>
@@ -181,7 +232,7 @@ const LinkPicker = ({ value, onChange }) => {
         {type !== 'none' && (
           <div className="sm:col-span-2 relative">
             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">
-              {type === 'search' ? 'Search Keyword' : type === 'external' ? 'Full URL (https://...)' : type === 'page' ? 'Select Page' : 'Search & Select'}
+              {type === 'search' ? 'Search Keyword' : type === 'external' ? 'Full URL (https://...)' : type === 'page' ? 'Select Page' : type === 'custom' ? 'Custom path (e.g. /my-path)' : 'Search & Select'}
             </label>
             <div className="relative">
               <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
@@ -205,9 +256,13 @@ const LinkPicker = ({ value, onChange }) => {
                     placeholder={
                       type === 'product' ? 'Type product name...' :
                       type === 'category' ? 'Search category...' :
+                      type === 'subcategory' ? 'Search sub category...' :
                       type === 'brand' ? 'Search brand...' :
+                      type === 'seller' ? 'Search vendor store...' :
+                      type === 'campaign' ? 'Search campaign name...' :
                       type === 'search' ? 'e.g. Lipsticks' :
-                      type === 'external' ? 'https://google.com' : 'Enter link...'
+                      type === 'external' ? 'https://google.com' :
+                      type === 'custom' ? 'e.g. /custom-route' : 'Enter link...'
                     }
                     className="w-full pl-10 pr-10 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 transition-all text-sm font-medium"
                   />

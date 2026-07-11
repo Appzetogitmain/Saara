@@ -3,6 +3,31 @@ import { motion, AnimatePresence } from "framer-motion";
 import { matchPath, useNavigate } from "react-router-dom";
 import { FiArrowRight, FiZap, FiTag } from "react-icons/fi";
 
+const getButtonStyleClasses = (style = "primary", isDarkBg = false) => {
+  const base = "inline-flex items-center justify-center gap-1.5 font-bold py-1.5 px-4 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-[10px] md:text-xs active:scale-95 mt-2 self-start border border-gray-100/10 group-hover:translate-x-1";
+  if (isDarkBg) {
+    switch (style) {
+      case "secondary":
+        return `${base} bg-gray-800 text-white hover:bg-gray-700 border border-gray-700 hover:scale-[1.02]`;
+      case "outline":
+        return `${base} bg-transparent text-white border-2 border-white hover:bg-white/10 hover:scale-[1.02]`;
+      case "primary":
+      default:
+        return `${base} bg-white text-gray-900 hover:bg-gray-100 hover:scale-[1.02]`;
+    }
+  } else {
+    switch (style) {
+      case "secondary":
+        return `${base} bg-gray-100 hover:bg-gray-200 text-gray-800 hover:scale-[1.02]`;
+      case "outline":
+        return `${base} bg-transparent border-2 border-primary-600 text-primary-600 hover:bg-primary-50 hover:scale-[1.02]`;
+      case "primary":
+      default:
+        return `${base} bg-primary-600 hover:bg-primary-700 text-white hover:scale-[1.02]`;
+    }
+  }
+};
+
 // Hero images for the parallax effect
 import sneakersImg from "../../../../../data/products/sneakers.png";
 import watchImg from "../../../../../data/products/stylish watch.png";
@@ -109,19 +134,27 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
           link: resolveBannerLink(banner),
           icon: banner.icon || FiTag,
           heroImage: banner.image || banner.heroImage || watchImg,
+          mobileImage: banner.mobileImage || null,
+          altText: banner.altText || "",
+          openInNewTab: !!banner.openInNewTab,
+          showButton: banner.showButton !== false,
+          buttonText: banner.buttonText || banner.discount || "Shop Now",
+          buttonStyle: banner.buttonStyle || "primary",
         }))
       : defaultBanners;
 
-  const handleBannerClick = (target) => {
-    const normalizedTarget = String(target || "").trim();
-    if (!normalizedTarget) return;
-    if (isExternalLink(normalizedTarget)) {
-      window.open(normalizedTarget, "_blank", "noopener,noreferrer");
+  const handleBannerClick = (banner) => {
+    if (!banner) return;
+    const target = typeof banner === "string" ? banner : String(banner.link || "").trim();
+    if (!target) return;
+
+    const openInNewTab = typeof banner === "object" && banner !== null ? !!banner.openInNewTab : false;
+
+    if (openInNewTab || isExternalLink(target)) {
+      window.open(target, "_blank", "noopener,noreferrer");
       return;
     }
-    if (isSafeInternalPath(normalizedTarget) && isKnownInternalRoute(normalizedTarget)) {
-      navigate(normalizedTarget);
-    }
+    navigate(target);
   };
 
   useEffect(() => {
@@ -133,7 +166,7 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
 
   return (
     <div className={`${showPadding ? "px-4 py-3" : ""} ${className}`}>
-      <div className="relative w-full h-32 md:h-44 rounded-3xl overflow-hidden shadow-xl">
+      <div className="relative w-full h-40 md:h-[180px] lg:h-[230px] rounded-3xl overflow-hidden shadow-xl">
         <AnimatePresence mode="wait">
           {resolvedBanners.map((banner, index) => {
             if (index !== currentBanner) return null;
@@ -207,19 +240,22 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
                       }}
                       className="w-full h-full flex items-center justify-center"
                     >
-                      <motion.img
-                        src={banner.heroImage}
-                        alt="Hero Product"
-                        className="w-full h-full object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.3)] rounded-2xl"
-                        animate={{
-                          y: [0, -6, 0],
-                        }}
-                        transition={{
-                          duration: 4.5,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
-                      />
+                      <picture className="w-full h-full object-contain pointer-events-none select-none">
+                        {banner.mobileImage && <source media="(max-width: 640px)" srcSet={banner.mobileImage} />}
+                        <motion.img
+                          src={banner.heroImage}
+                          alt={banner.altText || "Hero Product"}
+                          className="w-full h-full object-contain drop-shadow-[0_12px_24px_rgba(0,0,0,0.3)] rounded-2xl"
+                          animate={{
+                            y: [0, -6, 0],
+                          }}
+                          transition={{
+                            duration: 4.5,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                        />
+                      </picture>
                     </motion.div>
                   </div>
                 </div>
@@ -227,7 +263,7 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
                 {/* Content */}
                 <button
                   type="button"
-                  onClick={() => handleBannerClick(banner.link)}
+                  onClick={() => handleBannerClick(banner)}
                   disabled={!banner.link}
                   className="relative z-10 h-full flex items-center justify-between text-left group w-full pointer-events-auto">
                   <div className="flex-1 flex flex-col justify-center h-full space-y-1 md:space-y-2 max-w-[60%]">
@@ -271,19 +307,19 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
                       </motion.p>
                     )}
 
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.5, type: "spring" }}
-                      className="inline-flex items-center gap-1.5 bg-white text-gray-900 px-3.5 py-1.5 md:px-5 md:py-2.5 rounded-xl font-black text-[10px] md:text-xs hover:bg-gray-100 transition-all shadow-md self-start mt-2 border border-gray-100/10 select-none group-hover:translate-x-1"
-                      whileTap={{ scale: 0.95 }}>
-                      <span>
-                        {String(banner.discount).length > 15 || String(banner.discount) === String(banner.description)
-                          ? "Shop Now"
-                          : banner.discount}
-                      </span>
-                      <FiArrowRight className="text-gray-900 text-xs md:text-sm" />
-                    </motion.div>
+                    {banner.showButton !== false && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: 0.5, type: "spring" }}
+                        className={getButtonStyleClasses(banner.buttonStyle, true)}
+                        whileTap={{ scale: 0.95 }}>
+                        <span>
+                          {banner.buttonText}
+                        </span>
+                        <FiArrowRight className="text-xs md:text-sm" />
+                      </motion.div>
+                    )}
                   </div>
                 </button>
               </motion.div>

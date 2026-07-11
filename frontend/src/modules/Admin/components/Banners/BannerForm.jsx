@@ -16,6 +16,7 @@ const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
   const { createBanner, updateBanner } = useBannerStore();
   const isEdit = !!banner;
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isUploadingMobileImage, setIsUploadingMobileImage] = useState(false);
 
   const defaultType = allowedTypes && allowedTypes.length > 0 ? allowedTypes[0] : BannerTypes.HERO;
 
@@ -41,6 +42,12 @@ const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
     subtitle: "",
     description: "",
     image: "",
+    mobileImage: "",
+    altText: "",
+    openInNewTab: false,
+    showButton: true,
+    buttonText: "Shop Now",
+    buttonStyle: "primary",
     link: "",
     order: 1,
     isActive: true,
@@ -56,6 +63,12 @@ const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
         subtitle: banner.subtitle || "",
         description: banner.description || "",
         image: banner.image || "",
+        mobileImage: banner.mobileImage || "",
+        altText: banner.altText || "",
+        openInNewTab: !!banner.openInNewTab,
+        showButton: banner.showButton !== undefined ? !!banner.showButton : true,
+        buttonText: banner.buttonText || "Shop Now",
+        buttonStyle: banner.buttonStyle || "primary",
         link: banner.link || "",
         order: banner.order || 1,
         isActive: banner.isActive !== undefined ? banner.isActive : true,
@@ -100,11 +113,43 @@ const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
     }
   };
 
+  const handleMobileImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type?.startsWith("image/")) {
+      toast.error("Please select a valid image file");
+      return;
+    }
+
+    setIsUploadingMobileImage(true);
+    try {
+      const response = await uploadAdminImage(file, "banners");
+      const url = response?.data?.url;
+      if (!url) {
+        toast.error("Mobile image upload failed");
+        return;
+      }
+      setFormData((prev) => ({ ...prev, mobileImage: url }));
+      toast.success("Mobile image uploaded");
+    } catch (error) {
+      // Error toast handled by api interceptor
+    } finally {
+      setIsUploadingMobileImage(false);
+      e.target.value = "";
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (!formData.image.trim()) {
       toast.error("Banner image is required");
+      return;
+    }
+
+    if (formData.showButton && !formData.buttonText.trim()) {
+      toast.error("Button text is required when Show Button is enabled");
       return;
     }
 
@@ -136,6 +181,26 @@ const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
       onClose();
     } catch (error) {
       // Error handled in store
+    }
+  };
+
+  const getFormTitle = () => {
+    const action = isEdit ? "Edit" : "Create";
+    switch (formData.type) {
+      case BannerTypes.HOME_SLIDER:
+        return `${action} Hero Slide`;
+      case BannerTypes.SIDE_BANNER:
+        return `${action} Side Banner`;
+      case BannerTypes.PROMOTIONAL:
+        return `${action} Promotional Banner`;
+      case BannerTypes.CATEGORY_FOCUS_BANNER:
+        return `${action} Category Focus Banner`;
+      case BannerTypes.CATEGORY_FOCUS_ITEM:
+        return `${action} Category Focus Item`;
+      case BannerTypes.DEAL_ITEM:
+        return `${action} Deal Card`;
+      default:
+        return `${action} Banner`;
     }
   };
 
@@ -197,7 +262,7 @@ const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
             style={{ willChange: "transform" }}>
             <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between z-10">
               <h2 className="text-2xl font-bold text-gray-800">
-                {isEdit ? "Edit Banner" : "Create Banner"}
+                {getFormTitle()}
               </h2>
               <Button
                 onClick={onClose}
@@ -270,52 +335,108 @@ const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
                       placeholder="Banner description"
                     />
                   </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      SEO Alt Text
+                    </label>
+                    <input
+                      type="text"
+                      name="altText"
+                      value={formData.altText}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="Alt text for search engines and accessibility"
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Image */}
-              <div>
-                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                  Banner Image
-                </h3>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Image URL <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="image"
-                    value={formData.image}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    placeholder="data/banners/banner.png"
-                  />
-                  <div className="mt-3">
-                    <label className="inline-flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer text-sm font-semibold">
-                      <FiUpload />
-                      {isUploadingImage ? "Uploading..." : "Upload to Cloudinary"}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                        disabled={isUploadingImage}
-                      />
-                    </label>
-                  </div>
-                  {formData.image && (
-                    <div className="mt-4">
-                      <img
-                        src={formData.image}
-                        alt="Preview"
-                        className="w-full h-48 object-cover rounded-lg border border-gray-200"
-                        onError={(e) => {
-                          e.target.style.display = "none";
-                        }}
-                      />
+              {/* Images */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Desktop Image */}
+                <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50">
+                  <h3 className="text-md font-bold text-gray-800 mb-4">
+                    Desktop Image <span className="text-red-500">*</span>
+                  </h3>
+                  <div>
+                    <input
+                      type="text"
+                      name="image"
+                      value={formData.image}
+                      onChange={handleChange}
+                      required
+                      className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      placeholder="Image URL"
+                    />
+                    <div className="mt-3">
+                      <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm font-semibold shadow-sm">
+                        <FiUpload />
+                        {isUploadingImage ? "Uploading..." : "Upload Desktop Image"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageUpload}
+                          className="hidden"
+                          disabled={isUploadingImage}
+                        />
+                      </label>
                     </div>
-                  )}
+                    {formData.image && (
+                      <div className="mt-4">
+                        <img
+                          src={formData.image}
+                          alt="Preview Desktop"
+                          className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mobile Image (Optional) */}
+                <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/50">
+                  <h3 className="text-md font-bold text-gray-800 mb-4">
+                    Mobile Image (Optional)
+                  </h3>
+                  <div>
+                    <input
+                      type="text"
+                      name="mobileImage"
+                      value={formData.mobileImage}
+                      onChange={handleChange}
+                      className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                      placeholder="Mobile Image URL (optional)"
+                    />
+                    <div className="mt-3">
+                      <label className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer text-sm font-semibold shadow-sm">
+                        <FiUpload />
+                        {isUploadingMobileImage ? "Uploading..." : "Upload Mobile Image"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleMobileImageUpload}
+                          className="hidden"
+                          disabled={isUploadingMobileImage}
+                        />
+                      </label>
+                    </div>
+                    {formData.mobileImage && (
+                      <div className="mt-4">
+                        <img
+                          src={formData.mobileImage}
+                          alt="Preview Mobile"
+                          className="w-full h-32 object-cover rounded-lg border border-gray-200"
+                          onError={(e) => {
+                            e.target.style.display = "none";
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -328,6 +449,116 @@ const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
                   value={formData.link}
                   onChange={(val) => setFormData({ ...formData, link: val })}
                 />
+              </div>
+
+              {/* CTA Settings */}
+              <div className="border border-gray-100 rounded-xl p-5 bg-gray-50/30 space-y-4">
+                <h3 className="text-lg font-bold text-gray-800 border-b border-gray-100 pb-2">
+                  CTA Settings
+                </h3>
+                
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      name="showButton"
+                      checked={formData.showButton}
+                      onChange={handleChange}
+                      className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                    />
+                    <span className="text-sm font-semibold text-gray-700">
+                      Show Button
+                    </span>
+                  </label>
+                </div>
+
+                {formData.showButton && (
+                  <>
+                    <div className="animate-fadeIn">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Button Text <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        name="buttonText"
+                        value={formData.buttonText}
+                        onChange={handleChange}
+                        required={formData.showButton}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        placeholder="Enter CTA text (e.g. Shop Now, Learn More)"
+                      />
+                    </div>
+
+                    <div className="animate-fadeIn">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Button Style
+                      </label>
+                      <div className="flex items-center gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="buttonStyle"
+                            value="primary"
+                            checked={formData.buttonStyle === "primary"}
+                            onChange={() => setFormData({ ...formData, buttonStyle: "primary" })}
+                            className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                          />
+                          <span className="text-sm text-gray-700">Primary</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="buttonStyle"
+                            value="secondary"
+                            checked={formData.buttonStyle === "secondary"}
+                            onChange={() => setFormData({ ...formData, buttonStyle: "secondary" })}
+                            className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                          />
+                          <span className="text-sm text-gray-700">Secondary</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="radio"
+                            name="buttonStyle"
+                            value="outline"
+                            checked={formData.buttonStyle === "outline"}
+                            onChange={() => setFormData({ ...formData, buttonStyle: "outline" })}
+                            className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                          />
+                          <span className="text-sm text-gray-700">Outline</span>
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Open Link Behavior
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="openInNewTab"
+                        checked={!formData.openInNewTab}
+                        onChange={() => setFormData({ ...formData, openInNewTab: false })}
+                        className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span className="text-sm text-gray-700">Same Tab</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="openInNewTab"
+                        checked={formData.openInNewTab}
+                        onChange={() => setFormData({ ...formData, openInNewTab: true })}
+                        className="w-4 h-4 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span className="text-sm text-gray-700">New Tab</span>
+                    </label>
+                  </div>
+                </div>
               </div>
 
               {/* Schedule */}
@@ -385,7 +616,7 @@ const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
                     />
                   </div>
 
-                  <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       name="isActive"
@@ -394,7 +625,7 @@ const BannerForm = ({ banner, allowedTypes, onClose, onSave }) => {
                       className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
                     />
                     <span className="text-sm font-semibold text-gray-700">
-                      Active
+                      Active (Always visible within schedule dates)
                     </span>
                   </label>
                 </div>
