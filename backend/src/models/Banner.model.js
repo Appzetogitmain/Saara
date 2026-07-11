@@ -6,6 +6,12 @@ const bannerSchema = new mongoose.Schema(
         subtitle: String,
         description: String,
         image: { type: String, required: true },
+        mobileImage: String,
+        altText: String,
+        openInNewTab: { type: Boolean, default: false },
+        showButton: { type: Boolean, default: true },
+        buttonText: { type: String, default: "Shop Now" },
+        buttonStyle: { type: String, default: "primary" },
         link: String,
         type: {
             type: String,

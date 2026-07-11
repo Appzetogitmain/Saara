@@ -604,7 +604,26 @@ router.post('/shipping/estimate', asyncHandler(async (req, res) => {
 // GET /api/banners
 router.get('/banners', marketingCache, asyncHandler(async (req, res) => {
     const { type } = req.query;
-    const filter = { isActive: true };
+    const now = new Date();
+    const filter = {
+        isActive: true,
+        $and: [
+            {
+                $or: [
+                    { startDate: { $exists: false } },
+                    { startDate: null },
+                    { startDate: { $lte: now } }
+                ]
+            },
+            {
+                $or: [
+                    { endDate: { $exists: false } },
+                    { endDate: null },
+                    { endDate: { $gte: now } }
+                ]
+            }
+        ]
+    };
     if (type) filter.type = type;
     const banners = await Banner.find(filter).sort({ order: 1 }).lean();
     res.status(200).json(new ApiResponse(200, banners, 'Banners fetched.'));

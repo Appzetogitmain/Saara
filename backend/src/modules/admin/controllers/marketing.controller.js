@@ -5,6 +5,8 @@ import Coupon from '../../../models/Coupon.model.js';
 import Banner from '../../../models/Banner.model.js';
 import Campaign from '../../../models/Campaign.model.js';
 import { slugify } from '../../../utils/slugify.js';
+import { deleteFromCloudinary } from '../../../services/upload.service.js';
+import { clearResponseCache } from '../../../middlewares/responseCache.js';
 
 const COUPON_TYPES = new Set(['percentage', 'fixed', 'freeship']);
 const EXCLUSIVE_SALE_CAMPAIGN_TYPES = ['flash_sale', 'daily_deal', 'special_offer', 'festival'];
@@ -61,9 +63,30 @@ const normalizeBannerLink = (value) => {
     return '';
 };
 
+const extractCloudinaryPublicId = (url = '') => {
+    const raw = String(url || '').trim();
+    if (!raw || !raw.includes('/upload/')) return null;
+    try {
+        const afterUpload = raw.split('/upload/')[1] || '';
+        const withoutTransform = afterUpload.includes('/') ? afterUpload.substring(afterUpload.indexOf('/') + 1) : afterUpload;
+        const cleaned = withoutTransform.replace(/^v\d+\//, '');
+        const withoutExtension = cleaned.replace(/\.[^/.]+$/, '');
+        return withoutExtension || null;
+    } catch {
+        return null;
+    }
+};
+
 const normalizeBannerPayload = (payload = {}) => ({
     ...payload,
     link: normalizeBannerLink(payload?.link),
+    openInNewTab: toBooleanOrNull(payload?.openInNewTab) ?? false,
+    showButton: toBooleanOrNull(payload?.showButton) ?? true,
+    buttonText: payload?.buttonText && String(payload.buttonText).trim() ? String(payload.buttonText).trim() : "Shop Now",
+    buttonStyle: payload?.buttonStyle ? String(payload.buttonStyle).trim() : "primary",
+    startDate: toValidDateOrNull(payload?.startDate),
+    endDate: toValidDateOrNull(payload?.endDate),
+    order: toFiniteNumber(payload?.order) ?? 0,
 });
 
 const normalizeObjectIdList = (values) => {
@@ -444,16 +467,39 @@ export const getAllBanners = asyncHandler(async (req, res) => {
 
 export const createBanner = asyncHandler(async (req, res) => {
     const banner = await Banner.create(normalizeBannerPayload(req.body));
+    clearResponseCache();
     return res.status(201).json(new ApiResponse(201, banner, 'Banner created successfully'));
 });
 
 export const updateBanner = asyncHandler(async (req, res) => {
+    const oldBanner = await Banner.findById(req.params.id);
+    if (!oldBanner) throw new ApiError(404, 'Banner not found');
+
+    const payload = normalizeBannerPayload(req.body);
     const banner = await Banner.findByIdAndUpdate(
         req.params.id,
-        normalizeBannerPayload(req.body),
+        payload,
         { new: true }
     );
-    if (!banner) throw new ApiError(404, 'Banner not found');
+
+    if (banner) {
+        const oldImage = String(oldBanner.image || '').trim();
+        const newImage = String(banner.image || '').trim();
+        if (oldImage && oldImage !== newImage) {
+            const oldId = extractCloudinaryPublicId(oldImage);
+            if (oldId) await deleteFromCloudinary(oldId).catch(() => null);
+        }
+
+        const oldMobile = String(oldBanner.mobileImage || '').trim();
+        const newMobile = String(banner.mobileImage || '').trim();
+        if (oldMobile && oldMobile !== newMobile) {
+            const oldId = extractCloudinaryPublicId(oldMobile);
+            if (oldId) await deleteFromCloudinary(oldId).catch(() => null);
+        }
+
+        clearResponseCache();
+    }
+
     return res.status(200).json(new ApiResponse(200, banner, 'Banner updated successfully'));
 });
 
@@ -477,12 +523,29 @@ export const reorderBanners = asyncHandler(async (req, res) => {
     }
 
     await Banner.bulkWrite(ops, { ordered: true });
+    clearResponseCache();
     return res.status(200).json(new ApiResponse(200, null, 'Banners reordered successfully'));
 });
 
 export const deleteBanner = asyncHandler(async (req, res) => {
-    const banner = await Banner.findByIdAndDelete(req.params.id);
+    const banner = await Banner.findById(req.params.id);
     if (!banner) throw new ApiError(404, 'Banner not found');
+
+    await banner.deleteOne();
+
+    const image = String(banner.image || '').trim();
+    if (image) {
+        const publicId = extractCloudinaryPublicId(image);
+        if (publicId) await deleteFromCloudinary(publicId).catch(() => null);
+    }
+
+    const mobileImage = String(banner.mobileImage || '').trim();
+    if (mobileImage) {
+        const publicId = extractCloudinaryPublicId(mobileImage);
+        if (publicId) await deleteFromCloudinary(publicId).catch(() => null);
+    }
+
+    clearResponseCache();
     return res.status(200).json(new ApiResponse(200, null, 'Banner deleted successfully'));
 });
 
