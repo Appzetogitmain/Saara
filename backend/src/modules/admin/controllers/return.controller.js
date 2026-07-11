@@ -11,6 +11,7 @@ import mongoose from 'mongoose';
 import crypto from 'crypto';
 import { createNotification } from '../../../services/notification.service.js';
 import { initiateRefund } from '../../../services/payment.service.js';
+import { buildReturnItemsSummary, buildExchangeSummary } from '../../../utils/notificationProductFormatter.js';
 import { ApiError } from '../../../utils/ApiError.js';
 import { ApiResponse } from '../../../utils/ApiResponse.js';
 import { asyncHandler } from '../../../utils/asyncHandler.js';
@@ -410,6 +411,8 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
 
     notifyReturnUpdate(updatedRequest);
 
+    const itemsText = buildExchangeSummary(updatedRequest);
+
     const notificationTasks = [];
     if (updatedRequest.userId?._id) {
         notificationTasks.push(
@@ -417,7 +420,7 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
                 recipientId:   updatedRequest.userId._id,
                 recipientType: 'user',
                 title:         'Return request updated',
-                message:       `Your return request for order ${updatedRequest.orderId?.orderId || updatedRequest.orderId} is now ${updatedRequest.status}.`,
+                message:       `Your return request for order ${updatedRequest.orderId?.orderId || updatedRequest.orderId} is now ${updatedRequest.status}.${itemsText}`,
                 type:          'order',
                 data: {
                     returnRequestId: String(updatedRequest._id),
@@ -434,7 +437,7 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
                 recipientId:   updatedRequest.vendorId,
                 recipientType: 'vendor',
                 title:         'Return request updated by admin',
-                message:       `Return request for order ${updatedRequest.orderId?.orderId || updatedRequest.orderId} is now ${updatedRequest.status}.`,
+                message:       `Return request for order ${updatedRequest.orderId?.orderId || updatedRequest.orderId} is now ${updatedRequest.status}.${itemsText}`,
                 type:          'order',
                 data: {
                     returnRequestId: String(updatedRequest._id),

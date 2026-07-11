@@ -14,6 +14,7 @@ import { verifyWebhookSignature, initiateRefund } from '../../../services/paymen
 import { processCapturedPayment } from '../../../services/paymentProcessor.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { sendOrderConfirmationEmail } from '../../../services/email.service.js';
+import { buildOrderItemsSummary } from '../../../utils/notificationProductFormatter.js';
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
 
 /**
@@ -139,11 +140,12 @@ async function handleRefundProcessed(payload) {
 
     // Notify customer
     if (refund.userId) {
+        const itemsText = order ? buildOrderItemsSummary(order.items) : '';
         await createNotification({
             recipientId:   refund.userId,
             recipientType: 'user',          // fix: was 'customer' — schema enum is 'user'
             title:         'Refund Processed',
-            message:       `Your refund of ₹${refund.amount} has been successfully processed.`,
+            message:       `Your refund of ₹${refund.amount} has been successfully processed.${itemsText}`,
             type:          'refund',
             data:          { refundId: String(refund._id), amount: refund.amount },
         }).catch(console.error);
@@ -166,12 +168,14 @@ async function handleRefundFailed(payload) {
     // Notify admins
     const { default: Admin } = await import('../../../models/Admin.model.js');
     const admins = await Admin.find({ isActive: true }).select('_id').lean();
+    const order = await Order.findById(refund.orderId).lean();
+    const itemsText = order ? buildOrderItemsSummary(order.items) : '';
     for (const admin of admins) {
         await createNotification({
             recipientId:   admin._id,
             recipientType: 'admin',
             title:         'Refund Failed — Action Required',
-            message:       `Refund of ₹${refund.amount} for order failed. Manual intervention needed.`,
+            message:       `Refund of ₹${refund.amount} for order ${order?.orderId || ''} failed. Manual intervention needed.${itemsText}`,
             type:          'refund',
             data:          { refundId: String(refund._id), orderId: String(refund.orderId) },
         }).catch(console.error);

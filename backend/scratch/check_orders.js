@@ -1,27 +1,23 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import path from 'path';
 
 dotenv.config();
 
 const checkDb = async () => {
     try {
         const uri = process.env.MONGO_URI;
-        if (!uri) {
-            console.error('MONGO_URI is not set in .env');
-            process.exit(1);
-        }
         await mongoose.connect(uri);
         console.log('Connected to MongoDB.');
 
-        const Notification = mongoose.model('Notification', new mongoose.Schema({}, { strict: false }));
+        const Order = mongoose.model('Order', new mongoose.Schema({}, { strict: false }));
         
-        const recent = await Notification.find({ recipientType: 'vendor' })
+        const recent = await Order.find({})
             .sort({ createdAt: -1 })
-            .limit(10)
+            .limit(5)
+            .select('orderId status paymentStatus createdAt')
             .lean();
 
-        console.log('Recent vendor notifications:');
+        console.log('Recent orders:');
         console.log(JSON.stringify(recent, null, 2));
 
         await mongoose.disconnect();

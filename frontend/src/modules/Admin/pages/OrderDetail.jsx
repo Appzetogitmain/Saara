@@ -385,14 +385,14 @@ const OrderDetail = () => {
                     <p className="font-semibold text-xs text-gray-800">{formatDateTime(order.estimatedDelivery)}</p>
                   </div>
                 )}
-                {(order.deliveredDate || order.deliveredAt) && (
+                {order.status === 'delivered' && (
                   <div>
                     <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-1">
                       <FiPackage className="text-xs" />
-                      Delivered
+                      Delivered On
                     </p>
                     <p className="font-semibold text-xs text-gray-800">
-                      {formatDateTime(order.deliveredDate || order.deliveredAt)}
+                      {order.deliveredAt ? formatDateTime(order.deliveredAt) : '—'}
                     </p>
                   </div>
                 )}

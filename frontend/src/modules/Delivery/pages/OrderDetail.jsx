@@ -424,6 +424,21 @@ const DeliveryOrderDetail = () => {
               <span>Delivery Fee</span>
               <span>{formatPrice(order.deliveryFee)}</span>
             </div>
+            {(order.status === 'delivered' || order.status === 'completed') && (
+              <div className="pt-2 border-t border-gray-100 flex items-center justify-between text-gray-700">
+                <span>Delivered On</span>
+                <span className="font-semibold text-gray-800 text-sm">
+                  {order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                  }) : '—'}
+                </span>
+              </div>
+            )}
             <div className="pt-2 border-t border-gray-200 flex items-center justify-between">
               <span className="font-bold text-gray-800">Total</span>
               <span className="font-bold text-primary-600 text-lg">{formatPrice(order.total)}</span>

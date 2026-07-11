@@ -282,6 +282,20 @@ const MobileOrderDetail = () => {
     });
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return '—';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
   const handleReorder = () => {
     order.items.forEach((item) => {
       addItem({
@@ -1104,182 +1118,153 @@ const MobileOrderDetail = () => {
                 </div>
               )}
 
-            {/* Shipping Address */}
-            <div className="glass-card rounded-2xl p-4">
-              <h2 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
-                <FiMapPin className="text-primary-600" />
-                Shipping Address
-              </h2>
-              <div className="text-sm text-gray-600 space-y-1">
-                <p className="font-semibold text-gray-800">
-                  {shippingAddress.name || "N/A"}
-                </p>
-                <p>{shippingAddress.address || "N/A"}</p>
-                <p>
-                  {shippingAddress.city || "N/A"},{" "}
-                  {shippingAddress.state || "N/A"}{" "}
-                  {shippingAddress.zipCode || "N/A"}
-                </p>
-                <p>{shippingAddress.country || "N/A"}</p>
-                <p className="mt-2">Phone: {shippingAddress.phone || "N/A"}</p>
-              </div>
-            </div>
-
-            {/* Payment Info */}
-            <div className="glass-card rounded-2xl p-4">
-              <h2 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
-                <FiCreditCard className="text-primary-600" />
-                Payment Information
-              </h2>
-              <div className="text-sm text-gray-600 space-y-2">
-                <div className="flex justify-between">
-                  <span>Payment Method:</span>
-                  <span className="font-semibold text-gray-800 capitalize">
-                    {order.paymentMethod}
-                  </span>
+              {/* Shipping Address */}
+              <div className="glass-card rounded-2xl p-4">
+                <h2 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <FiMapPin className="text-primary-600" />
+                  Shipping Address
+                </h2>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p className="font-semibold text-gray-800">{shippingAddress.name || 'N/A'}</p>
+                  <p>{shippingAddress.address || 'N/A'}</p>
+                  <p>
+                    {shippingAddress.city || 'N/A'}, {shippingAddress.state || 'N/A'}{' '}
+                    {shippingAddress.zipCode || 'N/A'}
+                  </p>
+                  <p>{shippingAddress.country || 'N/A'}</p>
+                  <p className="mt-2">Phone: {shippingAddress.phone || 'N/A'}</p>
                 </div>
-                {order.trackingNumber && (
+              </div>
+
+              {/* Payment Info */}
+              <div className="glass-card rounded-2xl p-4">
+                <h2 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
+                  <FiCreditCard className="text-primary-600" />
+                  Payment Information
+                </h2>
+                <div className="text-sm text-gray-600 space-y-2">
                   <div className="flex justify-between">
-                    <span>Tracking Number:</span>
-                    <span className="font-semibold text-gray-800">
-                      {order.trackingNumber}
+                    <span>Payment Method:</span>
+                    <span className="font-semibold text-gray-800 capitalize">
+                      {order.paymentMethod}
                     </span>
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span>Order Date:</span>
-                  <span className="font-semibold text-gray-800">
-                    {formatDate(order.date)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Order Summary */}
-            <div className="glass-card rounded-2xl p-4">
-              <h2 className="text-base font-bold text-gray-800 mb-3">
-                Order Summary
-              </h2>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-gray-600">
-                  <span>Subtotal</span>
-                  <span>{formatPrice(order.subtotal)}</span>
-                </div>
-                {order.discount > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>Discount</span>
-                    <span>-{formatPrice(order.discount)}</span>
+                  {order.trackingNumber && (
+                    <div className="flex justify-between">
+                      <span>Tracking Number:</span>
+                      <span className="font-semibold text-gray-800">{order.trackingNumber}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Order Date:</span>
+                    <span className="font-semibold text-gray-800">{formatDate(order.date)}</span>
                   </div>
-                )}
-                <div className="flex justify-between text-gray-600">
-                  <span>Shipping</span>
-                  <span>{formatPrice(order.shipping)}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Tax</span>
-                  <span>{formatPrice(order.tax)}</span>
-                </div>
-                <div className="flex justify-between text-lg font-bold text-gray-800 pt-2 border-t border-gray-200">
-                  <span>Total</span>
-                  <span className="text-primary-600">
-                    {formatPrice(order.total)}
-                  </span>
+                  {order.status === 'delivered' && (
+                    <div className="flex justify-between">
+                      <span>Delivered On:</span>
+                      <span className="font-semibold text-gray-800">
+                        {order.deliveredAt ? formatDateTime(order.deliveredAt) : '—'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Actions */}
-            <div className="space-y-2">
-              {order.status === "payment_pending" && (
-                <button
-                  onClick={handleRetryPayment}
-                  disabled={isRetryingPayment}
-                  className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-60"
-                >
-                  <FiCreditCard className="text-lg" />
-                  {isRetryingPayment
-                    ? "Opening Payment..."
-                    : "Complete Payment (Pay Now)"}
-                </button>
-              )}
-              {["pending", "processing", "payment_pending"].includes(
-                order.status,
-              ) && (
-                <button
-                  onClick={handleCancel}
-                  className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-semibold hover:bg-red-100 transition-colors"
-                >
-                  Cancel Order
-                </button>
-              )}
+              {/* Order Summary */}
+              <div className="glass-card rounded-2xl p-4">
+                <h2 className="text-base font-bold text-gray-800 mb-3">Order Summary</h2>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Subtotal</span>
+                    <span>{formatPrice(order.subtotal)}</span>
+                  </div>
+                  {order.discount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount</span>
+                      <span>-{formatPrice(order.discount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-gray-600">
+                    <span>Shipping</span>
+                    <span>{formatPrice(order.shipping)}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-600">
+                    <span>Tax</span>
+                    <span>{formatPrice(order.tax)}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold text-gray-800 pt-2 border-t border-gray-200">
+                    <span>Total</span>
+                    <span className="text-primary-600">{formatPrice(order.total)}</span>
+                  </div>
+                </div>
+              </div>
 
-              <button
-                onClick={handleReorder}
-                className="w-full py-3 gradient-green text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:shadow-glow-green transition-all"
-              >
-                <FiRotateCw className="text-lg" />
-                Reorder
-              </button>
-              {order.status === "delivered" && (
-                <div
-                  className={`w-full py-2.5 px-4 rounded-xl border text-center font-bold text-[11px] uppercase tracking-wider ${
+              {/* Actions */}
+              <div className="space-y-2">
+                {order.status === 'payment_pending' && (
+                  <button
+                    onClick={handleRetryPayment}
+                    disabled={isRetryingPayment}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                  >
+                    <FiCreditCard className="text-lg" />
+                    {isRetryingPayment ? 'Opening Payment...' : 'Complete Payment (Pay Now)'}
+                  </button>
+                )}
+                {['pending', 'processing', 'payment_pending'].includes(order.status) && (
+                  <button
+                    onClick={handleCancel}
+                    className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-semibold hover:bg-red-100 transition-colors"
+                  >
+                    Cancel Order
+                  </button>
+                )}
+
+                <button
+                  onClick={handleReorder}
+                  className="w-full py-3 gradient-green text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:shadow-glow-green transition-all"
+                >
+                  <FiRotateCw className="text-lg" />
+                  Reorder
+                </button>
+                 {order.status === 'delivered' && (
+                  <div className={`w-full py-2.5 px-4 rounded-xl border text-center font-bold text-[11px] uppercase tracking-wider ${
                     hasSevenDaysPassed
-                      ? "bg-red-50/50 border-red-100 text-red-600"
-                      : "bg-green-50/50 border-green-100 text-green-700"
-                  }`}
-                >
-                  {hasSevenDaysPassed
-                    ? "Return policy expired (7 days elapsed)"
-                    : "🛡️ Covered by 7-Day Return Policy"}
-                </div>
-              )}
-              {order.status === "delivered" &&
-              !hasPendingOrCompletedReturn &&
-              !hasSevenDaysPassed &&
-              ![
-                "returned",
-                "refunded",
-                "return_in_progress",
-                "exchange_in_progress",
-              ].includes(order.status) ? (
-                <button
-                  onClick={openReturnModal}
-                  className="w-full py-3 bg-amber-50 text-amber-700 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors"
-                >
-                  <FiPackage className="text-lg" />
-                  Request Return / Exchange
-                </button>
-              ) : (
-                (hasPendingOrCompletedReturn ||
-                  [
-                    "returned",
-                    "refunded",
-                    "return_in_progress",
-                    "exchange_in_progress",
-                  ].includes(order?.status)) && (
-                  <div className="w-full py-3 bg-gray-50 border border-gray-200 text-gray-500 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
-                    <FiPackage className="text-lg" />
-                    {order?.status === "returned" ||
-                    order?.status === "refunded" ||
-                    (Array.isArray(order?.returnRequests) &&
-                      order.returnRequests.some(
-                        (r) => r.status === "completed",
-                      ))
-                      ? "Return Completed"
-                      : "Return Request Submitted"}
+                      ? 'bg-red-50/50 border-red-100 text-red-600'
+                      : 'bg-green-50/50 border-green-100 text-green-700'
+                  }`}>
+                    {hasSevenDaysPassed ? "Return policy expired (7 days elapsed)" : "🛡️ Covered by 7-Day Return Policy"}
                   </div>
-                )
-              )}
-              <button
-                onClick={() => navigate(`/track-order/${order.id}`)}
-                className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
-              >
-                <FiTruck className="text-lg" />
-                Track Order
-              </button>
+                )}
+                {order.status === 'delivered' && !hasPendingOrCompletedReturn && !hasSevenDaysPassed && !['returned', 'refunded', 'return_in_progress', 'exchange_in_progress'].includes(order.status) ? (
+                  <button
+                    onClick={openReturnModal}
+                    className="w-full py-3 bg-amber-50 text-amber-700 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-amber-100 transition-colors"
+                  >
+                    <FiPackage className="text-lg" />
+                    Request Return / Exchange
+                  </button>
+                ) : (
+                  (hasPendingOrCompletedReturn || ['returned', 'refunded', 'return_in_progress', 'exchange_in_progress'].includes(order?.status)) && (
+                    <div className="w-full py-3 bg-gray-50 border border-gray-200 text-gray-500 rounded-xl font-semibold flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+                      <FiPackage className="text-lg" />
+                      {order?.status === 'returned' || order?.status === 'refunded' || (Array.isArray(order?.returnRequests) && order.returnRequests.some(r => r.status === 'completed'))
+                        ? "Return Completed"
+                        : "Return Request Submitted"}
+                    </div>
+                  )
+                )}
+                <button
+                  onClick={() => navigate(`/track-order/${order.id}`)}
+                  className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-gray-200 transition-colors"
+                >
+                  <FiTruck className="text-lg" />
+                  Track Order
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+
 
         {showReturnModal && (
           <motion.div

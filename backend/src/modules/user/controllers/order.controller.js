@@ -14,6 +14,7 @@ import { generateOrderId } from '../../../utils/generateOrderId.js';
 import { generateTrackingNumber } from '../../../utils/generateTrackingNumber.js';
 import mongoose from 'mongoose';
 import { createNotification } from '../../../services/notification.service.js';
+import { buildExchangeSummary, buildOrderItemsSummary, buildVendorItemsSummary } from '../../../utils/notificationProductFormatter.js';
 import { calculateVendorShippingForGroups } from '../../../services/vendorShipping.service.js';
 import { sendOrderConfirmationEmail } from '../../../services/email.service.js';
 import { uploadLocalFileToCloudinaryAndCleanup } from '../../../services/upload.service.js';
@@ -600,14 +601,12 @@ export const placeOrder = asyncHandler(async (req, res) => {
         }
 
         if (userId) {
-            const itemsSummary = (order.items || [])
-                .map((item) => `${item.name} (x${item.quantity})`)
-                .join(', ');
+            const itemsText = buildOrderItemsSummary(order.items);
             createNotification({
                 recipientId: userId,
                 recipientType: 'user',
                 title: 'Order Placed!',
-                message: `Your order ${order.orderId} containing [${itemsSummary}] has been placed successfully.`,
+                message: `Your order ${order.orderId} has been placed successfully.${itemsText}`,
                 type: 'order',
                 data: { link: `/orders/${order.orderId}` },
             }).catch((err) => console.error('[Order Notification] Failed to create:', err.message));
@@ -615,14 +614,12 @@ export const placeOrder = asyncHandler(async (req, res) => {
 
         // Notify vendors and create database notifications
         (order.vendorItems || []).forEach((vGroup) => {
-            const vItemsSummary = (vGroup.items || [])
-                .map((item) => `${item.name} (x${item.quantity})`)
-                .join(', ');
+            const vItemsText = buildVendorItemsSummary(vGroup.items);
             createNotification({
                 recipientId: vGroup.vendorId,
                 recipientType: 'vendor',
                 title: 'New Order Received!',
-                message: `You have received a new order ${order.orderId} containing [${vItemsSummary}] totalling ₹${vGroup.subtotal}.`,
+                message: `You have received a new order ${order.orderId} totalling ₹${vGroup.subtotal}.${vItemsText}`,
                 type: 'order',
                 data: {
                     orderId: String(order.orderId || order._id),
@@ -1064,12 +1061,15 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
         exchangeDetails,
         evidenceImages,
         returnReason,
-        customReason,
+            customReason,
         status: 'pending',
         refundAmount: Number(refundAmount.toFixed(2)),
         refundStatus: 'pending',
         images: evidenceImages.map(img => img.url),
     });
+
+    const requestTypeLabel = requestType === 'exchange' ? 'exchange' : 'return';
+    const itemsText = buildExchangeSummary(request);
 
     const admins = await Admin.find({ isActive: true }).select('_id').lean();
     await Promise.all(
@@ -1077,8 +1077,8 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
             createNotification({
                 recipientId: admin._id,
                 recipientType: 'admin',
-                title: 'New Return Request',
-                message: `Order ${order.orderId} has a new return request awaiting review.`,
+                title: requestType === 'exchange' ? 'New Exchange Request' : 'New Return Request',
+                message: `Order ${order.orderId} has a new ${requestTypeLabel} request awaiting review.${itemsText}`,
                 type: 'order',
                 data: {
                     returnRequestId: String(request._id),
@@ -1092,12 +1092,13 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
     await createNotification({
         recipientId: vendorId,
         recipientType: 'vendor',
-        title: 'New Return Request',
-        message: `Order ${order.orderId} has a return request from customer.`,
+        title: requestType === 'exchange' ? 'New Exchange Request' : 'New Return Request',
+        message: `Order ${order.orderId} has a ${requestTypeLabel} request from customer.${itemsText}`,
         type: 'order',
         data: {
             returnRequestId: String(request._id),
             orderId: String(order.orderId),
+            vendorId: String(vendorId),
         },
     });
 
