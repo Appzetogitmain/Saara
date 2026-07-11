@@ -355,7 +355,7 @@ const MobileCheckout = () => {
         const payload = initData?.data ?? initData;
 
         // ── COD: order already created, navigate to confirmation ──
-        if (paymentMethod === "cod") {
+        if (paymentMethod === "cash" || paymentMethod === "cod") {
           clearCart();
           toast.success("Order placed successfully!");
           navigate(`/order-confirmation/${payload.orderId}`);

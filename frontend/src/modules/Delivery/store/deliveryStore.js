@@ -92,6 +92,7 @@ export const useDeliveryAuthStore = create(
       walletSummary: null,
       walletTransactions: [],
       walletTransactionsPagination: { total: 0, page: 1, limit: 20, pages: 1 },
+      companyPaymentDetails: null,
 
       // Delivery boy login action
       register: async (registrationData) => {
@@ -623,6 +624,18 @@ export const useDeliveryAuthStore = create(
             }
           });
           return list;
+        } catch (error) {
+          throw error;
+        }
+      },
+
+      fetchCompanyPaymentDetails: async () => {
+        try {
+          const response = await api.get('/delivery/wallet/company-payment-details');
+          const payload = response?.data ?? response ?? {};
+          const details = payload?.data ?? payload;
+          set({ companyPaymentDetails: details });
+          return details;
         } catch (error) {
           throw error;
         }

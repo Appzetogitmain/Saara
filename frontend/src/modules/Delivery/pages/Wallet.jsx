@@ -10,7 +10,11 @@ import {
   FiAlertCircle, 
   FiCreditCard, 
   FiInfo, 
-  FiChevronRight 
+  FiChevronRight,
+  FiChevronDown,
+  FiChevronUp,
+  FiCopy,
+  FiCheck 
 } from 'react-icons/fi';
 import PageTransition from '../../../shared/components/PageTransition';
 import toast from 'react-hot-toast';
@@ -24,7 +28,9 @@ const DeliveryWallet = () => {
     fetchWalletSummary, 
     requestWithdrawal, 
     updatePayoutSettings, 
-    fetchWalletTransactions 
+    fetchWalletTransactions,
+    companyPaymentDetails,
+    fetchCompanyPaymentDetails
   } = useDeliveryAuthStore();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -45,11 +51,17 @@ const DeliveryWallet = () => {
     bankName: ''
   });
 
+  // State to track if company payment instructions panel is open
+  const [instructionsOpen, setInstructionsOpen] = useState(false);
+  // State to track clipboard copy status
+  const [copiedField, setCopiedField] = useState(null);
+
   const loadData = useCallback(async (page = 1) => {
     try {
       setIsLoading(true);
       const summary = await fetchWalletSummary();
       await fetchWalletTransactions(page);
+      await fetchCompanyPaymentDetails().catch((e) => console.error('Failed loading company details', e));
       
       // Pre-fill payout details from summary
       if (summary?.payoutMethodDetails) {
@@ -69,7 +81,7 @@ const DeliveryWallet = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [fetchWalletSummary, fetchWalletTransactions]);
+  }, [fetchWalletSummary, fetchWalletTransactions, fetchCompanyPaymentDetails]);
 
   useEffect(() => {
     loadData(currentPage);
@@ -107,6 +119,13 @@ const DeliveryWallet = () => {
     } finally {
       setIsSubmittingWithdraw(false);
     }
+  };
+
+  const handleCopy = (text, fieldName) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    toast.success(`${fieldName} copied to clipboard!`);
+    setTimeout(() => setCopiedField(null), 2000);
   };
 
   const handleSaveSettings = async (e) => {
@@ -219,6 +238,164 @@ const DeliveryWallet = () => {
             )}
           </div>
         </div>
+
+        {/* COD Cash Settlement Instructions */}
+        {!isLoading && walletSummary && (
+          <div className="space-y-3">
+            {Number(walletSummary.codLiability || 0) <= 0 ? (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-4 flex items-center gap-3">
+                <div className="p-2 bg-emerald-500 text-white rounded-xl">
+                  <FiCheckCircle className="text-base" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">All Clear!</h4>
+                  <p className="text-[10px] text-slate-500 font-medium">All COD cash collections are fully settled. No outstanding liabilities.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden transition-all duration-300">
+                <button
+                  onClick={() => setInstructionsOpen(!instructionsOpen)}
+                  className="w-full p-5 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
+                >
+                  <div className="flex items-center gap-3 text-left">
+                    <div className="p-2.5 bg-orange-500/10 text-orange-600 rounded-2xl">
+                      <FiInfo className="text-lg" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">How to Settle COD Cash</h4>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                        Due Amount: <span className="font-mono text-orange-600 font-black">{formatPrice(walletSummary.codLiability)}</span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-1.5 bg-slate-50 rounded-xl text-slate-500">
+                    {instructionsOpen ? <FiChevronUp className="text-lg" /> : <FiChevronDown className="text-lg" />}
+                  </div>
+                </button>
+
+                <AnimatePresence>
+                  {instructionsOpen && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3, ease: 'easeInOut' }}
+                      className="border-t border-slate-50 overflow-hidden"
+                    >
+                      <div className="p-5 space-y-5">
+                        {/* Dynamic QR Code Section */}
+                        <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                          <div className="p-2 bg-white rounded-2xl border border-slate-100 shadow-sm flex-shrink-0">
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(
+                                `upi://pay?pa=${companyPaymentDetails?.upiId || 'saara.pay@upi'}&pn=${encodeURIComponent(
+                                  companyPaymentDetails?.accountName || 'SAARA Logistics'
+                                )}&am=${walletSummary.codLiability}&cu=INR`
+                              )}`}
+                              alt="UPI QR Code"
+                              className="w-28 h-28 object-contain"
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                          </div>
+                          <div className="text-center sm:text-left space-y-1">
+                            <h5 className="text-[10px] font-black text-slate-800 uppercase tracking-wider">Scan & Pay Instantly</h5>
+                            <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                              Scan this QR code with any UPI app (GPay, PhonePe, Paytm) to transfer the exact amount of <span className="font-bold text-slate-800 font-mono">{formatPrice(walletSummary.codLiability)}</span> directly to the platform.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* UPI ID Transfer */}
+                        <div className="space-y-2">
+                          <label className="text-[9px] text-slate-400 font-black uppercase tracking-wider">Deposit via UPI ID</label>
+                          <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-100 rounded-2xl">
+                            <span className="text-xs font-mono font-bold text-slate-700 flex-1 truncate">
+                              {companyPaymentDetails?.upiId || 'saara.pay@upi'}
+                            </span>
+                            <button
+                              onClick={() => handleCopy(companyPaymentDetails?.upiId || 'saara.pay@upi', 'UPI ID')}
+                              className="p-2 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 border border-slate-100 rounded-xl shadow-sm transition-all"
+                            >
+                              {copiedField === 'UPI ID' ? <FiCheck className="text-emerald-600 text-sm" /> : <FiCopy className="text-sm" />}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Bank Transfer Details */}
+                        <div className="space-y-3">
+                          <label className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">Deposit via Bank Transfer</label>
+                          <div className="bg-slate-50 border border-slate-100 rounded-3xl p-4 space-y-3">
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div>
+                                <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">Account Name</span>
+                                <span className="font-semibold text-slate-800 truncate block">
+                                  {companyPaymentDetails?.accountName || 'SAARA LOGISTICS PVT LTD'}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between min-w-0">
+                                <div className="truncate flex-1 min-w-0">
+                                  <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">Bank Name</span>
+                                  <span className="font-semibold text-slate-800 truncate block">
+                                    {companyPaymentDetails?.bankName || 'HDFC Bank'}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="border-t border-slate-100 pt-3 space-y-2">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">Account Number</span>
+                                  <span className="font-bold font-mono text-xs text-slate-800 block truncate">
+                                    {companyPaymentDetails?.accountNumber || '50200081729012'}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => handleCopy(companyPaymentDetails?.accountNumber || '50200081729012', 'Account Number')}
+                                  className="p-1.5 bg-white hover:bg-slate-50 border border-slate-100 rounded-lg shadow-sm transition-all"
+                                >
+                                  {copiedField === 'Account Number' ? <FiCheck className="text-emerald-600 text-xs" /> : <FiCopy className="text-xs" />}
+                                </button>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-3 border-t border-slate-100/50 pt-2">
+                                <div className="min-w-0 flex-1">
+                                  <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">IFSC Code</span>
+                                  <span className="font-bold font-mono text-xs text-slate-800 block truncate">
+                                    {companyPaymentDetails?.ifscCode || 'HDFC0000103'}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={() => handleCopy(companyPaymentDetails?.ifscCode || 'HDFC0000103', 'IFSC Code')}
+                                  className="p-1.5 bg-white hover:bg-slate-50 border border-slate-100 rounded-lg shadow-sm transition-all"
+                                >
+                                  {copiedField === 'IFSC Code' ? <FiCheck className="text-emerald-600 text-xs" /> : <FiCopy className="text-xs" />}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Step Instructions */}
+                        <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-[10px] text-amber-700 leading-relaxed font-semibold">
+                          <p className="font-black uppercase tracking-wider text-[9px] mb-1">Settlement instructions:</p>
+                          <ol className="list-decimal pl-4 space-y-1">
+                            <li>Transfer the exact amount above to the platform bank or UPI details.</li>
+                            <li>Save the receipt/transaction reference number.</li>
+                            <li>Submit the transaction screenshot/proof to the Admin for verification.</li>
+                          </ol>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Transaction Ledger Statement List */}
         <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-4">

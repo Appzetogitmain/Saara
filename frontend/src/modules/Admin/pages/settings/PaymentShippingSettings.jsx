@@ -4,12 +4,20 @@ import { motion } from 'framer-motion';
 import { useSettingsStore } from '../../../../shared/store/settingsStore';
 import AnimatedSelect from '../../components/AnimatedSelect';
 import toast from 'react-hot-toast';
+import { getCompanyPaymentSettings, updateCompanyPaymentSettings } from '../../services/adminService';
 
 const PaymentShippingSettings = () => {
   const { settings, updateSettings, initialize } = useSettingsStore();
   const [paymentData, setPaymentData] = useState({});
   const [shippingData, setShippingData] = useState({});
   const [activeSection, setActiveSection] = useState('payment');
+  const [companyPaymentData, setCompanyPaymentData] = useState({
+    upiId: '',
+    accountName: '',
+    accountNumber: '',
+    bankName: '',
+    ifscCode: ''
+  });
 
   useEffect(() => {
     initialize();
@@ -17,6 +25,20 @@ const PaymentShippingSettings = () => {
       if (settings.payment) setPaymentData(settings.payment);
       if (settings.shipping) setShippingData(settings.shipping);
     }
+
+    // Load company payment settings from database
+    const loadCompanySettings = async () => {
+      try {
+        const res = await getCompanyPaymentSettings();
+        const data = res?.data ?? res ?? {};
+        if (data.value) {
+          setCompanyPaymentData(data.value);
+        }
+      } catch (err) {
+        console.error('Failed to load company payment settings', err);
+      }
+    };
+    loadCompanySettings();
   }, []);
 
   useEffect(() => {
@@ -38,6 +60,14 @@ const PaymentShippingSettings = () => {
     const { name, value } = e.target;
     setShippingData({
       ...shippingData,
+      [name]: value,
+    });
+  };
+
+  const handleCompanyChange = (e) => {
+    const { name, value } = e.target;
+    setCompanyPaymentData({
+      ...companyPaymentData,
       [name]: value,
     });
   };
@@ -67,11 +97,16 @@ const PaymentShippingSettings = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     updateSettings('payment', paymentData);
     updateSettings('shipping', shippingData);
-    toast.success('Settings saved successfully');
+    try {
+      await updateCompanyPaymentSettings(companyPaymentData);
+      toast.success('Settings saved successfully');
+    } catch (err) {
+      toast.error('Failed to save company payment settings');
+    }
   };
 
   const sections = [
@@ -270,6 +305,71 @@ const PaymentShippingSettings = () => {
                       </div>
                     </>
                   )}
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Company Payout Collection Details (COD Settlements)</h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Company UPI ID</label>
+                      <input
+                        type="text"
+                        name="upiId"
+                        value={companyPaymentData.upiId || ''}
+                        onChange={handleCompanyChange}
+                        placeholder="e.g. pay@company.com"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Account Holder Name</label>
+                      <input
+                        type="text"
+                        name="accountName"
+                        value={companyPaymentData.accountName || ''}
+                        onChange={handleCompanyChange}
+                        placeholder="e.g. COMPANY LOGISTICS PVT LTD"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold text-gray-800"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Account Number</label>
+                      <input
+                        type="text"
+                        name="accountNumber"
+                        value={companyPaymentData.accountNumber || ''}
+                        onChange={handleCompanyChange}
+                        placeholder="e.g. 50200012345678"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-mono text-gray-800 font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Bank Name</label>
+                      <input
+                        type="text"
+                        name="bankName"
+                        value={companyPaymentData.bankName || ''}
+                        onChange={handleCompanyChange}
+                        placeholder="e.g. HDFC Bank"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-semibold text-gray-800"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">IFSC Code</label>
+                      <input
+                        type="text"
+                        name="ifscCode"
+                        value={companyPaymentData.ifscCode || ''}
+                        onChange={handleCompanyChange}
+                        placeholder="e.g. HDFC0000103"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-mono text-gray-800 font-bold"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

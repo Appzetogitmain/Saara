@@ -300,6 +300,7 @@ export const initializePayment = asyncHandler(async (req, res) => {
         rzpOrder = await createRazorpayOrder(total, 'INR', order.orderId, { userId: String(userId) });
     } catch (err) {
         // If Razorpay fails, mark order as payment_failed
+        console.error('[RAZORPAY_INITIALIZE_ERROR] Failed to create order:', err);
         await Order.findByIdAndUpdate(order._id, { status: 'payment_failed' });
         throw new ApiError(502, 'Payment gateway error. Please try again.');
     }
@@ -355,6 +356,7 @@ export const retryPayment = asyncHandler(async (req, res) => {
     try {
         rzpOrder = await createRazorpayOrder(order.total, 'INR', `${order.orderId}-retry-${attemptNumber}`);
     } catch (err) {
+        console.error('[RAZORPAY_RETRY_ERROR] Failed to create retry order:', err);
         throw new ApiError(502, 'Payment gateway error. Please try again.');
     }
 
@@ -415,6 +417,7 @@ export const exchangeUpgradePayment = asyncHandler(async (req, res) => {
     try {
         rzpOrder = await createRazorpayOrder(priceDelta, 'INR', `exchange-${request._id}`);
     } catch (err) {
+        console.error('[RAZORPAY_EXCHANGE_UPGRADE_ERROR] Failed to create upgrade order:', err);
         throw new ApiError(502, 'Payment gateway error.');
     }
 

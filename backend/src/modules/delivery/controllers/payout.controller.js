@@ -5,6 +5,7 @@ import DeliveryBoy from '../../../models/DeliveryBoy.model.js';
 import DeliveryWithdrawal from '../../../models/DeliveryWithdrawal.model.js';
 import DeliveryWalletTransaction from '../../../models/DeliveryWalletTransaction.model.js';
 import mongoose from 'mongoose';
+import Settings from '../../../models/Settings.model.js';
 
 /**
  * @desc    Get delivery boy wallet summary
@@ -177,4 +178,22 @@ export const getWalletTransactions = asyncHandler(async (req, res) => {
             totalCount: total
         }, 'Wallet transactions retrieved successfully.')
     );
+});
+
+/**
+ * @desc    Get company payment transfer details for cash deposit/settlement
+ * @route   GET /api/delivery/wallet/company-payment-details
+ * @access  Private (Delivery Boy)
+ */
+export const getCompanyPaymentDetails = asyncHandler(async (req, res) => {
+    const settings = await Settings.findOne({ key: 'company_payment_details' });
+    const defaultDetails = {
+        upiId: "saara.pay@upi",
+        accountName: "SAARA LOGISTICS PVT LTD",
+        accountNumber: "50200081729012",
+        bankName: "HDFC Bank",
+        ifscCode: "HDFC0000103"
+    };
+    const details = settings?.value || defaultDetails;
+    res.status(200).json(new ApiResponse(200, details, 'Company payment details fetched.'));
 });

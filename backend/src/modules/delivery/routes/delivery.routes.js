@@ -86,5 +86,6 @@ router.get('/wallet/summary', ...deliveryAuth, payoutController.getWalletSummary
 router.post('/wallet/withdraw', ...deliveryAuth, payoutController.requestWithdrawal);
 router.put('/wallet/payout-settings', ...deliveryAuth, payoutController.updatePayoutSettings);
 router.get('/wallet/transactions', ...deliveryAuth, payoutController.getWalletTransactions);
+router.get('/wallet/company-payment-details', ...deliveryAuth, payoutController.getCompanyPaymentDetails);
 
 export default router;
