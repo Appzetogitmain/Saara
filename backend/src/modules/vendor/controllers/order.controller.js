@@ -108,7 +108,10 @@ export const getVendorOrderById = asyncHandler(async (req, res) => {
     const order = await Order.findOne({
         $or: idFilter,
         'vendorItems.vendorId': req.user.id,
-    }).populate('deliveryBoyId', 'name email phone vehicleType vehicleNumber status');
+    })
+    .populate('deliveryBoyId', 'name email phone vehicleType vehicleNumber status')
+    .populate('userId', 'name email');
+
     if (!order) throw new ApiError(404, 'Order not found.');
 
     const commissionDoc = await Commission.findOne({
