@@ -446,7 +446,12 @@ export const settleCash = asyncHandler(async (req, res) => {
             const result = await Order.updateMany(
                 { _id: { $in: orderIds }, isCashSettled: { $ne: true } },
                 {
-                    $set: { isCashSettled: true, settledAt: new Date(), cashSettlementId: settlement._id }
+                    $set: {
+                        isCashSettled:    true,
+                        settledAt:        new Date(),
+                        cashSettlementId: settlement._id,
+                        paymentStatus:    'paid',         // fix: COD orders now correctly show paymentStatus: 'paid'
+                    }
                 },
                 { session }
             );

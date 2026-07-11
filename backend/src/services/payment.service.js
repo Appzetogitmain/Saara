@@ -34,7 +34,12 @@ export const verifyWebhookSignature = (rawBody, signature) => {
         .createHmac('sha256', process.env.RAZORPAY_WEBHOOK_SECRET)
         .update(rawBody)
         .digest('hex');
-    if (expected !== signature) {
+    // SEC-01: Use timingSafeEqual to prevent timing-based signature forgery
+    const expectedBuf = Buffer.from(expected);
+    const actualBuf   = Buffer.from(signature || '');
+    const isValid = expectedBuf.length === actualBuf.length &&
+        crypto.timingSafeEqual(expectedBuf, actualBuf);
+    if (!isValid) {
         throw new ApiError(400, 'Invalid Razorpay webhook signature.');
     }
 };
@@ -48,7 +53,11 @@ export const verifyPaymentSignature = (razorpayOrderId, razorpayPaymentId, signa
         .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
         .update(`${razorpayOrderId}|${razorpayPaymentId}`)
         .digest('hex');
-    return expected === signature;
+    // SEC-01: Constant-time comparison prevents timing attack enumeration
+    const expectedBuf = Buffer.from(expected);
+    const actualBuf   = Buffer.from(signature || '');
+    return expectedBuf.length === actualBuf.length &&
+        crypto.timingSafeEqual(expectedBuf, actualBuf);
 };
 
 /**

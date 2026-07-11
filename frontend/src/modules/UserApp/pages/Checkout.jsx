@@ -285,6 +285,17 @@ const MobileCheckout = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // Load Razorpay SDK dynamically (Phase 2.1)
+  const loadRazorpay = () =>
+    new Promise((resolve) => {
+      if (window.Razorpay) { resolve(true); return; }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -323,30 +334,90 @@ const MobileCheckout = () => {
     } else if (step === 2) {
       setIsPlacingOrder(true);
       try {
-        const order = await createOrder({
-          userId: isAuthenticated ? user?.id : null,
-          items: items,
-          shippingAddress: normalizedShipping,
-          paymentMethod: formData.paymentMethod,
-          subtotal: total,
-          shipping: shipping,
-          tax: tax,
-          discount: discount,
-          total: finalTotal,
-          couponCode: appliedCoupon ? (appliedCoupon.code || couponCode.trim().toUpperCase()) : null,
-          shippingOption,
-        });
+        const paymentMethod = formData.paymentMethod;
 
-        clearCart();
-        toast.success("Order placed successfully!");
-        navigate(`/order-confirmation/${order.id}`);
+        // Build items payload — use DB-verified prices from cart
+        const itemsPayload = items.map((item) => ({
+          productId: item.id || item._id || item.productId,
+          quantity: item.quantity,
+          variantKey: item.variantKey || null,
+        }));
+
+        // Call payment/initialize for all payment methods (COD included)
+        const { data: initData } = await api.post('/user/payment/initialize', {
+            items: itemsPayload,
+            shippingAddress: normalizedShipping,
+            paymentMethod,
+            couponCode: appliedCoupon ? (appliedCoupon.code || couponCode.trim().toUpperCase()) : undefined,
+            shippingOption,
+          });
+
+        const payload = initData?.data ?? initData;
+
+        // ── COD: order already created, navigate to confirmation ──
+        if (paymentMethod === "cod") {
+          clearCart();
+          toast.success("Order placed successfully!");
+          navigate(`/order-confirmation/${payload.orderId}`);
+          return;
+        }
+
+        // ── Online Payment: open Razorpay checkout ──
+        const sdkLoaded = await loadRazorpay();
+        if (!sdkLoaded) {
+          toast.error("Payment gateway failed to load. Please try again.");
+          return;
+        }
+
+        await new Promise((resolve, reject) => {
+          const options = {
+            key: payload.key,
+            amount: Math.round((payload.amount || 0) * 100),
+            currency: payload.currency || "INR",
+            order_id: payload.razorpayOrderId,
+            name: "Saara",
+            description: `Order #${payload.orderId}`,
+            prefill: {
+              name: normalizedShipping.name,
+              email: normalizedShipping.email,
+              contact: normalizedShipping.phone,
+            },
+            theme: { color: "#6366f1" },
+            handler: async (response) => {
+              try {
+                // Webhook handles stock/commission — we just navigate
+                clearCart();
+                toast.success("Payment successful! Order confirmed.");
+                navigate(`/order-confirmation/${payload.orderId}`);
+                resolve();
+              } catch (err) {
+                reject(err);
+              }
+            },
+            modal: {
+              ondismiss: () => {
+                toast("Payment cancelled. Your order is saved — you can retry from Orders.");
+                navigate(`/orders`);
+                resolve();
+              },
+            },
+          };
+          const rzp = new window.Razorpay(options);
+          rzp.on("payment.failed", (response) => {
+            toast.error(`Payment failed: ${response.error?.description || "Unknown error"}`);
+            navigate(`/orders`);
+            resolve();
+          });
+          rzp.open();
+        });
       } catch (error) {
-        toast.error(error?.message || "Failed to place order");
+        toast.error(error?.response?.data?.message || error?.message || "Failed to place order");
       } finally {
         setIsPlacingOrder(false);
       }
     }
   };
+
 
   return (
     <PageTransition>

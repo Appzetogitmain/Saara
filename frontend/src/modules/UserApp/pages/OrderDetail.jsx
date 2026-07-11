@@ -277,7 +277,7 @@ const MobileOrderDetail = () => {
 
   const handleCancel = async () => {
     if (window.confirm('Are you sure you want to cancel this order?')) {
-      if (['pending', 'processing'].includes(order.status)) {
+      if (['pending', 'processing', 'payment_pending'].includes(order.status)) {
         try {
           await cancelOrder(order.id);
           toast.success('Order cancelled successfully');
@@ -290,6 +290,67 @@ const MobileOrderDetail = () => {
       }
     }
   };
+
+  // Phase 2.2 — Retry payment for payment_pending orders
+  const [isRetryingPayment, setIsRetryingPayment] = useState(false);
+
+  const loadRazorpay = () =>
+    new Promise((resolve) => {
+      if (window.Razorpay) { resolve(true); return; }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+
+  const handleRetryPayment = async () => {
+    if (isRetryingPayment) return;
+    setIsRetryingPayment(true);
+    try {
+      const sdkLoaded = await loadRazorpay();
+      if (!sdkLoaded) { toast.error('Payment gateway failed to load.'); return; }
+
+      const { data: retryData } = await api.post(`/user/payment/retry/${order.orderId}`);
+      const payload = retryData?.data ?? retryData;
+
+      await new Promise((resolve) => {
+        const options = {
+          key: payload.key,
+          amount: Math.round((payload.amount || 0) * 100),
+          currency: payload.currency || 'INR',
+          order_id: payload.razorpayOrderId,
+          name: 'Saara',
+          description: `Retry Payment — Order #${order.orderId}`,
+          prefill: { name: order.shippingAddress?.name || '', email: order.shippingAddress?.email || '', contact: order.shippingAddress?.phone || '' },
+          theme: { color: '#6366f1' },
+          handler: async () => {
+            toast.success('Payment successful! Order confirmed.');
+            await fetchOrderById(order.id);
+            resolve();
+          },
+          modal: {
+            ondismiss: () => {
+              toast('Payment cancelled. You can retry again from Orders.');
+              resolve();
+            },
+          },
+        };
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', (response) => {
+          toast.error(`Payment failed: ${response.error?.description || 'Unknown error'}`);
+          resolve();
+        });
+        rzp.open();
+      });
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Could not initiate retry payment');
+    } finally {
+      setIsRetryingPayment(false);
+    }
+  };
+
+
 
   const handleToggleCheck = (prodId) => {
     setSelectedItems((prev) => {
@@ -910,7 +971,17 @@ const MobileOrderDetail = () => {
 
               {/* Actions */}
               <div className="space-y-2">
-                {['pending', 'processing'].includes(order.status) && (
+                {order.status === 'payment_pending' && (
+                  <button
+                    onClick={handleRetryPayment}
+                    disabled={isRetryingPayment}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                  >
+                    <FiCreditCard className="text-lg" />
+                    {isRetryingPayment ? 'Opening Payment...' : 'Complete Payment (Pay Now)'}
+                  </button>
+                )}
+                {['pending', 'processing', 'payment_pending'].includes(order.status) && (
                   <button
                     onClick={handleCancel}
                     className="w-full py-3 bg-red-50 text-red-600 rounded-xl font-semibold hover:bg-red-100 transition-colors"
@@ -918,6 +989,7 @@ const MobileOrderDetail = () => {
                     Cancel Order
                   </button>
                 )}
+
                 <button
                   onClick={handleReorder}
                   className="w-full py-3 gradient-green text-white rounded-xl font-semibold flex items-center justify-center gap-2 hover:shadow-glow-green transition-all"

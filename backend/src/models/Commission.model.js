@@ -23,7 +23,7 @@ const commissionSchema = new mongoose.Schema(
         walletCredit: { type: Number, default: 0 },
         escrowStatus: {
             type: String,
-            enum: ['held', 'released', 'refund_processing', 'refunded'],
+            enum: ['held', 'processing', 'released', 'failed', 'refund_processing', 'refunded'],
             default: 'held',
             index: true,
         },

@@ -25,11 +25,18 @@ const vendorItemGroupSchema = new mongoose.Schema({
         enum: ['pending', 'processing', 'ready_for_pickup', 'shipped', 'delivered', 'cancelled'],
         default: 'pending',
     },
+    // 5.1: per-vendor escrow status for multi-vendor order split tracking
+    escrowStatus: {
+        type: String,
+        enum: ['held', 'processing', 'released', 'refunded', 'cancelled'],
+        default: 'held',
+    },
     commissionRate: { type: Number, default: 0 },
     commissionAmount: { type: Number, default: 0 },
     vendorEarnings: { type: Number, default: 0 },
     isOnHoldBalanceAdded: { type: Boolean, default: false }
 });
+
 
 const orderSchema = new mongoose.Schema(
     {
