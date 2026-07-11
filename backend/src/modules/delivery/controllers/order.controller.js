@@ -9,6 +9,7 @@ import { sendEmail } from '../../../services/email.service.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { emitToRoom, notifyOrderUpdate } from '../../../services/socket.service.js';
 import { autoAssignDeliveryPartner } from '../../../services/assignmentService.js';
+import { handleOrderDeliveryBalances } from '../../../services/orderFinancialHelper.js';
 
 const IS_PRODUCTION = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
 const DELIVERY_OTP_TTL_MS = IS_PRODUCTION ? 10 * 60 * 1000 : 24 * 60 * 60 * 1000;
@@ -325,6 +326,7 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
     if (status === 'delivered') {
         order.deliveredAt = new Date();
     }
+    await handleOrderDeliveryBalances(order);
     await order.save();
     notifyOrderUpdate(order);
 

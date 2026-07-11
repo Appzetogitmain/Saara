@@ -49,9 +49,48 @@ export const getVendorOrders = asyncHandler(async (req, res) => {
 
     const ordersWithCommissions = orders.map(order => {
         const comm = commissions.find(c => String(c.orderId) === String(order._id));
+        const filteredItems = (order.items || []).filter(item => String(item.vendorId) === String(req.user.id));
+        const filteredVendorItems = (order.vendorItems || []).filter(vi => String(vi.vendorId) === String(req.user.id));
+        
+        const vi = filteredVendorItems[0] || {};
+        const vSubtotal = vi.subtotal || 0;
+        const vDiscount = vi.discount || 0;
+        const vTax = vi.tax || 0;
+        const vShipping = vi.shipping || 0;
+        const vCommissionRate = vi.commissionRate || 10;
+        
+        const commSubtotal = comm ? (comm.vendorSubtotal || comm.subtotal || vSubtotal) : vSubtotal;
+        const commDiscount = comm ? (comm.vendorCouponDiscount !== undefined ? comm.vendorCouponDiscount : comm.discountShare || vDiscount) : vDiscount;
+        const commDiscountedSub = comm ? (comm.vendorDiscountedSubtotal !== undefined ? comm.vendorDiscountedSubtotal : comm.effectiveSubtotal || (commSubtotal - commDiscount)) : (commSubtotal - commDiscount);
+        const commTax = comm ? (comm.vendorTax || vTax) : vTax;
+        const commPaidAmount = comm ? (comm.vendorTotalPaidByCustomer || (commDiscountedSub + vShipping + commTax)) : (commDiscountedSub + vShipping + commTax);
+        const commRate = comm ? comm.commissionRate : vCommissionRate;
+        const commAmount = comm ? (comm.commissionAmount !== undefined ? comm.commissionAmount : comm.commission) : parseFloat((commDiscountedSub * commRate / 100).toFixed(2));
+        const commEarnings = comm ? (comm.vendorNetEarnings !== undefined ? comm.vendorNetEarnings : comm.vendorEarnings) : parseFloat((commDiscountedSub - commAmount).toFixed(2));
+        const escrowStatus = comm ? (comm.escrowStatus || 'held') : 'held';
+        const settlementStatus = comm ? (comm.settlementStatus || comm.status || 'pending') : 'pending';
+
         return {
             ...order,
-            commissionDetails: comm || null
+            items: filteredItems,
+            vendorItems: filteredVendorItems,
+            commissionDetails: comm ? {
+                ...comm,
+                effectiveSubtotal: commDiscountedSub,
+                commission: commAmount,
+                vendorEarnings: commEarnings
+            } : null,
+            vendorFinancials: {
+                subtotal: parseFloat(commSubtotal.toFixed(2)),
+                discount: parseFloat(commDiscount.toFixed(2)),
+                tax: parseFloat(commTax.toFixed(2)),
+                shipping: parseFloat(vShipping.toFixed(2)),
+                customerPaidAmount: parseFloat(commPaidAmount.toFixed(2)),
+                commission: parseFloat(commAmount.toFixed(2)),
+                earnings: parseFloat(commEarnings.toFixed(2)),
+                escrowStatus,
+                settlementStatus
+            }
         };
     });
 
@@ -78,7 +117,47 @@ export const getVendorOrderById = asyncHandler(async (req, res) => {
     }).lean();
 
     const orderObj = order.toObject();
-    orderObj.commissionDetails = commissionDoc || null;
+    const comm = commissionDoc;
+    const filteredItems = (orderObj.items || []).filter(item => String(item.vendorId) === String(req.user.id));
+    const filteredVendorItems = (orderObj.vendorItems || []).filter(vi => String(vi.vendorId) === String(req.user.id));
+    
+    const vi = filteredVendorItems[0] || {};
+    const vSubtotal = vi.subtotal || 0;
+    const vDiscount = vi.discount || 0;
+    const vTax = vi.tax || 0;
+    const vShipping = vi.shipping || 0;
+    const vCommissionRate = vi.commissionRate || 10;
+    
+    const commSubtotal = comm ? (comm.vendorSubtotal || comm.subtotal || vSubtotal) : vSubtotal;
+    const commDiscount = comm ? (comm.vendorCouponDiscount !== undefined ? comm.vendorCouponDiscount : comm.discountShare || vDiscount) : vDiscount;
+    const commDiscountedSub = comm ? (comm.vendorDiscountedSubtotal !== undefined ? comm.vendorDiscountedSubtotal : comm.effectiveSubtotal || (commSubtotal - commDiscount)) : (commSubtotal - commDiscount);
+    const commTax = comm ? (comm.vendorTax || vTax) : vTax;
+    const commPaidAmount = comm ? (comm.vendorTotalPaidByCustomer || (commDiscountedSub + vShipping + commTax)) : (commDiscountedSub + vShipping + commTax);
+    const commRate = comm ? comm.commissionRate : vCommissionRate;
+    const commAmount = comm ? (comm.commissionAmount !== undefined ? comm.commissionAmount : comm.commission) : parseFloat((commDiscountedSub * commRate / 100).toFixed(2));
+    const commEarnings = comm ? (comm.vendorNetEarnings !== undefined ? comm.vendorNetEarnings : comm.vendorEarnings) : parseFloat((commDiscountedSub - commAmount).toFixed(2));
+    const escrowStatus = comm ? (comm.escrowStatus || 'held') : 'held';
+    const settlementStatus = comm ? (comm.settlementStatus || comm.status || 'pending') : 'pending';
+
+    orderObj.items = filteredItems;
+    orderObj.vendorItems = filteredVendorItems;
+    orderObj.commissionDetails = comm ? {
+        ...comm,
+        effectiveSubtotal: commDiscountedSub,
+        commission: commAmount,
+        vendorEarnings: commEarnings
+    } : null;
+    orderObj.vendorFinancials = {
+        subtotal: parseFloat(commSubtotal.toFixed(2)),
+        discount: parseFloat(commDiscount.toFixed(2)),
+        tax: parseFloat(commTax.toFixed(2)),
+        shipping: parseFloat(vShipping.toFixed(2)),
+        customerPaidAmount: parseFloat(commPaidAmount.toFixed(2)),
+        commission: parseFloat(commAmount.toFixed(2)),
+        earnings: parseFloat(commEarnings.toFixed(2)),
+        escrowStatus,
+        settlementStatus
+    };
 
     res.status(200).json(new ApiResponse(200, orderObj, 'Order fetched.'));
 });

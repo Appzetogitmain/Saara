@@ -440,6 +440,63 @@ const OrderDetail = () => {
             </div>
           </div>
 
+          {/* Vendor Splits */}
+          {Array.isArray(order.commissions) && order.commissions.length > 0 && (
+            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+              <h2 className="text-sm font-bold text-gray-800 mb-3">Vendor Splits</h2>
+              <div className="divide-y divide-gray-150 space-y-3">
+                {order.commissions.map((comm, idx) => {
+                  const vendorSub = comm.vendorSubtotal || comm.subtotal || 0;
+                  const vendorDisc = comm.vendorCouponDiscount !== undefined ? comm.vendorCouponDiscount : comm.discountShare || 0;
+                  const vendorTax = comm.vendorTax || 0;
+                  const commission = comm.commissionAmount !== undefined ? comm.commissionAmount : comm.commission || 0;
+                  const earnings = comm.vendorNetEarnings !== undefined ? comm.vendorNetEarnings : comm.vendorEarnings || 0;
+                  const escrowStatus = comm.escrowStatus || 'held';
+                  const releaseDate = comm.escrowReleaseDate ? new Date(comm.escrowReleaseDate).toLocaleDateString() : 'N/A';
+
+                  return (
+                    <div key={idx} className={idx > 0 ? "pt-3 text-xs space-y-1.5" : "text-xs space-y-1.5"}>
+                      <div className="flex justify-between font-bold text-gray-700">
+                        <span>{comm.vendorName || `Vendor ${comm.vendorId}`}</span>
+                        <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded ${escrowStatus === 'released' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{escrowStatus}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Subtotal:</span>
+                        <span>{formatCurrency(vendorSub)}</span>
+                      </div>
+                      {vendorDisc > 0 && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Coupon Share:</span>
+                          <span>-{formatCurrency(vendorDisc)}</span>
+                        </div>
+                      )}
+                      {vendorTax > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Tax:</span>
+                          <span>{formatCurrency(vendorTax)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-red-500">
+                        <span>Commission:</span>
+                        <span>-{formatCurrency(commission)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-primary-700">
+                        <span>Net Earnings:</span>
+                        <span>{formatCurrency(earnings)}</span>
+                      </div>
+                      {escrowStatus === 'held' && comm.escrowReleaseDate && (
+                        <div className="flex justify-between text-[10px] text-gray-400">
+                          <span>Est. Release:</span>
+                          <span>{releaseDate}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Order Timeline */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">

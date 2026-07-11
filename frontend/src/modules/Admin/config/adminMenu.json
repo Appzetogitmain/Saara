@@ -146,13 +146,5 @@
       "Refund Policy",
       "Terms & Conditions"
     ]
-  },
-  {
-    "title": "Firebase",
-    "route": "/admin/firebase",
-    "children": [
-      "Push Config",
-      "Authentication"
-    ]
   }
 ]

@@ -44,7 +44,6 @@ const iconMap = {
   "Analytics & Finance": FiBarChart2,
   Settings: FiSettings,
   Policies: FiShield,
-  Firebase: FiDatabase,
   "Social Control": FiShield,
 };
 
@@ -118,10 +117,6 @@ const getChildRoute = (parentRoute, childName) => {
       "Privacy Policy": "/admin/policies/privacy-policy",
       "Refund Policy": "/admin/policies/refund-policy",
       "Terms & Conditions": "/admin/policies/terms-conditions",
-    },
-    "/admin/firebase": {
-      "Push Config": "/admin/firebase/push-config",
-      "Authentication": "/admin/firebase/authentication",
     },
     "/admin/vendors": {
       "Manage Vendors": "/admin/vendors/manage-vendors",

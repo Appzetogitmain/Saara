@@ -96,9 +96,6 @@ import NotificationsSEOSettings from "./modules/Admin/pages/settings/Notificatio
 import PrivacyPolicy from "./modules/Admin/pages/policies/PrivacyPolicy";
 import RefundPolicy from "./modules/Admin/pages/policies/RefundPolicy";
 import TermsConditions from "./modules/Admin/pages/policies/TermsConditions";
-// Firebase child pages
-import PushConfig from "./modules/Admin/pages/firebase/PushConfig";
-import Authentication from "./modules/Admin/pages/firebase/Authentication";
 import RouteWrapper from "./shared/components/RouteWrapper";
 import ScrollToTop from "./shared/components/ScrollToTop";
 import AppBootstrap from "./shared/components/AppBootstrap";
@@ -635,9 +632,6 @@ const AppRoutes = () => {
         <Route path="policies/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="policies/refund-policy" element={<RefundPolicy />} />
         <Route path="policies/terms-conditions" element={<TermsConditions />} />
-        <Route path="firebase" element={<PushConfig />} />
-        <Route path="firebase/push-config" element={<PushConfig />} />
-        <Route path="firebase/authentication" element={<Authentication />} />
         <Route path="campaigns" element={<Campaigns />} />
         <Route path="reviews" element={<Reviews />} />
         <Route path="content" element={<Content />} />
