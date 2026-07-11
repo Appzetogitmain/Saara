@@ -135,7 +135,7 @@ const getChildRoute = (parentRoute, childName) => {
   return routeMap[parentRoute]?.[childName] || parentRoute;
 };
 
-const AdminSidebar = ({ isOpen, onClose }) => {
+const AdminSidebar = ({ isOpen, onClose, isCollapsed }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { admin } = useAdminAuthStore();
@@ -411,7 +411,7 @@ const AdminSidebar = ({ isOpen, onClose }) => {
       </AnimatePresence>
 
       {/* Sidebar - Desktop Fixed */}
-      <div className="hidden lg:flex fixed left-0 top-0 bottom-0 w-64 z-40">
+      <div className={`hidden lg:flex fixed left-0 top-0 bottom-0 w-64 z-40 transition-transform duration-300 ${isCollapsed ? '-translate-x-full' : 'translate-x-0'}`}>
         {sidebarContent}
       </div>
     </>

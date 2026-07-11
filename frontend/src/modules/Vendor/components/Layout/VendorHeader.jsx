@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 import Button from "../../../Admin/components/Button";
 import VendorNotificationWindow from "./VendorNotificationWindow";
 
-const VendorHeader = ({ onMenuClick }) => {
+const VendorHeader = ({ onMenuClick, isCollapsed, onToggleSidebar }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { vendor, logout } = useVendorAuthStore();
@@ -50,7 +50,7 @@ const VendorHeader = ({ onMenuClick }) => {
 
   return (
     <header
-      className="bg-white border-b border-gray-200 fixed top-0 left-0 lg:left-64 right-0 z-30"
+      className={`bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-30 transition-all duration-300 ${isCollapsed ? 'lg:left-0' : 'lg:left-64'}`}
       style={{
         paddingTop: "env(safe-area-inset-top, 0px)",
       }}>
@@ -58,9 +58,15 @@ const VendorHeader = ({ onMenuClick }) => {
         {/* Left: Menu Button */}
         <div className="flex items-center gap-4">
           <Button
-            onClick={onMenuClick}
+            onClick={() => {
+              if (window.innerWidth >= 1024) {
+                onToggleSidebar();
+              } else {
+                onMenuClick();
+              }
+            }}
             variant="icon"
-            className="lg:hidden text-gray-700"
+            className="text-gray-700"
             icon={FiMenu}
           />
 

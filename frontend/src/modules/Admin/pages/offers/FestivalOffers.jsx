@@ -5,6 +5,9 @@ import {
   FiTrash2,
   FiTag,
   FiExternalLink,
+  FiEye,
+  FiEyeOff,
+  FiCopy,
 } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -13,10 +16,9 @@ import CampaignForm from "../../components/Campaigns/CampaignForm";
 import DataTable from "../../components/DataTable";
 import Badge from "../../../../shared/components/Badge";
 import ConfirmModal from "../../components/ConfirmModal";
-// import { formatDateTime } from "../../../utils/adminHelpers";
 
 const Offers = () => {
-  const { campaigns, initialize, getCampaignsByType, deleteCampaign } =
+  const { campaigns, initialize, getCampaignsByType, deleteCampaign, toggleCampaignStatus } =
     useCampaignStore();
 
   const [editingOffer, setEditingOffer] = useState(null);
@@ -69,6 +71,18 @@ const Offers = () => {
 
   const handleFormClose = () => {
     setEditingOffer(null);
+  };
+
+  const handleClone = (campaignToClone) => {
+    if (!campaignToClone) return;
+    const cloned = {
+      ...campaignToClone,
+      _id: undefined, // Clear Mongo ID so it creates a new record
+      id: undefined,
+      name: `${campaignToClone.name} (Copy)`,
+      slug: "", // Clear slug so it auto-generates
+    };
+    setEditingOffer(cloned);
   };
 
   const columns = [
@@ -149,13 +163,27 @@ const Offers = () => {
             </Link>
           )}
           <button
+            onClick={() => toggleCampaignStatus(row.id)}
+            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title={row.campaign?.isActive ? "Deactivate" : "Activate"}>
+            {row.campaign?.isActive ? <FiEye /> : <FiEyeOff />}
+          </button>
+          <button
+            onClick={() => handleClone(row.campaign)}
+            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+            title="Clone Offer">
+            <FiCopy />
+          </button>
+          <button
             onClick={() => setEditingOffer(row.campaign)}
-            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            title="Edit Offer">
             <FiEdit />
           </button>
           <button
             onClick={() => setDeleteModal({ isOpen: true, id: row.id })}
-            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            title="Delete Offer">
             <FiTrash2 />
           </button>
         </div>

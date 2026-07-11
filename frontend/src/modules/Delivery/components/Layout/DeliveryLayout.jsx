@@ -14,6 +14,15 @@ const DeliveryLayout = () => {
   const { deliveryBoy, logout } = useDeliveryAuthStore();
   const { unreadCount, fetchNotifications } = useDeliveryNotificationStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(
+    localStorage.getItem('delivery_sidebar_collapsed') === 'true'
+  );
+
+  const toggleSidebar = () => {
+    const nextVal = !isCollapsed;
+    setIsCollapsed(nextVal);
+    localStorage.setItem('delivery_sidebar_collapsed', String(nextVal));
+  };
 
   useEffect(() => {
     fetchNotifications(1);
@@ -51,7 +60,7 @@ const DeliveryLayout = () => {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Desktop Persistent Sidebar (md and up) */}
-      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-100 fixed top-0 bottom-0 left-0 z-30">
+      <aside className={`hidden md:flex flex-col w-64 bg-white border-r border-slate-100 fixed top-0 bottom-0 left-0 z-30 transition-transform duration-300 ${isCollapsed ? '-translate-x-full' : 'translate-x-0'}`}>
         {/* Sidebar Header with Logo */}
         <div className="p-5 border-b border-slate-100 flex items-center h-16 flex-shrink-0">
           <Link to="/delivery/dashboard" className="flex items-center gap-2.5 overflow-visible">
@@ -144,15 +153,21 @@ const DeliveryLayout = () => {
       </aside>
 
       {/* Main Workspace Wrapper */}
-      <div className="flex-1 md:pl-64 flex flex-col min-h-screen">
+      <div className={`flex-1 flex flex-col min-h-screen transition-all duration-300 ${isCollapsed ? 'md:pl-0' : 'md:pl-64'}`}>
         {/* Header */}
-        <header className="fixed top-0 left-0 right-0 md:left-64 z-20 bg-white border-b border-slate-100 shadow-sm">
+        <header className={`fixed top-0 left-0 right-0 z-20 bg-white border-b border-slate-100 shadow-sm transition-all duration-300 ${isCollapsed ? 'md:left-0' : 'md:left-64'}`}>
           <div className="flex items-center justify-between px-4 py-3 h-16">
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setSidebarOpen(true)}
-                className="md:hidden p-2 rounded-xl hover:bg-slate-50 transition-colors"
-                aria-label="Open menu"
+                onClick={() => {
+                  if (window.innerWidth >= 768) {
+                    toggleSidebar();
+                  } else {
+                    setSidebarOpen(true);
+                  }
+                }}
+                className="p-2 rounded-xl hover:bg-slate-50 transition-colors"
+                aria-label="Toggle menu"
               >
                 <FiMenu className="text-slate-600 text-xl" />
               </button>
