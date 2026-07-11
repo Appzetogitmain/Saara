@@ -134,6 +134,16 @@ const returnRequestSchema = new mongoose.Schema(
             upiId: { type: String },
         },
         refundId: { type: mongoose.Schema.Types.ObjectId, ref: 'Refund' },
+        statusHistory: [
+            {
+                status: { type: String, required: true },
+                changedAt: { type: Date, default: Date.now },
+                performedByRole: { type: String, enum: ['admin', 'vendor', 'delivery_partner', 'user'], required: true },
+                performedById: { type: mongoose.Schema.Types.ObjectId, required: true },
+                performedByName: { type: String, required: true },
+                notes: { type: String }
+            }
+        ],
     },
     { timestamps: true }
 );

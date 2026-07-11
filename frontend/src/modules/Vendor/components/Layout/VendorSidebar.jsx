@@ -38,7 +38,7 @@ const iconMap = {
   "Affiliate Program": FiAward,
   "Website Builder": FiLayout,
   Orders: FiShoppingBag,
-  "Return Requests": FiRefreshCw,
+  "Returns & Exchanges": FiRefreshCw,
   "Product Reviews": FiStar,
   "Stock Management": FiTrendingDown,
   "Wallet History": FiCreditCard,

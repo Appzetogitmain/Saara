@@ -20,7 +20,7 @@ import OrderDetail from "./modules/Admin/pages/OrderDetail";
 import ReturnRequests from "./modules/Admin/pages/ReturnRequests";
 import ReturnRequestDetail from "./modules/Admin/pages/ReturnRequestDetail";
 import Categories from "./modules/Admin/pages/Categories";
-import Brands from "./modules/Admin/pages/Brands";
+import BrandManagement from "./modules/Admin/pages/BrandManagement";
 import Customers from "./modules/Admin/pages/Customers";
 
 import Campaigns from "./modules/Admin/pages/Campaigns";
@@ -44,8 +44,6 @@ import ProductRatings from "./modules/Admin/pages/products/ProductRatings";
 // Categories child pages
 import ManageCategories from "./modules/Admin/pages/categories/ManageCategories";
 import CategoryOrder from "./modules/Admin/pages/categories/CategoryOrder";
-// Brands child pages
-import ManageBrands from "./modules/Admin/pages/brands/ManageBrands";
 // Customers child pages
 import ViewCustomers from "./modules/Admin/pages/customers/ViewCustomers";
 import CustomerAddresses from "./modules/Admin/pages/customers/Addresses";
@@ -550,8 +548,7 @@ const AppRoutes = () => {
           element={<ManageCategories />}
         />
         <Route path="categories/category-order" element={<CategoryOrder />} />
-        <Route path="brands" element={<Brands />} />
-        <Route path="brands/manage-brands" element={<ManageBrands />} />
+        <Route path="brands" element={<BrandManagement />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="orders/:id/invoice" element={<Invoice />} />

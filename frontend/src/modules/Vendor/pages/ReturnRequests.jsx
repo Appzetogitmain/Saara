@@ -14,6 +14,7 @@ import {
 } from "../services/vendorService";
 import { getSocket, joinRoom, leaveRoom } from "../../../shared/utils/socket";
 import toast from "react-hot-toast";
+import { getStatusConfig } from "../../../shared/constants/returnExchangeConfig";
 
 const ReturnRequests = () => {
   const navigate = useNavigate();
@@ -182,9 +183,33 @@ const ReturnRequests = () => {
   const columns = [
     {
       key: "id",
-      label: "Return ID",
+      label: "Request ID",
       sortable: true,
-      render: (value) => <span className="font-semibold">{value}</span>,
+      render: (value, row) => (
+        <div>
+          <span className="font-semibold text-gray-800">{value}</span>
+          <span className="block text-[10px] text-gray-500 uppercase tracking-wider mt-0.5 font-medium">
+            {row.requestType === 'exchange' ? 'Exchange ID' : 'Return ID'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: "requestType",
+      label: "Type",
+      sortable: true,
+      render: (value) => {
+        const isExchange = value === "exchange";
+        return (
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
+            isExchange 
+              ? 'bg-purple-50 text-purple-700 border-purple-200' 
+              : 'bg-blue-50 text-blue-700 border-blue-200'
+          }`}>
+            {isExchange ? 'Exchange' : 'Return'}
+          </span>
+        );
+      }
     },
     {
       key: "orderId",
@@ -192,7 +217,7 @@ const ReturnRequests = () => {
       sortable: true,
       render: (value) => (
         <span
-          className="text-blue-600 hover:text-blue-800 cursor-pointer"
+          className="text-blue-600 hover:text-blue-800 cursor-pointer font-medium"
           onClick={() => navigate(`/vendor/orders/${value}`)}>
           {value}
         </span>
@@ -219,12 +244,18 @@ const ReturnRequests = () => {
       key: "items",
       label: "Items",
       sortable: false,
-      render: (value) => {
+      render: (value, row) => {
         const count = Array.isArray(value) ? value.length : 0;
+        const requestedSize = row.exchangeDetails?.requestedVariant?.size;
         return (
-          <span>
-            {count} item{count !== 1 ? "s" : ""}
-          </span>
+          <div>
+            <span className="text-gray-800 font-medium">
+              {count} item{count !== 1 ? "s" : ""}
+            </span>
+            {row.requestType === 'exchange' && requestedSize && (
+              <span className="block text-[10px] text-purple-600 font-medium">New Size: {requestedSize}</span>
+            )}
+          </div>
         );
       },
     },
@@ -232,23 +263,48 @@ const ReturnRequests = () => {
       key: "reason",
       label: "Reason",
       sortable: true,
-      render: (value) => <span className="text-sm text-gray-700">{value}</span>,
+      render: (value) => <span className="text-sm text-gray-600 line-clamp-1 max-w-[150px]">{value}</span>,
     },
     {
       key: "refundAmount",
-      label: "Refund Amount",
+      label: "Financials",
       sortable: true,
-      render: (value) => (
-        <span className="font-bold text-gray-800">{formatPrice(value)}</span>
-      ),
+      render: (value, row) => {
+        if (row.requestType === 'exchange') {
+          const diff = Number(row.exchangeDetails?.priceDifference || 0);
+          if (diff === 0) {
+            return <span className="text-gray-400 text-sm font-medium">Even Exchange</span>;
+          } else if (diff > 0) {
+            return (
+              <div>
+                <span className="font-bold text-amber-600">+{formatPrice(diff)}</span>
+                <span className="block text-[9px] text-gray-400 font-medium">Customer owes</span>
+              </div>
+            );
+          } else {
+            return (
+              <div>
+                <span className="font-bold text-green-600">{formatPrice(Math.abs(diff))}</span>
+                <span className="block text-[9px] text-gray-400 font-medium">Refund customer</span>
+              </div>
+            );
+          }
+        }
+        return <span className="font-bold text-gray-800">{formatPrice(value)}</span>;
+      },
     },
     {
       key: "status",
       label: "Status",
       sortable: true,
-      render: (value) => (
-        <Badge variant={getStatusVariant(value)}>{value}</Badge>
-      ),
+      render: (value, row) => {
+        const config = getStatusConfig(value, row.requestType);
+        return (
+          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${config.color}`}>
+            {config.label}
+          </span>
+        );
+      },
     },
     {
       key: "actions",
@@ -268,7 +324,7 @@ const ReturnRequests = () => {
                 onClick={() => {
                   if (
                     window.confirm(
-                      "Are you sure you want to approve this return request?"
+                      `Are you sure you want to approve this ${row.requestType}?`
                     )
                   ) {
                     handleStatusUpdate(row.id, "approved", "approve");
@@ -282,7 +338,7 @@ const ReturnRequests = () => {
                 onClick={() => {
                   if (
                     window.confirm(
-                      "Are you sure you want to reject this return request?"
+                      `Are you sure you want to reject this ${row.requestType}?`
                     )
                   ) {
                     const reason = window.prompt(
@@ -300,7 +356,7 @@ const ReturnRequests = () => {
               </button>
             </>
           )}
-          {row.status === "approved" && row.refundStatus === "pending" && (
+          {row.status === "approved" && row.refundStatus === "pending" && row.requestType !== 'exchange' && (
             <button
               onClick={() => {
                 if (window.confirm("Process refund for this return request?")) {
@@ -346,10 +402,10 @@ const ReturnRequests = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="lg:hidden">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
-            Return Requests
+            Returns & Exchanges
           </h1>
           <p className="text-sm sm:text-base text-gray-600">
-            Manage and process customer return requests
+            Manage and process customer return & exchange requests
           </p>
         </div>
       </div>

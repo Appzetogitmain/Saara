@@ -13,7 +13,7 @@
     ]
   },
   {
-    "title": "Return Requests",
+    "title": "Returns & Exchanges",
     "route": "/admin/return-requests",
     "children": []
   },
@@ -38,9 +38,7 @@
   {
     "title": "Brands",
     "route": "/admin/brands",
-    "children": [
-      "Manage Brands"
-    ]
+    "children": []
   },
   {
     "title": "Customers",
