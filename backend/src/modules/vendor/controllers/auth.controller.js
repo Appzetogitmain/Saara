@@ -13,6 +13,7 @@ import {
     persistRefreshSession,
     rotateRefreshSession,
 } from '../../../services/refreshToken.service.js';
+import { isVendorApprovalRequired } from '../../../services/settingsService.js';
 
 // POST /api/vendor/auth/register
 export const register = asyncHandler(async (req, res) => {

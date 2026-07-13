@@ -10,6 +10,7 @@ import { createNotification } from '../../../services/notification.service.js';
 import { autoAssignDeliveryPartner } from '../../../services/assignmentService.js';
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
 import { buildVendorItemsSummary } from '../../../utils/notificationProductFormatter.js';
+import { getDefaultCommissionRate } from '../../../services/settingsService.js';
 
 const deriveTopLevelOrderStatus = (vendorItems = [], fallback = 'pending') => {
     const statuses = (vendorItems || [])
@@ -48,6 +49,7 @@ export const getVendorOrders = asyncHandler(async (req, res) => {
         vendorId: req.user.id
     }).lean();
 
+    const defaultRate = await getDefaultCommissionRate();
     const ordersWithCommissions = orders.map(order => {
         const comm = commissions.find(c => String(c.orderId) === String(order._id));
         const filteredItems = (order.items || []).filter(item => String(item.vendorId) === String(req.user.id));
@@ -58,7 +60,7 @@ export const getVendorOrders = asyncHandler(async (req, res) => {
         const vDiscount = vi.discount || 0;
         const vTax = vi.tax || 0;
         const vShipping = vi.shipping || 0;
-        const vCommissionRate = vi.commissionRate || 10;
+        const vCommissionRate = vi.commissionRate !== undefined && vi.commissionRate !== null ? vi.commissionRate : defaultRate;
         
         const commSubtotal = comm ? (comm.vendorSubtotal || comm.subtotal || vSubtotal) : vSubtotal;
         const commDiscount = comm ? (comm.vendorCouponDiscount !== undefined ? comm.vendorCouponDiscount : comm.discountShare || vDiscount) : vDiscount;
@@ -120,6 +122,7 @@ export const getVendorOrderById = asyncHandler(async (req, res) => {
         vendorId: req.user.id
     }).lean();
 
+    const defaultRate = await getDefaultCommissionRate();
     const orderObj = order.toObject();
     const comm = commissionDoc;
     const filteredItems = (orderObj.items || []).filter(item => String(item.vendorId) === String(req.user.id));
@@ -130,7 +133,7 @@ export const getVendorOrderById = asyncHandler(async (req, res) => {
     const vDiscount = vi.discount || 0;
     const vTax = vi.tax || 0;
     const vShipping = vi.shipping || 0;
-    const vCommissionRate = vi.commissionRate || 10;
+    const vCommissionRate = vi.commissionRate !== undefined && vi.commissionRate !== null ? vi.commissionRate : defaultRate;
     
     const commSubtotal = comm ? (comm.vendorSubtotal || comm.subtotal || vSubtotal) : vSubtotal;
     const commDiscount = comm ? (comm.vendorCouponDiscount !== undefined ? comm.vendorCouponDiscount : comm.discountShare || vDiscount) : vDiscount;

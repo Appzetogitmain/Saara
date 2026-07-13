@@ -22,6 +22,7 @@ import crypto from 'crypto';
 import { notifyOrderUpdate, notifyReturnUpdate, emitToRoom } from '../../../services/socket.service.js';
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
 import { initiateRefund } from '../../../services/payment.service.js';
+import { getDefaultCommissionRate } from '../../../services/settingsService.js';
 
 
 const normalizeVariantPart = (value) => String(value || '').trim().toLowerCase();
@@ -216,6 +217,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
     const idempotencyScope = userId
         ? `user:${String(userId)}`
         : `guest:${normalizedGuestEmail || normalizedGuestPhone || 'anonymous'}`;
+    const defaultRate = await getDefaultCommissionRate();
 
     if (idempotencyKey) {
         const existingOrder = await Order.findOne({ idempotencyScope, idempotencyKey })
@@ -297,7 +299,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
             vendorMap[vid] = {
                 vendorId: product.vendorId._id,
                 vendorName: product.vendorId.storeName,
-                commissionRate: product.vendorId.commissionRate || 10,
+                commissionRate: product.vendorId.commissionRate !== undefined && product.vendorId.commissionRate !== null ? product.vendorId.commissionRate : defaultRate,
                 shippingEnabled: product.vendorId.shippingEnabled !== false,
                 defaultShippingRate: product.vendorId.defaultShippingRate,
                 freeShippingThreshold: product.vendorId.freeShippingThreshold,
@@ -392,7 +394,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
             tax: parseFloat(vTax.toFixed(2)),
             discount: vCalc.discountShare || 0,
             status: 'pending',
-            commissionRate: vCalc.commissionRate || 10,
+            commissionRate: vCalc.commissionRate !== undefined && vCalc.commissionRate !== null ? vCalc.commissionRate : defaultRate,
             commissionAmount: vCalc.commission || 0,
             vendorEarnings: vCalc.vendorEarnings || 0,
             isOnHoldBalanceAdded: false

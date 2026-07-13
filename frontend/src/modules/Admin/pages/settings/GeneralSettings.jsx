@@ -1,33 +1,33 @@
 import { useState, useEffect } from "react";
-import { FiSave, FiSettings, FiImage, FiGlobe } from "react-icons/fi";
+import { FiSave, FiSettings, FiGlobe } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { useSettingsStore } from "../../../../shared/store/settingsStore";
 import AnimatedSelect from "../../components/AnimatedSelect";
+import { getGeneralSettings, updateGeneralSettings } from "../../services/adminService";
 import toast from "react-hot-toast";
 
 const GeneralSettings = () => {
-  const { settings, updateSettings, initialize } = useSettingsStore();
+  const { updateSettings, initialize } = useSettingsStore();
   const [formData, setFormData] = useState({});
   const [activeSection, setActiveSection] = useState("identity");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     initialize();
-    if (settings && settings.general) {
-      setFormData({
-        ...settings.general,
-        ...settings.theme,
-      });
-    }
+    const fetchSettings = async () => {
+      try {
+        const response = await getGeneralSettings();
+        if (response?.data?.value) {
+          setFormData(response.data.value);
+        }
+      } catch (err) {
+        console.error("Error loading general settings:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSettings();
   }, []);
-
-  useEffect(() => {
-    if (settings && settings.general) {
-      setFormData({
-        ...settings.general,
-        ...settings.theme,
-      });
-    }
-  }, [settings]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -44,22 +44,24 @@ const GeneralSettings = () => {
     });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const {
-      socialMedia,
-      storeDescription,
-      ...generalData
-    } = formData;
-
-    updateSettings("general", {
-      ...generalData,
-      socialMedia: socialMedia || {},
-      storeDescription: storeDescription || "",
-    });
-
-    toast.success("Settings saved successfully");
+    try {
+      await updateGeneralSettings(formData);
+      updateSettings("general", formData);
+      toast.success("Settings saved successfully");
+    } catch (err) {
+      toast.error("Failed to save settings");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   const sections = [
     { id: "identity", label: "Store Identity", icon: FiSettings },
@@ -123,31 +125,7 @@ const GeneralSettings = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Store Logo URL
-                  </label>
-                  <input
-                    type="text"
-                    name="storeLogo"
-                    value={formData.storeLogo || ""}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Favicon URL
-                  </label>
-                  <input
-                    type="text"
-                    name="favicon"
-                    value={formData.favicon || ""}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -223,24 +201,7 @@ const GeneralSettings = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Timezone
-                  </label>
-                  <AnimatedSelect
-                    name="timezone"
-                    value={formData.timezone || "UTC"}
-                    onChange={handleChange}
-                    options={[
-                      { value: "UTC", label: "UTC" },
-                      { value: "America/New_York", label: "Eastern Time" },
-                      { value: "America/Chicago", label: "Central Time" },
-                      { value: "America/Denver", label: "Mountain Time" },
-                      { value: "America/Los_Angeles", label: "Pacific Time" },
-                      { value: "Asia/Kolkata", label: "IST (India)" },
-                    ]}
-                  />
-                </div>
+
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -259,21 +220,7 @@ const GeneralSettings = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Language
-                  </label>
-                  <AnimatedSelect
-                    name="language"
-                    value={formData.language || "en"}
-                    onChange={handleChange}
-                    options={[
-                      { value: "en", label: "English" },
-                      { value: "es", label: "Spanish" },
-                      { value: "fr", label: "French" },
-                    ]}
-                  />
-                </div>
+
               </div>
 
               <div className="border-t border-gray-200 pt-6">
@@ -366,25 +313,6 @@ const GeneralSettings = () => {
                     Default commission rate for new vendors
                   </p>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Minimum Vendor Rating
-                  </label>
-                  <input
-                    type="number"
-                    name="minimumVendorRating"
-                    value={formData.minimumVendorRating || 3.0}
-                    onChange={handleChange}
-                    min="0"
-                    max="5"
-                    step="0.1"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Minimum rating required for vendor approval
-                  </p>
-                </div>
               </div>
 
               <div className="space-y-3">
@@ -409,97 +337,9 @@ const GeneralSettings = () => {
                   </label>
                 </div>
 
-                <div className="flex items-center justify-between gap-3 p-4 border border-gray-200 rounded-lg">
-                  <div>
-                    <span className="text-sm font-semibold text-gray-700">
-                      Auto-approve Verified Vendors
-                    </span>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Automatically approve verified vendors
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="autoApproveVerified"
-                      checked={formData.autoApproveVerified || false}
-                      onChange={handleChange}
-                      className="sr-only peer"
-                    />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                  </label>
-                </div>
               </div>
 
-              <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                  Vendor Features
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between gap-3 p-4 border border-gray-200 rounded-lg">
-                    <div>
-                      <span className="text-sm font-semibold text-gray-700">
-                        Vendor Product Management
-                      </span>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Allow vendors to manage their own products
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="vendorProductManagement"
-                        checked={formData.vendorProductManagement !== false}
-                        onChange={handleChange}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                    </label>
-                  </div>
 
-                  <div className="flex items-center justify-between gap-3 p-4 border border-gray-200 rounded-lg">
-                    <div>
-                      <span className="text-sm font-semibold text-gray-700">
-                        Vendor Order Management
-                      </span>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Allow vendors to manage their own orders
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="vendorOrderManagement"
-                        checked={formData.vendorOrderManagement !== false}
-                        onChange={handleChange}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-3 p-4 border border-gray-200 rounded-lg">
-                    <div>
-                      <span className="text-sm font-semibold text-gray-700">
-                        Vendor Analytics
-                      </span>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Allow vendors to view their analytics
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        name="vendorAnalytics"
-                        checked={formData.vendorAnalytics !== false}
-                        onChange={handleChange}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
-                    </label>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 

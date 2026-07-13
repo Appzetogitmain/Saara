@@ -12,6 +12,7 @@ import ReturnRequest from '../../../models/ReturnRequest.model.js';
 import mongoose from 'mongoose';
 import { createRazorpayOrder, verifyPaymentSignature } from '../../../services/payment.service.js';
 import { processCapturedPayment } from '../../../services/paymentProcessor.js';
+import { getDefaultCommissionRate } from '../../../services/settingsService.js';
 
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
 import { calculateVendorShippingForGroups } from '../../../services/vendorShipping.service.js';
@@ -155,8 +156,11 @@ export const initializePayment = asyncHandler(async (req, res) => {
     });
     const shipping = shippingResult?.totalShipping || 0;
     const shippingByVendor = shippingResult?.shippingByVendor || {};
-
-    const vendorCommissions = Object.fromEntries(vendorDocs.map(v => [String(v._id), v.commissionRate || 10]));
+    const defaultRate = await getDefaultCommissionRate();
+    const vendorCommissions = Object.fromEntries(vendorDocs.map(v => [
+        String(v._id),
+        v.commissionRate !== undefined && v.commissionRate !== null ? v.commissionRate : defaultRate
+    ]));
 
     // --- Calculate financials server-side ---
     const financials = calculateOrderFinancials({

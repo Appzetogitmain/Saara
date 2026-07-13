@@ -1,5 +1,6 @@
 import Commission from '../models/Commission.model.js';
 import Vendor from '../models/Vendor.model.js';
+import { getDefaultCommissionRate } from './settingsService.js';
 
 /**
  * Calculate commission for a vendor order item group.
@@ -17,7 +18,8 @@ export const calculateCommission = async (vendorId, subtotal, taxRate = 18, taxI
     const vendor = await Vendor.findById(vendorId).select('commissionRate');
     if (!vendor) throw new Error(`Vendor not found: ${vendorId}`);
 
-    const commissionRate = vendor.commissionRate || 10;
+    const defaultRate = await getDefaultCommissionRate();
+    const commissionRate = vendor.commissionRate !== undefined && vendor.commissionRate !== null ? vendor.commissionRate : defaultRate;
 
     // If tax is baked in, extract the pre-tax base (backward extraction)
     const commissionBase = taxIncluded

@@ -262,6 +262,12 @@ export const getCompanyPaymentSettings = () =>
 export const updateCompanyPaymentSettings = (data) =>
     api.put('/admin/settings/company_payment_details', { value: data });
 
+export const getGeneralSettings = () =>
+    api.get('/admin/settings/general');
+
+export const updateGeneralSettings = (data) =>
+    api.put('/admin/settings/general', { value: data });
+
 // ─── Marketing & Promotions ──────────────────────────────────────────────────
 // Coupons
 export const getAllCoupons = (params) => api.get('/admin/marketing/coupons', { params });

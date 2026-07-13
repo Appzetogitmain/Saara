@@ -14,6 +14,7 @@ import { calculateOrderFinancials } from './financial.service.js';
 import { createNotification } from './notification.service.js';
 import { sendOrderConfirmationEmail } from './email.service.js';
 import { notifyOrderUpdate } from './socket.service.js';
+import { getDefaultCommissionRate } from './settingsService.js';
 
 /**
  * Reusable core payment processor.
@@ -98,7 +99,11 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
                 .session(session)
                 .lean();
 
-            const vendorCommissionMap = Object.fromEntries(vendors.map(v => [String(v._id), v.commissionRate || 10]));
+            const defaultRate = await getDefaultCommissionRate();
+            const vendorCommissionMap = Object.fromEntries(vendors.map(v => [
+                String(v._id),
+                v.commissionRate !== undefined && v.commissionRate !== null ? v.commissionRate : defaultRate
+            ]));
             const vendorNameMap       = Object.fromEntries(vendors.map(v => [String(v._id), v.vendorName || v.name || '']));
 
             const financials = calculateOrderFinancials({
