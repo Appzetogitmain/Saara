@@ -12,7 +12,7 @@ import ReturnRequest from '../../../models/ReturnRequest.model.js';
 import mongoose from 'mongoose';
 import { createRazorpayOrder, verifyPaymentSignature } from '../../../services/payment.service.js';
 import { processCapturedPayment } from '../../../services/paymentProcessor.js';
-import { getDefaultCommissionRate } from '../../../services/settingsService.js';
+import { getDefaultCommissionRate, isPaymentMethodEnabled } from '../../../services/settingsService.js';
 
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
 import { calculateVendorShippingForGroups } from '../../../services/vendorShipping.service.js';
@@ -33,6 +33,12 @@ export const initializePayment = asyncHandler(async (req, res) => {
 
     const userId = req.user?.id;
     const normalizedPaymentMethod = paymentMethod === 'cash' ? 'cod' : paymentMethod;
+
+    // Validate that payment method is enabled
+    const isMethodActive = await isPaymentMethodEnabled(normalizedPaymentMethod);
+    if (!isMethodActive) {
+        throw new ApiError(400, `${paymentMethod === 'cash' ? 'Cash on Delivery' : paymentMethod} is currently unavailable.`);
+    }
 
     // 4.3 — Idempotency: if client sends a key, return the existing order if it was already created
     if (idempotencyKey) {
@@ -394,6 +400,12 @@ export const retryPayment = asyncHandler(async (req, res) => {
 
     const order = await Order.findOne({ orderId, userId }).lean();
     if (!order) throw new ApiError(404, 'Order not found.');
+
+    // Validate if the order's paymentMethod is still active in settings
+    const isRetryMethodActive = await isPaymentMethodEnabled(order.paymentMethod);
+    if (!isRetryMethodActive) {
+        throw new ApiError(400, `The payment method ${order.paymentMethod === 'cod' ? 'Cash on Delivery' : order.paymentMethod} used for this order is currently unavailable.`);
+    }
     if (order.status !== 'payment_pending') {
         throw new ApiError(400, 'This order is not awaiting payment. Cannot retry.');
     }

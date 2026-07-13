@@ -99,13 +99,13 @@ const PaymentShippingSettings = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    updateSettings('payment', paymentData);
-    updateSettings('shipping', shippingData);
     try {
+      await updateSettings('payment', paymentData, true);
+      await updateSettings('shipping', shippingData, true);
       await updateCompanyPaymentSettings(companyPaymentData);
       toast.success('Settings saved successfully');
     } catch (err) {
-      toast.error('Failed to save company payment settings');
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to save settings');
     }
   };
 

@@ -22,7 +22,7 @@ import crypto from 'crypto';
 import { notifyOrderUpdate, notifyReturnUpdate, emitToRoom } from '../../../services/socket.service.js';
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
 import { initiateRefund } from '../../../services/payment.service.js';
-import { getDefaultCommissionRate } from '../../../services/settingsService.js';
+import { getDefaultCommissionRate, isPaymentMethodEnabled } from '../../../services/settingsService.js';
 
 
 const normalizeVariantPart = (value) => String(value || '').trim().toLowerCase();
@@ -209,6 +209,12 @@ const resolveOrderItemVariantKey = (product, orderItem) => {
 export const placeOrder = asyncHandler(async (req, res) => {
     const { items, shippingAddress, paymentMethod, couponCode, shippingOption } = req.body;
     const normalizedPaymentMethod = paymentMethod === 'cash' ? 'cod' : paymentMethod;
+
+    // Validate that payment method is enabled
+    const isMethodActive = await isPaymentMethodEnabled(normalizedPaymentMethod);
+    if (!isMethodActive) {
+        throw new ApiError(400, `${paymentMethod === 'cash' ? 'Cash on Delivery' : paymentMethod} is currently unavailable.`);
+    }
     const userId = req.user?.id || null;
     const rawIdempotencyKey = String(req.get('x-idempotency-key') || '').trim();
     const idempotencyKey = rawIdempotencyKey || null;

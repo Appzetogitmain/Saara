@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FiSave, FiFileText } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import api from '../../../../shared/utils/api';
 
-const PrivacyPolicy = () => {
-  const [content, setContent] = useState(`Privacy Policy
+const DEFAULT_CONTENT = `Privacy Policy
 
 Last updated: ${new Date().toLocaleDateString()}
 
@@ -21,11 +21,49 @@ We do not sell, trade, or rent your personal information to third parties withou
 We implement appropriate security measures to protect your personal information.
 
 5. Your Rights
-You have the right to access, update, or delete your personal information at any time.`);
+You have the right to access, update, or delete your personal information at any time.`;
 
-  const handleSave = () => {
-    toast.success('Privacy policy saved successfully');
+const PrivacyPolicy = () => {
+  const [content, setContent] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPolicy = async () => {
+      try {
+        const response = await api.get('/admin/policies/privacy');
+        const data = response?.data ?? response;
+        if (data?.content !== undefined) {
+          setContent(data.content);
+        } else {
+          setContent(DEFAULT_CONTENT);
+        }
+      } catch (err) {
+        console.error('Failed to load privacy policy:', err);
+        setContent(DEFAULT_CONTENT);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPolicy();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      await api.put('/admin/policies/privacy', { content });
+      toast.success('Privacy policy saved successfully');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to save privacy policy');
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-slate-500">Loading Privacy Policy...</p>
+      </div>
+    );
+  }
 
   return (
     <motion.div

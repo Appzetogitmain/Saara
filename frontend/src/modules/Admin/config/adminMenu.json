@@ -130,11 +130,7 @@
     "route": "/admin/settings",
     "children": [
       "General",
-      "Payment & Shipping",
-      "Orders & Customers",
-      "Products & Inventory",
-      "Content & Features",
-      "Notifications & SEO"
+      "Payment & Shipping"
     ]
   },
   {

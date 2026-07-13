@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
-import { FiSave, FiImage, FiGlobe, FiShoppingBag } from "react-icons/fi";
+import { FiSave, FiShoppingBag, FiGlobe, FiUpload } from "react-icons/fi";
 import { motion } from "framer-motion";
 import { useVendorAuthStore } from "../../store/vendorAuthStore";
-import AnimatedSelect from "../../../Admin/components/AnimatedSelect";
+import { uploadVendorImage } from "../../services/vendorService";
 import toast from "react-hot-toast";
 
 const StoreSettings = () => {
   const { vendor, updateProfile } = useVendorAuthStore();
   const [formData, setFormData] = useState({});
   const [activeSection, setActiveSection] = useState("identity");
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   useEffect(() => {
     if (vendor) {
@@ -23,14 +24,6 @@ const StoreSettings = () => {
           } ${vendor.address.zipCode || ""}`
           : "",
         businessHours: vendor.businessHours || "Mon-Fri 9AM-6PM",
-        timezone: vendor.timezone || "UTC",
-        currency: vendor.currency || "INR",
-        socialMedia: vendor.socialMedia || {
-          facebook: "",
-          instagram: "",
-          twitter: "",
-          linkedin: "",
-        },
       });
     }
   }, [vendor]);
@@ -40,14 +33,34 @@ const StoreSettings = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleSocialMediaChange = (platform, value) => {
-    setFormData({
-      ...formData,
-      socialMedia: {
-        ...formData.socialMedia,
-        [platform]: value,
-      },
-    });
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select an image file");
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image size should be less than 5MB");
+        return;
+      }
+
+      setIsUploadingLogo(true);
+      try {
+        const res = await uploadVendorImage(file, "vendors/logos");
+        const uploaded = res?.data ?? res;
+        setFormData((prev) => ({
+          ...prev,
+          storeLogo: uploaded?.url || "",
+        }));
+        toast.success("Logo uploaded successfully");
+      } catch {
+        // api.js shows toast
+      } finally {
+        setIsUploadingLogo(false);
+      }
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -87,7 +100,6 @@ const StoreSettings = () => {
   const sections = [
     { id: "identity", label: "Store Identity", icon: FiShoppingBag },
     { id: "contact", label: "Contact Info", icon: FiGlobe },
-    { id: "social", label: "Social Media", icon: FiImage },
   ];
 
   if (!vendor) {
@@ -155,16 +167,67 @@ const StoreSettings = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Store Logo URL
+                    Store Logo
                   </label>
-                  <input
-                    type="text"
-                    name="storeLogo"
-                    value={formData.storeLogo || ""}
-                    onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    placeholder="data/logos/logo.png"
-                  />
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="relative flex-1 sm:flex-initial">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                        id="logo-upload"
+                        disabled={isUploadingLogo}
+                      />
+                      <label
+                        htmlFor="logo-upload"
+                        className={`flex items-center justify-center gap-2 px-4 py-2 border-2 border-dashed rounded-lg cursor-pointer transition-colors bg-white ${
+                          isUploadingLogo
+                            ? "border-gray-300 bg-gray-50 cursor-not-allowed"
+                            : "border-purple-300 hover:border-purple-500 hover:bg-purple-50"
+                        }`}
+                      >
+                        <FiUpload className={`text-base ${isUploadingLogo ? "text-purple-400 animate-spin" : "text-purple-600"}`} />
+                        <span className="text-xs font-semibold text-gray-700">
+                          {isUploadingLogo ? "Uploading..." : formData.storeLogo ? "Change Logo" : "Choose Logo"}
+                        </span>
+                      </label>
+                    </div>
+
+                    <input
+                      type="text"
+                      name="storeLogo"
+                      value={formData.storeLogo || ""}
+                      onChange={handleChange}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      placeholder="Or enter logo URL directly"
+                    />
+                  </div>
+
+                  {formData.storeLogo && (
+                    <div className="mt-3 flex items-center gap-3 bg-gray-50 p-2.5 rounded-lg border border-gray-200 w-full sm:w-fit">
+                      <img
+                        src={formData.storeLogo}
+                        alt="Logo Preview"
+                        className="w-16 h-16 object-cover rounded-lg border border-purple-200 shadow-sm"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                        }}
+                      />
+                      <div className="flex flex-col items-start gap-1">
+                        <span className="text-xs text-gray-500 font-medium truncate max-w-[150px]">
+                          {formData.storeLogo.split("/").pop()}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, storeLogo: "" })}
+                          className="text-xs font-bold text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          Remove Logo
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="md:col-span-2">
@@ -175,45 +238,9 @@ const StoreSettings = () => {
                     name="storeDescription"
                     value={formData.storeDescription || ""}
                     onChange={handleChange}
-                    rows={3}
+                    rows={4}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                     placeholder="Brief description of your store"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Timezone
-                  </label>
-                  <AnimatedSelect
-                    name="timezone"
-                    value={formData.timezone || "UTC"}
-                    onChange={handleChange}
-                    options={[
-                      { value: "UTC", label: "UTC" },
-                      { value: "America/New_York", label: "Eastern Time" },
-                      { value: "America/Chicago", label: "Central Time" },
-                      { value: "America/Denver", label: "Mountain Time" },
-                      { value: "America/Los_Angeles", label: "Pacific Time" },
-                      { value: "Asia/Kolkata", label: "IST (India)" },
-                    ]}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Currency
-                  </label>
-                  <AnimatedSelect
-                    name="currency"
-                    value={formData.currency || "INR"}
-                    onChange={handleChange}
-                    options={[
-                      { value: "INR", label: "INR (₹)" },
-                      { value: "USD", label: "USD ($)" },
-                      { value: "EUR", label: "EUR (€)" },
-                      { value: "GBP", label: "GBP (£)" },
-                    ]}
                   />
                 </div>
               </div>
@@ -276,70 +303,6 @@ const StoreSettings = () => {
                     value={formData.businessHours || ""}
                     onChange={handleChange}
                     placeholder="Mon-Fri 9AM-6PM"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Social Media Section */}
-          {activeSection === "social" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Facebook
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.socialMedia?.facebook || ""}
-                    onChange={(e) =>
-                      handleSocialMediaChange("facebook", e.target.value)
-                    }
-                    placeholder="https://facebook.com/yourpage"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Instagram
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.socialMedia?.instagram || ""}
-                    onChange={(e) =>
-                      handleSocialMediaChange("instagram", e.target.value)
-                    }
-                    placeholder="https://instagram.com/yourpage"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Twitter
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.socialMedia?.twitter || ""}
-                    onChange={(e) =>
-                      handleSocialMediaChange("twitter", e.target.value)
-                    }
-                    placeholder="https://twitter.com/yourpage"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    LinkedIn
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.socialMedia?.linkedin || ""}
-                    onChange={(e) =>
-                      handleSocialMediaChange("linkedin", e.target.value)
-                    }
-                    placeholder="https://linkedin.com/company/yourpage"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>

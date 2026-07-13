@@ -64,6 +64,9 @@ const MobileCheckout = () => {
     paymentMethod: "card",
   });
 
+  const [paymentSettings, setPaymentSettings] = useState(null);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+
   useEffect(() => {
     if (isAuthenticated) {
       fetchAddresses().catch(() => null);
@@ -91,6 +94,62 @@ const MobileCheckout = () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const fetchCheckoutSettings = async () => {
+      try {
+        const response = await api.get("/settings/checkout");
+        const data = response?.data ?? response;
+        if (active) {
+          setPaymentSettings(data);
+        }
+      } catch (err) {
+        console.error("Failed to load checkout settings:", err);
+      } finally {
+        if (active) {
+          setIsLoadingSettings(false);
+        }
+      }
+    };
+    fetchCheckoutSettings();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const activePaymentMethods = useMemo(() => {
+    if (!paymentSettings || !paymentSettings.payment) {
+      return [
+        { id: "card", label: "Credit/Debit Card (Online Payment)" },
+        { id: "cod", label: "Cash on Delivery" }
+      ];
+    }
+    const methods = [];
+    const p = paymentSettings.payment;
+    if (p.razorpay) {
+      methods.push({ id: "card", label: "Credit/Debit Card (Online Payment)" });
+    }
+    if (p.upi) {
+      methods.push({ id: "upi", label: "UPI Direct" });
+    }
+    if (p.wallet) {
+      methods.push({ id: "wallet", label: "Wallet Payment" });
+    }
+    if (p.cod) {
+      methods.push({ id: "cod", label: "Cash on Delivery" });
+    }
+    return methods;
+  }, [paymentSettings]);
+
+  useEffect(() => {
+    if (!isLoadingSettings && activePaymentMethods.length > 0) {
+      const isCurrentActive = activePaymentMethods.some(m => m.id === formData.paymentMethod);
+      if (!isCurrentActive) {
+        setFormData(prev => ({ ...prev, paymentMethod: activePaymentMethods[0].id }));
+      }
+    }
+  }, [activePaymentMethods, formData.paymentMethod, isLoadingSettings]);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -121,16 +180,20 @@ const MobileCheckout = () => {
 
   const calculateShippingFallback = () => {
     const total = getTotal();
+    const defaults = paymentSettings?.shipping || { defaultShippingRate: 0, freeShippingThreshold: 0 };
+    const defaultRate = defaults.defaultShippingRate;
+    const threshold = defaults.freeShippingThreshold;
+
     if (appliedCoupon?.type === "freeship") {
       return 0;
     }
-    if (total >= 100) {
+    if (threshold > 0 && total >= threshold) {
       return 0;
     }
     if (shippingOption === "express") {
-      return 100;
+      return defaultRate > 0 ? defaultRate * 2 : 100;
     }
-    return 50;
+    return defaultRate > 0 ? defaultRate : 50;
   };
 
   const total = getTotal();
@@ -605,32 +668,34 @@ const MobileCheckout = () => {
                       Payment Method
                     </h2>
                     <div className="space-y-3 mb-6">
-                      {["card", "cash", "bank"].map((method) => (
-                        <label
-                          key={method}
-                          className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                            formData.paymentMethod === method
-                              ? "border-primary-500 bg-primary-50"
-                              : "border-gray-200"
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value={method}
-                            checked={formData.paymentMethod === method}
-                            onChange={handleInputChange}
-                            className="w-5 h-5 text-primary-500"
-                          />
-                          <span className="font-semibold text-gray-800 capitalize text-sm">
-                            {method === "card"
-                              ? "Credit/Debit Card"
-                              : method === "cash"
-                                ? "Cash on Delivery"
-                                : "Bank Transfer"}
-                          </span>
-                        </label>
-                      ))}
+                      {activePaymentMethods.length > 0 ? (
+                        activePaymentMethods.map((method) => (
+                          <label
+                            key={method.id}
+                            className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                              formData.paymentMethod === method.id
+                                ? "border-primary-500 bg-primary-50"
+                                : "border-gray-200"
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="paymentMethod"
+                              value={method.id}
+                              checked={formData.paymentMethod === method.id}
+                              onChange={handleInputChange}
+                              className="w-5 h-5 text-primary-500"
+                            />
+                            <span className="font-semibold text-gray-800 capitalize text-sm">
+                              {method.label}
+                            </span>
+                          </label>
+                        ))
+                      ) : (
+                        <div className="p-4 bg-red-50 text-red-700 rounded-xl border border-red-200 text-sm font-semibold">
+                          No payment methods are currently available. Please contact support.
+                        </div>
+                      )}
                     </div>
 
                     {/* Shipping Options */}
@@ -827,13 +892,19 @@ const MobileCheckout = () => {
                     <div className="p-4 border-t border-gray-100 bg-gray-50">
                       <button
                         type="submit"
-                        disabled={step === 2 && isPlacingOrder}
-                        className="w-full gradient-green text-white py-3.5 rounded-xl font-bold text-lg shadow-lg hover:shadow-glow-green transition-all duration-300 transform hover:-translate-y-0.5"
+                        disabled={(step === 2 && isPlacingOrder) || (step === 2 && activePaymentMethods.length === 0)}
+                        className={`w-full py-3.5 rounded-xl font-bold text-lg shadow-lg transition-all duration-300 transform hover:-translate-y-0.5 ${
+                          step === 2 && activePaymentMethods.length === 0
+                            ? "bg-gray-300 text-gray-500 cursor-not-allowed shadow-none hover:translate-y-0"
+                            : "gradient-green text-white hover:shadow-glow-green"
+                        }`}
                       >
                         {step === 2
                           ? isPlacingOrder
                             ? "Placing Order..."
-                            : "Place Order"
+                            : activePaymentMethods.length === 0
+                              ? "Unavailable"
+                              : "Place Order"
                           : "Continue to Payment"}
                       </button>
                       {step === 2 && (
@@ -876,13 +947,19 @@ const MobileCheckout = () => {
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={step === 2 && isPlacingOrder}
-                className="flex-1 gradient-green text-white py-3 rounded-xl font-semibold hover:shadow-glow-green transition-all duration-300"
+                disabled={(step === 2 && isPlacingOrder) || (step === 2 && activePaymentMethods.length === 0)}
+                className={`flex-1 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                  step === 2 && activePaymentMethods.length === 0
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "gradient-green text-white hover:shadow-glow-green"
+                }`}
               >
                 {step === 2
                   ? isPlacingOrder
                     ? "Placing..."
-                    : "Place Order"
+                    : activePaymentMethods.length === 0
+                      ? "Unavailable"
+                      : "Place Order"
                   : "Continue"}
               </button>
             </div>

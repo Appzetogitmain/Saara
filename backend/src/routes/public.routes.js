@@ -12,6 +12,7 @@ import Campaign from '../models/Campaign.model.js';
 import { calculateVendorShippingForGroups } from '../services/vendorShipping.service.js';
 import { cacheResponse } from '../middlewares/responseCache.js';
 import Settings from '../models/Settings.model.js';
+import PlatformPolicy from '../models/PlatformPolicy.model.js';
 
 const router = Router();
 const listCache = cacheResponse({ ttlSeconds: 30, maxEntries: 1000 });
@@ -676,6 +677,57 @@ router.get('/settings/general', listCache, asyncHandler(async (req, res) => {
     };
     
     res.status(200).json(new ApiResponse(200, publicSettings, 'Public general settings fetched.'));
+}));
+
+// GET /api/settings/checkout
+router.get('/settings/checkout', asyncHandler(async (req, res) => {
+    const [paymentSettings, shippingSettings] = await Promise.all([
+        Settings.findOne({ key: 'payment' }).lean(),
+        Settings.findOne({ key: 'shipping' }).lean(),
+    ]);
+
+    const payVal = paymentSettings?.value || {};
+    const shipVal = shippingSettings?.value || {};
+
+    const publicSettings = {
+        payment: {
+            cod: payVal.codEnabled !== false,
+            razorpay: payVal.cardEnabled !== false,
+            wallet: payVal.walletEnabled !== false,
+            upi: payVal.upiEnabled !== false,
+        },
+        shipping: {
+            defaultShippingRate: shipVal.defaultShippingRate !== undefined ? Number(shipVal.defaultShippingRate) : 0,
+            freeShippingThreshold: shipVal.freeShippingThreshold !== undefined ? Number(shipVal.freeShippingThreshold) : 0,
+        }
+    };
+
+    res.status(200).json(new ApiResponse(200, publicSettings, 'Public checkout settings fetched.'));
+}));
+
+// GET /api/policies/:policyKey
+router.get('/policies/:policyKey', asyncHandler(async (req, res) => {
+    const { policyKey } = req.params;
+    const doc = await PlatformPolicy.findOne().lean();
+
+    let policy = null;
+    if (policyKey === 'privacy' || policyKey === 'privacy-policy') {
+        policy = doc?.privacy;
+    } else if (policyKey === 'refund' || policyKey === 'refund-policy') {
+        policy = doc?.refund;
+    } else if (policyKey === 'terms' || policyKey === 'terms-conditions') {
+        policy = doc?.terms;
+    }
+
+    if (!policy) {
+        return res.status(404).json(new ApiResponse(404, null, 'Policy not found.'));
+    }
+
+    res.status(200).json(new ApiResponse(200, {
+        title: policy.title,
+        content: policy.content,
+        lastUpdated: policy.lastUpdated
+    }, 'Public policy fetched.'));
 }));
 
 router.get('/:id([a-fA-F0-9]{24})', detailCache, getProductDetail);

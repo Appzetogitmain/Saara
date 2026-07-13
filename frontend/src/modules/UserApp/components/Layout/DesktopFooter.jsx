@@ -135,12 +135,15 @@ const DesktopFooter = () => {
           reserved. Developed with ❤️.
         </p>
         <div className="flex items-center gap-6 text-xs text-slate-500 font-bold uppercase tracking-wider">
-          <span className="hover:text-white cursor-pointer transition-colors">
+          <Link to="/policy/privacy-policy" className="hover:text-white transition-colors">
             Privacy Policy
-          </span>
-          <span className="hover:text-white cursor-pointer transition-colors">
-            Terms of Service
-          </span>
+          </Link>
+          <Link to="/policy/terms-conditions" className="hover:text-white transition-colors">
+            Terms & Conditions
+          </Link>
+          <Link to="/policy/refund-policy" className="hover:text-white transition-colors">
+            Refund Policy
+          </Link>
         </div>
       </div>
     </footer>

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import toast from "react-hot-toast";
 import logoImage from "../../../data/logos/porutkal_logo.png";
+import api from "../utils/api";
 
 const defaultSettings = {
   general: {
@@ -58,6 +59,8 @@ const defaultSettings = {
       "delivered",
       "cancelled",
     ],
+    refundModes: ["wallet", "gateway", "manual"],
+    returnWindow: 7, // days
   },
   customers: {
     guestCheckoutEnabled: true,
@@ -119,21 +122,15 @@ const defaultSettings = {
     smtpPort: 587,
     smtpUser: "",
     smtpPassword: "",
+    fromName: "Porutkal",
     fromEmail: "noreply@example.com",
-    fromName: "Porutkal Store",
+    encryption: "tls", // 'ssl', 'tls', or 'none'
   },
   notifications: {
-    email: {
-      orderConfirmation: true,
-      shippingUpdate: true,
-      deliveryUpdate: true,
-    },
-    smsEnabled: false,
-    pushEnabled: false,
-    admin: {
-      newOrders: true,
-      lowStock: true,
-    },
+    orderStatusUpdate: true,
+    newRegistration: true,
+    lowStockAlert: true,
+    newsletterSubscription: false,
   },
   seo: {
     metaTitle: "Porutkal E-commerce - Shop Online",
@@ -156,16 +153,29 @@ export const useSettingsStore = create(
       isLoading: false,
 
       // Initialize settings
-      initialize: () => {
-        const savedSettings = localStorage.getItem("admin-settings");
-        if (savedSettings) {
-          set({ settings: JSON.parse(savedSettings) });
-        } else {
-          set({ settings: defaultSettings });
-          localStorage.setItem(
-            "admin-settings",
-            JSON.stringify(defaultSettings)
-          );
+      initialize: async () => {
+        set({ isLoading: true });
+        try {
+          const response = await api.get('/admin/settings');
+          const config = response?.data ?? response;
+          if (config && typeof config === 'object') {
+            const merged = {
+              ...defaultSettings,
+              ...config
+            };
+            set({ settings: merged });
+            localStorage.setItem("admin-settings", JSON.stringify(merged));
+          }
+        } catch (error) {
+          console.error("Failed to fetch settings from backend:", error);
+          const savedSettings = localStorage.getItem("admin-settings");
+          if (savedSettings) {
+            set({ settings: JSON.parse(savedSettings) });
+          } else {
+            set({ settings: defaultSettings });
+          }
+        } finally {
+          set({ isLoading: false });
         }
       },
 
@@ -178,17 +188,22 @@ export const useSettingsStore = create(
         return get().settings;
       },
 
-      updateSettings: (category, settingsData, silent = false) => {
+      updateSettings: async (category, settingsData, silent = false) => {
         set({ isLoading: true });
         try {
           const currentSettings = get().settings;
+          const updatedCategorySettings = {
+            ...currentSettings[category],
+            ...settingsData,
+          };
           const updatedSettings = {
             ...currentSettings,
-            [category]: {
-              ...currentSettings[category],
-              ...settingsData,
-            },
+            [category]: updatedCategorySettings,
           };
+
+          // Save to database
+          await api.put(`/admin/settings/${category}`, { value: updatedCategorySettings });
+
           set({ settings: updatedSettings, isLoading: false });
           localStorage.setItem(
             "admin-settings",

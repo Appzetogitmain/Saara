@@ -15,6 +15,7 @@ import * as marketingController from '../controllers/marketing.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
 import * as uploadController from '../controllers/upload.controller.js';
 import * as settingsController from '../controllers/settings.controller.js';
+import * as policyController from '../controllers/policy.controller.js';
 import * as reelController from '../controllers/reel.controller.js';
 import * as affiliateController from '../controllers/affiliate.controller.js';
 import * as escrowController from '../controllers/escrow.controller.js';
@@ -209,6 +210,10 @@ router.put('/notifications/read-all', ...adminAuth, notificationController.markA
 router.get('/settings', ...adminAuth, settingsController.getAllSettings);
 router.get('/settings/:key', ...adminAuth, settingsController.getSettings);
 router.put('/settings/:key', ...adminAuth, audit('UPDATE_SETTINGS', 'Settings'), settingsController.updateSettings);
+
+// ─── System Policies ──────────────────────────────────────────────────────────
+router.get('/policies/:type', ...adminAuth, policyController.getPolicy);
+router.put('/policies/:type', ...adminAuth, audit('UPDATE_POLICY', 'Policy'), policyController.updatePolicy);
 
 // ─── Reel Moderation ─────────────────────────────────────────────────────────
 router.get('/reels/pending', ...adminAuth, reelController.getPendingReels);

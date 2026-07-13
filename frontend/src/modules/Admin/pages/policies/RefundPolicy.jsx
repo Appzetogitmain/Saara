@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FiSave, FiFileText } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import api from '../../../../shared/utils/api';
 
-const RefundPolicy = () => {
-  const [content, setContent] = useState(`Refund Policy
+const DEFAULT_CONTENT = `Refund Policy
 
 Last updated: ${new Date().toLocaleDateString()}
 
@@ -21,11 +21,49 @@ Certain items such as personalized products, digital goods, and perishable items
 Customers are responsible for return shipping costs unless the item was defective or incorrect.
 
 5. Refund Methods
-Refunds will be issued to the original payment method used for the purchase.`);
+Refunds will be issued to the original payment method used for the purchase.`;
 
-  const handleSave = () => {
-    toast.success('Refund policy saved successfully');
+const RefundPolicy = () => {
+  const [content, setContent] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPolicy = async () => {
+      try {
+        const response = await api.get('/admin/policies/refund');
+        const data = response?.data ?? response;
+        if (data?.content !== undefined) {
+          setContent(data.content);
+        } else {
+          setContent(DEFAULT_CONTENT);
+        }
+      } catch (err) {
+        console.error('Failed to load refund policy:', err);
+        setContent(DEFAULT_CONTENT);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPolicy();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      await api.put('/admin/policies/refund', { content });
+      toast.success('Refund policy saved successfully');
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to save refund policy');
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-slate-500">Loading Refund Policy...</p>
+      </div>
+    );
+  }
 
   return (
     <motion.div

@@ -1,5 +1,6 @@
 import VendorShippingZone from '../models/VendorShippingZone.model.js';
 import VendorShippingRate from '../models/VendorShippingRate.model.js';
+import { getPlatformShippingDefaults } from './settingsService.js';
 
 const normalizeText = (value) => String(value || '').trim().toLowerCase();
 
@@ -33,6 +34,7 @@ export const calculateVendorShippingForGroups = async ({
     shippingOption = 'standard',
     couponType = null,
 }) => {
+    const { defaultShippingRate: platformDefaultShippingRate, freeShippingThreshold: platformFreeShippingThreshold } = await getPlatformShippingDefaults();
     const groups = Array.isArray(vendorGroups) ? vendorGroups : [];
     if (!groups.length) {
         return { totalShipping: 0, shippingByVendor: {} };
@@ -102,7 +104,9 @@ export const calculateVendorShippingForGroups = async ({
 
         if (chosenRate) {
             const threshold = Math.max(0, toNumber(chosenRate.freeShippingThreshold, 0));
-            if (threshold > 0 && subtotal >= threshold) {
+            // Vendor Threshold Exists -> Use Vendor Threshold, Else -> Use Platform Threshold
+            const finalThreshold = threshold > 0 ? threshold : platformFreeShippingThreshold;
+            if (finalThreshold > 0 && subtotal >= finalThreshold) {
                 shippingByVendor[vendorId] = 0;
             } else {
                 shippingByVendor[vendorId] = Math.max(0, toNumber(chosenRate.rate, 0));
@@ -110,14 +114,17 @@ export const calculateVendorShippingForGroups = async ({
             return;
         }
 
-        if (defaultThreshold > 0 && subtotal >= defaultThreshold) {
+        const finalVendorThreshold = defaultThreshold > 0 ? defaultThreshold : platformFreeShippingThreshold;
+        if (finalVendorThreshold > 0 && subtotal >= finalVendorThreshold) {
             shippingByVendor[vendorId] = 0;
             return;
         }
 
-        const fallbackStandard = defaultRate > 0 ? defaultRate : 50;
+        // Fallback standard / express calculation
+        const rateToUse = defaultRate > 0 ? defaultRate : platformDefaultShippingRate;
+        const fallbackStandard = rateToUse;
         shippingByVendor[vendorId] = normalizeText(shippingOption) === 'express'
-            ? (defaultRate > 0 ? defaultRate * 2 : 100)
+            ? (rateToUse * 2)
             : fallbackStandard;
     });
 
