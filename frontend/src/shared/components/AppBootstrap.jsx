@@ -4,6 +4,8 @@ import { useCartStore } from "../store/useStore";
 import { useAuthStore } from "../store/authStore";
 import { getSocket, joinRoom, leaveRoom } from "../utils/socket";
 import { useOrderStore } from "../store/orderStore";
+import { useSettingsStore } from "../store/settingsStore";
+import { getPublicGeneralSettings } from "../services/publicService";
 import toast from "react-hot-toast";
 
 const PRODUCTS_CACHE_KEY = "user-catalog-products-cache";
@@ -51,6 +53,21 @@ const AppBootstrap = () => {
       fetchCart();
     }
   }, [isAuthenticated, fetchCart]);
+
+  useEffect(() => {
+    const loadPublicSettings = async () => {
+      try {
+        const res = await getPublicGeneralSettings();
+        const data = res?.data ?? res ?? {};
+        if (data) {
+          useSettingsStore.getState().updateSettings("general", data, true);
+        }
+      } catch (err) {
+        console.error("Failed to load public general settings:", err);
+      }
+    };
+    loadPublicSettings();
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;

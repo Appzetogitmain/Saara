@@ -69,14 +69,23 @@ export const verifyOTP = asyncHandler(async (req, res) => {
     vendor.isVerified = true;
     vendor.otp = undefined;
     vendor.otpExpiry = undefined;
+
+    const approvalRequired = await isVendorApprovalRequired();
+    if (!approvalRequired) {
+        vendor.status = 'approved';
+    }
+
     await vendor.save();
 
-    res.status(200).json(new ApiResponse(200, null, 'Email verified. Awaiting admin approval.'));
+    const msg = approvalRequired
+        ? 'Email verified. Awaiting admin approval.'
+        : 'Email verified successfully. You can now login.';
+
+    res.status(200).json(new ApiResponse(200, null, msg));
 });
 
 // POST /api/vendor/auth/resend-otp
 export const resendOTP = asyncHandler(async (req, res) => {
-    const { email } = req.body;
     if (!email) throw new ApiError(400, 'Email is required.');
 
     const vendor = await Vendor.findOne({ email });

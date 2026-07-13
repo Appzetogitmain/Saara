@@ -178,8 +178,7 @@ export const useSettingsStore = create(
         return get().settings;
       },
 
-      // Update settings
-      updateSettings: (category, settingsData) => {
+      updateSettings: (category, settingsData, silent = false) => {
         set({ isLoading: true });
         try {
           const currentSettings = get().settings;
@@ -195,11 +194,15 @@ export const useSettingsStore = create(
             "admin-settings",
             JSON.stringify(updatedSettings)
           );
-          toast.success("Settings updated successfully");
+          if (!silent) {
+            toast.success("Settings updated successfully");
+          }
           return updatedSettings;
         } catch (error) {
           set({ isLoading: false });
-          toast.error("Failed to update settings");
+          if (!silent) {
+            toast.error("Failed to update settings");
+          }
           throw error;
         }
       },

@@ -11,6 +11,7 @@ import Banner from '../models/Banner.model.js';
 import Campaign from '../models/Campaign.model.js';
 import { calculateVendorShippingForGroups } from '../services/vendorShipping.service.js';
 import { cacheResponse } from '../middlewares/responseCache.js';
+import Settings from '../models/Settings.model.js';
 
 const router = Router();
 const listCache = cacheResponse({ ttlSeconds: 30, maxEntries: 1000 });
@@ -652,6 +653,29 @@ router.get('/orders/track/:id', detailCache, asyncHandler(async (req, res) => {
     const order = await Order.findOne({ orderId: req.params.id }).select('orderId status trackingNumber estimatedDelivery deliveredAt readyForPickupAt processingAt shippedAt deliveryOtpDebug').lean();
     if (!order) throw new ApiError(404, 'Order not found.');
     res.status(200).json(new ApiResponse(200, order, 'Order tracking.'));
+}));
+
+// GET /api/settings/general
+router.get('/settings/general', listCache, asyncHandler(async (req, res) => {
+    const settings = await Settings.findOne({ key: 'general' }).lean();
+    const value = settings?.value || {};
+    
+    // Filter out private administrative fields to protect platform configuration data
+    const publicSettings = {
+        storeName: value.storeName || "Porutkal E-commerce",
+        storeDescription: value.storeDescription || "",
+        contactEmail: value.contactEmail || "contact@example.com",
+        contactPhone: value.contactPhone || "",
+        address: value.address || "",
+        socialMedia: value.socialMedia || {
+            facebook: "",
+            instagram: "",
+            twitter: "",
+            linkedin: "",
+        }
+    };
+    
+    res.status(200).json(new ApiResponse(200, publicSettings, 'Public general settings fetched.'));
 }));
 
 router.get('/:id([a-fA-F0-9]{24})', detailCache, getProductDetail);

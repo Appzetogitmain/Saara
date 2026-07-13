@@ -187,39 +187,6 @@ const GeneralSettings = () => {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Business Hours
-                  </label>
-                  <input
-                    type="text"
-                    name="businessHours"
-                    value={formData.businessHours || ""}
-                    onChange={handleChange}
-                    placeholder="Mon-Fri 9AM-6PM"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-
-
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Currency
-                  </label>
-                  <AnimatedSelect
-                    name="currency"
-                    value={formData.currency || "INR"}
-                    onChange={handleChange}
-                    options={[
-                      { value: "INR", label: "INR (₹)" },
-                      { value: "USD", label: "USD ($)" },
-                      { value: "EUR", label: "EUR (€)" },
-                      { value: "GBP", label: "GBP (£)" },
-                    ]}
-                  />
-                </div>
-
 
               </div>
 

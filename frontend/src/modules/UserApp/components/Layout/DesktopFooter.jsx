@@ -6,8 +6,12 @@ import {
   FiTwitter,
   FiArrowRight,
 } from "react-icons/fi";
+import { useSettingsStore } from "../../../../shared/store/settingsStore";
 
 const DesktopFooter = () => {
+  const { settings } = useSettingsStore();
+  const general = settings?.general || {};
+
   return (
     <footer className="hidden lg:block bg-slate-900 text-slate-300 border-t border-slate-800 pt-16 pb-8 w-full mt-auto">
       <div className="max-w-[1440px] mx-auto px-12 grid grid-cols-1 md:grid-cols-4 gap-10">
@@ -15,23 +19,37 @@ const DesktopFooter = () => {
         <div className="space-y-6">
           <Link to="/" className="flex items-center gap-2">
             <span className="text-2xl font-black tracking-tight text-white uppercase">
-              Porutkal
+              {general.storeName || "Porutkal"}
             </span>
             <span className="w-2 h-2 rounded-full bg-pink-500 mt-1.5" />
           </Link>
           <p className="text-sm text-slate-400 font-medium leading-relaxed">
-            Your premium marketplace for multi-vendor apparel, beauty,
-            electronics, and fashion accessories.
+            {general.storeDescription || "Your premium marketplace for multi-vendor apparel, beauty, electronics, and fashion accessories."}
           </p>
+          {(general.contactEmail || general.contactPhone || general.address) && (
+            <div className="text-xs space-y-1.5 text-slate-400 font-medium pt-1">
+              {general.contactEmail && (
+                <p>Email: <a href={`mailto:${general.contactEmail}`} className="hover:text-white transition-colors">{general.contactEmail}</a></p>
+              )}
+              {general.contactPhone && (
+                <p>Phone: <a href={`tel:${general.contactPhone}`} className="hover:text-white transition-colors">{general.contactPhone}</a></p>
+              )}
+              {general.address && (
+                <p>Address: <span className="text-slate-400">{general.address}</span></p>
+              )}
+            </div>
+          )}
           <div className="flex gap-4">
             {[
-              { icon: FiFacebook, link: "#" },
-              { icon: FiInstagram, link: "#" },
-              { icon: FiTwitter, link: "#" },
+              { icon: FiFacebook, link: general.socialMedia?.facebook || "#" },
+              { icon: FiInstagram, link: general.socialMedia?.instagram || "#" },
+              { icon: FiTwitter, link: general.socialMedia?.twitter || "#" },
             ].map((social, idx) => (
               <a
                 key={idx}
                 href={social.link}
+                target={social.link !== "#" ? "_blank" : undefined}
+                rel={social.link !== "#" ? "noopener noreferrer" : undefined}
                 className="w-10 h-10 rounded-full border border-slate-700 flex items-center justify-center text-slate-400 hover:text-white hover:border-white transition-all duration-300"
               >
                 <social.icon className="text-lg" />
