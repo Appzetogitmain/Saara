@@ -127,7 +127,6 @@ import MobileTrackOrder from "./modules/UserApp/pages/TrackOrder";
 import MobileOrderConfirmation from "./modules/UserApp/pages/OrderConfirmation";
 import PolicyPage from "./modules/UserApp/pages/PolicyPage";
 import SimilarExplore from "./modules/UserApp/pages/SimilarExplore";
-import UserChats from "./modules/UserApp/pages/Chats";
 import UserSupport from "./modules/UserApp/pages/Support";
 import ComingSoon from "./modules/UserApp/pages/ComingSoon";
 import ReelsPage from "./modules/Reels/pages/ReelsPage";
@@ -178,7 +177,6 @@ import VendorEarnings from "./modules/Vendor/pages/Earnings";
 import VendorSettings from "./modules/Vendor/pages/Settings";
 import VendorStockManagement from "./modules/Vendor/pages/StockManagement";
 import VendorWalletHistory from "./modules/Vendor/pages/WalletHistory";
-import VendorChat from "./modules/Vendor/pages/Chat";
 import VendorReturnRequests from "./modules/Vendor/pages/ReturnRequests";
 import VendorReturnRequestDetail from "./modules/Vendor/pages/returns/ReturnRequestDetail";
 import VendorProductReviews from "./modules/Vendor/pages/ProductReviews";
@@ -190,6 +188,7 @@ import VendorPerformanceMetrics from "./modules/Vendor/pages/PerformanceMetrics"
 import VendorDocuments from "./modules/Vendor/pages/Documents";
 import VendorNotifications from "./modules/Vendor/pages/Notifications";
 import VendorSupportTickets from "./modules/Vendor/pages/SupportTickets";
+import VendorProfile from "./modules/Vendor/pages/settings/ProfileSettings";
 import VendorPickupLocations from "./modules/Vendor/pages/PickupLocations";
 import VendorReports from "./modules/Vendor/pages/Reports";
 import VendorLanguageSettings from "./modules/Vendor/pages/LanguageSettings";
@@ -449,16 +448,6 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/chats"
-        element={
-          <RouteWrapper>
-            <ProtectedRoute>
-              <UserChats />
-            </ProtectedRoute>
-          </RouteWrapper>
-        }
-      />
-      <Route
         path="/support"
         element={
           <RouteWrapper>
@@ -707,7 +696,6 @@ const AppRoutes = () => {
         />
         <Route path="stock-management" element={<VendorStockManagement />} />
         <Route path="wallet-history" element={<VendorWalletHistory />} />
-        <Route path="chat" element={<VendorChat />} />
         <Route path="notifications" element={<VendorNotifications />} />
         <Route path="return-requests" element={<VendorReturnRequests />} />
         <Route
@@ -737,7 +725,7 @@ const AppRoutes = () => {
         <Route path="settings/payment-settings" element={<VendorSettings />} />
         <Route path="settings/shipping" element={<VendorSettings />} />
         <Route path="settings/shipping-settings" element={<VendorSettings />} />
-        <Route path="profile" element={<VendorSettings />} />
+        <Route path="profile" element={<VendorProfile />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

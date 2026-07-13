@@ -37,8 +37,6 @@ import Badge from "../../../shared/components/Badge";
 import ProductCard from "../../../shared/components/ProductCard";
 import { getVariantSignature } from "../../../shared/utils/variant";
 import AffiliateBadge from "../../Affiliate/components/AffiliateBadge";
-import ChatDrawer from "../../../shared/components/Chat/ChatDrawer";
-import { initiateChat } from "../services/chatService";
 
 const FlipkartCompactCard = ({ product }) => {
   const navigate = useNavigate();
@@ -270,23 +268,6 @@ const MobileProductDetail = () => {
   const [activeTab, setActiveTab] = useState("Description");
   const [isExpanded, setIsExpanded] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState(0);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [activeThreadId, setActiveThreadId] = useState(null);
-
-  const handleStartChat = async () => {
-    if (!isAuthenticated) {
-      toast.error("Please login to chat with seller");
-      navigate("/login");
-      return;
-    }
-    try {
-      const data = await initiateChat(product.vendorId, product.id);
-      setActiveThreadId(data?._id || data?.id);
-      setIsChatOpen(true);
-    } catch (err) {
-      toast.error("Failed to initiate chat");
-    }
-  };
 
   const { items, addItem, removeItem } = useCartStore();
   const { triggerCartAnimation, toggleCart } = useUIStore();
@@ -824,16 +805,6 @@ const MobileProductDetail = () => {
                       </div>
                       <span className="text-base font-bold text-gray-900 leading-tight mt-0.5">{vendor?.storeName || vendor?.name || "ecom storess"}</span>
                     </Link>
-                    <button 
-                      onClick={handleStartChat}
-                      className="p-2 text-gray-800"
-                    >
-                      <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                        <line x1="8" y1="9" x2="16" y2="9"></line>
-                        <line x1="8" y1="13" x2="14" y2="13"></line>
-                      </svg>
-                    </button>
                   </div>
 
                   <div className="px-4 py-4 space-y-4 lg:px-0 lg:py-0 lg:space-y-6">
@@ -1321,12 +1292,6 @@ const MobileProductDetail = () => {
           </button>
         </div>
       </div>
-      <ChatDrawer 
-        isOpen={isChatOpen} 
-        onClose={() => setIsChatOpen(false)} 
-        threadId={activeThreadId}
-        vendorName={vendor?.storeName || vendor?.name || product.vendorName}
-      />
     </>
   );
 };

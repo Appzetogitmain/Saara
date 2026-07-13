@@ -10,7 +10,7 @@ import {
 } from "react-icons/fi";
 import { useVendorAuthStore } from "../store/vendorAuthStore";
 import { useVendorProductStore } from "../store/vendorProductStore";
-import { getVendorOrders, getVendorEarnings } from "../services/vendorService";
+import { getVendorOrders, getVendorEarnings, getVendorDocuments } from "../services/vendorService";
 import { formatPrice } from "../../../shared/utils/helpers";
 
 const VendorDashboard = () => {
@@ -29,6 +29,7 @@ const VendorDashboard = () => {
 
   const [recentOrders, setRecentOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasUploadedDocs, setHasUploadedDocs] = useState(true);
 
   const vendorId = vendor?.id;
 
@@ -43,18 +44,20 @@ const VendorDashboard = () => {
     const loadDashboardData = async () => {
       setIsLoading(true);
       try {
-        // Fetch orders and earnings in parallel
-        const [ordersRes, earningsRes, pendingRes, processingRes] = await Promise.all([
+        // Fetch orders, earnings, and documents in parallel
+        const [ordersRes, earningsRes, pendingRes, processingRes, docsRes] = await Promise.all([
           getVendorOrders({ page: 1, limit: 5 }),
           getVendorEarnings(),
           getVendorOrders({ page: 1, limit: 1, status: "pending" }),
           getVendorOrders({ page: 1, limit: 1, status: "processing" }),
+          getVendorDocuments(),
         ]);
 
         const ordersData = ordersRes?.data ?? ordersRes;
         const earningsData = earningsRes?.data ?? earningsRes;
         const pendingData = pendingRes?.data ?? pendingRes;
         const processingData = processingRes?.data ?? processingRes;
+        const docsData = docsRes?.data ?? docsRes;
 
         const orders = ordersData?.orders ?? [];
         const summary = earningsData?.summary ?? {};
@@ -70,6 +73,7 @@ const VendorDashboard = () => {
         }));
 
         setRecentOrders(orders);
+        setHasUploadedDocs(Array.isArray(docsData) && docsData.length > 0);
       } catch {
         // errors handled by api.js toast
       } finally {
@@ -136,6 +140,21 @@ const VendorDashboard = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6">
+      {!hasUploadedDocs && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="font-bold text-yellow-800 text-sm sm:text-base">Complete Your Verification</h3>
+            <p className="text-xs sm:text-sm text-yellow-700">Complete your verification by uploading your business documents. Your account review can begin once documents are submitted.</p>
+          </div>
+          <button
+            onClick={() => navigate("/vendor/documents")}
+            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs sm:text-sm font-bold shadow-md transition-colors whitespace-nowrap"
+          >
+            Upload Documents
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div className="lg:hidden">

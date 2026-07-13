@@ -62,6 +62,7 @@ import {
     vendorStatusUpdateSchema,
     vendorCommissionUpdateSchema,
     vendorCommissionsQuerySchema,
+    vendorDocParamsSchema,
 } from '../validators/vendor.validator.js';
 import {
     marketingIdParamSchema,
@@ -125,6 +126,9 @@ router.get('/vendors/:id', ...adminAuth, validate(vendorIdParamSchema, 'params')
 router.get('/vendors/:id/commissions', ...adminAuth, validate(vendorIdParamSchema, 'params'), validate(vendorCommissionsQuerySchema, 'query'), vendorController.getVendorCommissions);
 router.patch('/vendors/:id/status', ...adminAuth, audit('UPDATE_VENDOR_STATUS', 'Vendor'), validate(vendorIdParamSchema, 'params'), validate(vendorStatusUpdateSchema), vendorController.updateVendorStatus);
 router.patch('/vendors/:id/commission', ...adminAuth, audit('UPDATE_VENDOR_COMMISSION', 'Vendor'), validate(vendorIdParamSchema, 'params'), validate(vendorCommissionUpdateSchema), vendorController.updateCommissionRate);
+router.get('/vendors/:id/documents', ...adminAuth, validate(vendorIdParamSchema, 'params'), vendorController.getVendorDocuments);
+router.patch('/vendors/:id/documents/:docId/status', ...adminAuth, validate(vendorDocParamsSchema, 'params'), vendorController.updateVendorDocumentStatus);
+router.post('/vendors/:id/documents/bulk-status', ...adminAuth, validate(vendorIdParamSchema, 'params'), vendorController.bulkUpdateVendorDocumentStatus);
 
 // ─── Customers ────────────────────────────────────────────────────────────────
 router.get('/customers', ...adminAuth, validate(customerListQuerySchema, 'query'), customerController.getAllCustomers);

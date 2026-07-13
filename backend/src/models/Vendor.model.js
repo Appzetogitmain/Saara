@@ -49,6 +49,13 @@ const vendorSchema = new mongoose.Schema(
             bankName: { type: String, select: false },
             ifscCode: { type: String, select: false },
         },
+        paymentMethods: {
+            bankTransfer: { type: Boolean, default: true },
+            upi: { type: Boolean, default: false },
+            paypal: { type: Boolean, default: false },
+        },
+        upiId: { type: String, select: false },
+        paypalEmail: { type: String, select: false },
         documents: {
             gst: String,
             pan: String,
@@ -67,6 +74,15 @@ const vendorSchema = new mongoose.Schema(
         onHoldBalance: { type: Number, default: 0 },
         pendingWithdrawal: { type: Number, default: 0 },
         totalWithdrawn: { type: Number, default: 0 },
+        statusHistory: [
+            {
+                previousStatus: { type: String },
+                newStatus: { type: String },
+                reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+                reviewedAt: { type: Date, default: Date.now },
+                reason: { type: String },
+            }
+        ],
     },
     { timestamps: true }
 );

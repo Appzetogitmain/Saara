@@ -67,7 +67,6 @@ const MobileProfile = () => {
   const menuItems = [
     { label: 'Personal Information', icon: FiUser, color: 'text-blue-600', bg: 'bg-blue-50', action: () => { setEditTab('personal'); setShowMenu(false); } },
     { label: 'My Orders', icon: FiPackage, color: 'text-orange-600', bg: 'bg-orange-50', action: () => { navigate('/orders'); setShowMenu(false); } },
-    { label: 'My Chats', icon: FiMessageCircle, color: 'text-pink-600', bg: 'bg-pink-50', action: () => { navigate('/chats'); setShowMenu(false); } },
     { label: 'My Addresses', icon: FiMapPin, color: 'text-green-600', bg: 'bg-green-50', action: () => { navigate('/addresses'); setShowMenu(false); } },
     { label: 'Notifications', icon: FiBell, color: 'text-indigo-600', bg: 'bg-indigo-50', badge: unreadNotificationCount > 0 ? unreadNotificationCount : null, action: () => { navigate('/notifications'); setShowMenu(false); } },
     { label: 'Change Password', icon: FiLock, color: 'text-purple-600', bg: 'bg-purple-50', action: () => { setEditTab('password'); setShowMenu(false); } },
@@ -78,7 +77,6 @@ const MobileProfile = () => {
     { label: 'Orders', icon: FiPackage, color: 'text-orange-600', bg: 'bg-orange-50', action: () => navigate('/orders') },
     { label: 'Wishlist', icon: FiBell, color: 'text-pink-600', bg: 'bg-pink-50', action: () => navigate('/wishlist') },
     { label: 'Addresses', icon: FiMapPin, color: 'text-green-600', bg: 'bg-green-50', action: () => navigate('/addresses') },
-    { label: 'Chats', icon: FiMessageCircle, color: 'text-blue-600', bg: 'bg-blue-50', action: () => navigate('/chats') },
   ];
 
   const renderContent = () => {
@@ -115,7 +113,8 @@ const MobileProfile = () => {
   };
 
   return (
-    <PageTransition>
+    <>
+      <PageTransition>
       <MobileLayout showBottomNav={true} showCartBar={false}>
         <div className="min-h-[calc(100vh-56px)] bg-white text-black font-sans pb-0">
           <input ref={avatarInputRef} type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/gif" onChange={handleAvatarChange} />
@@ -239,7 +238,6 @@ const MobileProfile = () => {
                       <div className="hidden md:flex items-center gap-4">
                         <h2 className="text-xl font-light">{user?.name}</h2>
                         <button onClick={() => setEditTab('personal')} className="bg-[#7C3AED] text-white px-4 py-1.5 rounded-lg text-sm font-bold">Edit Profile</button>
-                        <Link to="/chats" className="bg-gray-100 px-4 py-1.5 rounded-lg text-sm font-bold">Message</Link>
                         <Link to="/support" className="bg-gray-100 px-4 py-1.5 rounded-lg text-sm font-bold">Contact</Link>
                       </div>
                       {/* Stats */}
@@ -276,7 +274,6 @@ const MobileProfile = () => {
                   {/* Mobile Action Buttons */}
                   <div className="flex md:hidden gap-2 mb-6">
                     <button onClick={() => setEditTab('personal')} className="flex-1 bg-[#7C3AED] text-white rounded-lg py-1.5 text-sm font-bold">Edit Profile</button>
-                    <Link to="/chats" className="flex-1 bg-gray-100 text-black rounded-lg py-1.5 text-sm font-bold text-center">Message</Link>
                     <Link to="/support" className="flex-1 bg-gray-100 text-black rounded-lg py-1.5 text-sm font-bold text-center">Contact</Link>
                   </div>
 
@@ -305,38 +302,40 @@ const MobileProfile = () => {
             )}
           </div>
 
-          {/* Side Menu Drawer */}
-          {showMenu && (
-            <div className="fixed inset-0 z-[100] flex justify-end">
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setShowMenu(false)} />
-              <div className="relative w-[75%] max-w-[300px] h-full bg-white shadow-2xl flex flex-col">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                  <span className="font-bold text-lg">Settings</span>
-                  <button onClick={() => setShowMenu(false)} className="p-1 hover:bg-gray-100 rounded-full"><X size={24} /></button>
-                </div>
-                <div className="flex-1 py-2 overflow-y-auto">
-                  {menuItems.map((item, idx) => (
-                    <button key={idx} onClick={item.action} className="w-full flex items-center gap-4 px-6 py-4 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0">
-                      <div className={`w-10 h-10 rounded-xl ${item.bg} ${item.color} flex items-center justify-center relative`}>
-                        <item.icon className="text-lg" />
-                        {item.badge ? <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{item.badge > 9 ? '9+' : item.badge}</span> : null}
-                      </div>
-                      <span className="text-sm font-semibold text-gray-800">{item.label}</span>
-                      <FiChevronRight className="ml-auto text-gray-400" />
-                    </button>
-                  ))}
-                </div>
-                <div className="p-6 border-t border-gray-100">
-                  <button onClick={handleLogout} className="w-full py-3 rounded-xl border border-gray-200 text-sm font-bold text-red-500 hover:bg-red-50 flex items-center justify-center gap-2">
-                    <FiLogOut /> Sign Out
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </MobileLayout>
     </PageTransition>
+
+    {/* Side Menu Drawer - Rendered outside PageTransition to prevent positioning and viewport height bugs from CSS transform */}
+    {showMenu && (
+      <div className="fixed inset-0 z-[10000] flex justify-end">
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setShowMenu(false)} />
+        <div className="relative w-[75%] max-w-[300px] h-[100dvh] max-h-[100dvh] bg-white shadow-2xl flex flex-col">
+          <div className="p-4 px-5 border-b border-gray-100 flex items-center justify-between">
+            <span className="font-bold text-lg">Settings</span>
+            <button onClick={() => setShowMenu(false)} className="p-1 hover:bg-gray-100 rounded-full"><X size={24} /></button>
+          </div>
+          <div className="flex-1 py-1.5 overflow-y-auto">
+            {menuItems.map((item, idx) => (
+              <button key={idx} onClick={item.action} className="w-full flex items-center gap-3.5 px-5 py-3 hover:bg-gray-50 transition-all border-b border-gray-50 last:border-0">
+                <div className={`w-9 h-9 rounded-xl ${item.bg} ${item.color} flex items-center justify-center relative`}>
+                  <item.icon className="text-base" />
+                  {item.badge ? <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{item.badge > 9 ? '9+' : item.badge}</span> : null}
+                </div>
+                <span className="text-sm font-semibold text-gray-800">{item.label}</span>
+                <FiChevronRight className="ml-auto text-gray-400" />
+              </button>
+            ))}
+          </div>
+          <div className="p-4 px-5 pb-6 border-t border-gray-100">
+            <button onClick={handleLogout} className="w-full py-2.5 rounded-xl border border-gray-200 text-sm font-bold text-red-500 hover:bg-red-50 flex items-center justify-center gap-2">
+              <FiLogOut /> Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 };
 
