@@ -89,7 +89,7 @@ const DesktopFooter = () => {
           </h4>
           <ul className="space-y-3 text-sm font-medium">
             {[
-              { name: "Help Center", path: "/policy/support" },
+              { name: "Help & Support", path: "/support" },
               { name: "Returns & Refund Policy", path: "/policy/return" },
               { name: "Seller Terms & Conditions", path: "/policy/seller" },
               { name: "FAQ", path: "/policy/support" },

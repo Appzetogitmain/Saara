@@ -98,39 +98,6 @@ const DesktopHeader = () => {
 
   return (
     <header className="hidden md:block sticky top-0 z-[999] bg-white shadow-sm border-b border-gray-100 w-full">
-      {/* 1. TOP PROMOTIONAL BAR */}
-      <div className="w-full bg-[#f3f4f6] text-gray-700 py-2 border-b border-gray-200">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-12 flex items-center justify-between text-xs font-semibold">
-          <div className="flex items-center gap-1.5 hover:text-primary-600 cursor-pointer transition-colors">
-            <span className="bg-primary-600 text-white px-1.5 py-0.5 rounded text-[10px] tracking-wide uppercase">
-              Sale
-            </span>
-            <span>
-              Big Summer Sale is Live! Up to 60% OFF on Electronics &rarr;
-            </span>
-          </div>
-          <div className="flex items-center gap-6">
-            <Link
-              to="/app"
-              className="hover:text-primary-600 transition-colors"
-            >
-              📱 Download App
-            </Link>
-            <Link
-              to="/orders"
-              className="hover:text-primary-600 transition-colors"
-            >
-              📦 Track Order
-            </Link>
-            <Link
-              to="/support"
-              className="hover:text-primary-600 transition-colors"
-            >
-              💬 Help & Support
-            </Link>
-          </div>
-        </div>
-      </div>
 
       {/* 2. MAIN HEADER BAR */}
       <div className="w-full bg-white py-4 border-b border-gray-50">
