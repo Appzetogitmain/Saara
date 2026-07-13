@@ -6,7 +6,6 @@ import * as reviewController from '../controllers/review.controller.js';
 import * as orderController from '../controllers/order.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
 import * as cartController from '../controllers/cart.controller.js';
-import * as chatController from '../controllers/chat.controller.js';
 import * as supportController from '../controllers/support.controller.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
@@ -93,12 +92,6 @@ router.put('/cart/update', ...customerAuth, cartController.updateCartItem);
 router.delete('/cart/item/:itemId', ...customerAuth, cartController.removeFromCart);
 router.delete('/cart/clear', ...customerAuth, cartController.clearCart);
 router.post('/cart/merge', ...customerAuth, cartController.mergeCart);
-
-// Chat routes (protected)
-router.get('/chat/threads', ...customerAuth, chatController.getUserChatThreads);
-router.get('/chat/threads/:id/messages', ...customerAuth, chatController.getUserChatMessages);
-router.post('/chat/threads/:id/messages', ...customerAuth, chatController.sendUserChatMessage);
-router.post('/chat/initiate', ...customerAuth, chatController.initiateChatWithVendor);
 
 // Support routes (protected)
 router.post('/support/tickets', ...customerAuth, supportController.createTicket);

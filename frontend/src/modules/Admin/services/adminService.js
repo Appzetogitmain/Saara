@@ -130,6 +130,15 @@ export const updateCommissionRate = (id, commissionRate) =>
 export const getVendorCommissions = (id, params = {}) =>
     api.get(`/admin/vendors/${id}/commissions`, { params });
 
+export const getVendorDocuments = (vendorId) =>
+    api.get(`/admin/vendors/${vendorId}/documents`);
+
+export const updateVendorDocumentStatus = (vendorId, docId, status, remarks = '', confirmForce = false) =>
+    api.patch(`/admin/vendors/${vendorId}/documents/${docId}/status`, { status, remarks, confirmForce });
+
+export const bulkUpdateVendorDocumentStatus = (vendorId, docIds, status, remarks = '') =>
+    api.post(`/admin/vendors/${vendorId}/documents/bulk-status`, { docIds, status, remarks });
+
 // ─── Customers ────────────────────────────────────────────────────────────────
 export const getAllCustomers = (params = {}) =>
     api.get('/admin/customers', { params });

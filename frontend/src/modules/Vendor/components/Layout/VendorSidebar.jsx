@@ -43,7 +43,6 @@ const iconMap = {
   "Stock Management": FiTrendingDown,
   "Wallet History": FiCreditCard,
   "Pickup Locations": FiMapPin,
-  Chat: FiMessageCircle,
   Promotions: FiTag,
   Notifications: FiBell,
   "Shipping Management": FiTruck,

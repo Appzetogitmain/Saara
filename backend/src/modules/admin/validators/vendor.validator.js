@@ -14,7 +14,7 @@ export const vendorIdParamSchema = Joi.object({
 });
 
 export const vendorStatusUpdateSchema = Joi.object({
-    status: Joi.string().valid('approved', 'suspended', 'rejected').required(),
+    status: Joi.string().valid('approved', 'suspended', 'rejected', 'pending').required(),
     reason: Joi.string().trim().allow('').max(500).optional(),
 });
 
@@ -26,5 +26,10 @@ export const vendorCommissionsQuerySchema = Joi.object({
     page: Joi.number().integer().min(1).optional(),
     limit: Joi.number().integer().min(1).max(200).optional(),
     status: Joi.string().valid('all', 'pending', 'paid', 'cancelled').optional(),
+});
+
+export const vendorDocParamsSchema = Joi.object({
+    id: objectId.required(),
+    docId: objectId.required(),
 });
 

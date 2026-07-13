@@ -6,7 +6,6 @@ import * as customerController from '../controllers/customer.controller.js';
 import * as inventoryController from '../controllers/inventory.controller.js';
 import * as performanceController from '../controllers/performance.controller.js';
 import * as analyticsController from '../controllers/analytics.controller.js';
-import * as chatController from '../controllers/chat.controller.js';
 import * as documentController from '../controllers/document.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
 import * as returnController from '../controllers/return.controller.js';
@@ -71,13 +70,6 @@ router.post('/orders/:id/verify-pickup', ...vendorAuth, orderController.verifyPi
 // Customers
 router.get('/customers', ...vendorAuth, customerController.getVendorCustomers);
 router.get('/customers/:id', ...vendorAuth, customerController.getVendorCustomerById);
-
-// Chat
-router.get('/chat/threads', ...vendorAuth, chatController.getVendorChatThreads);
-router.get('/chat/threads/:id/messages', ...vendorAuth, chatController.getVendorChatMessages);
-router.post('/chat/threads/:id/messages', ...vendorAuth, chatController.sendVendorChatMessage);
-router.patch('/chat/threads/:id/read', ...vendorAuth, chatController.markVendorChatRead);
-router.patch('/chat/threads/:id/status', ...vendorAuth, chatController.updateVendorChatStatus);
 
 // Documents
 router.get('/documents', ...vendorAuth, documentController.getVendorDocuments);

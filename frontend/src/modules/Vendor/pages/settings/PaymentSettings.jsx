@@ -8,7 +8,7 @@ import AnimatedSelect from '../../../Admin/components/AnimatedSelect';
 import toast from 'react-hot-toast';
 
 const PaymentSettings = () => {
-  const { vendor } = useVendorAuthStore();
+  const { vendor, syncVendor } = useVendorAuthStore();
   const [formData, setFormData] = useState({
     bankDetails: {
       accountName: '',
@@ -27,7 +27,7 @@ const PaymentSettings = () => {
   const [activeSection, setActiveSection] = useState('bank');
 
   useEffect(() => {
-    if (vendor && vendor.bankDetails) {
+    if (vendor) {
       setFormData({
         bankDetails: vendor.bankDetails || {
           accountName: '',
@@ -78,12 +78,20 @@ const PaymentSettings = () => {
 
     try {
       // Save bank details via dedicated endpoint
-      await updateVendorBankDetails({
+      const response = await updateVendorBankDetails({
         accountName: formData.bankDetails.accountName,
         accountNumber: formData.bankDetails.accountNumber,
         ifscCode: formData.bankDetails.ifscCode,
         bankName: formData.bankDetails.bankName,
+        paymentMethods: formData.paymentMethods,
+        upiId: formData.upiId,
+        paypalEmail: formData.paypalEmail,
       });
+      const data = response?.data ?? response;
+      const updatedVendor = data?.vendor || data;
+      if (updatedVendor && (updatedVendor.id || updatedVendor._id)) {
+        syncVendor(updatedVendor);
+      }
       toast.success('Payment settings saved successfully');
     } catch {
       // api.js shows toast

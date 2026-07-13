@@ -27,6 +27,13 @@ const vendorDocumentSchema = new mongoose.Schema(
         fileType: { type: String, required: true },
         fileSize: { type: Number, default: 0 },
         uploadedAt: { type: Date, default: Date.now },
+        remarks: { type: String, default: '' },
+        reviewedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Admin',
+            default: null,
+        },
+        reviewedAt: { type: Date, default: null },
     },
     { timestamps: true }
 );

@@ -225,7 +225,7 @@ export const logout = asyncHandler(async (req, res) => {
 
 // GET /api/vendor/auth/profile
 export const getProfile = asyncHandler(async (req, res) => {
-    const vendor = await Vendor.findById(req.user.id).select('-password -otp -otpExpiry');
+    const vendor = await Vendor.findById(req.user.id).select('-password -otp -otpExpiry +bankDetails.accountName +bankDetails.accountNumber +bankDetails.bankName +bankDetails.ifscCode +upiId +paypalEmail');
     if (!vendor) throw new ApiError(404, 'Vendor not found.');
     res.status(200).json(new ApiResponse(200, vendor, 'Profile fetched.'));
 });
@@ -247,28 +247,36 @@ export const updateProfile = asyncHandler(async (req, res) => {
         'processingTime',
     ];
     const updates = Object.fromEntries(Object.entries(req.body).filter(([k]) => allowed.includes(k)));
-    const vendor = await Vendor.findByIdAndUpdate(req.user.id, updates, { new: true, runValidators: true }).select('-password -otp -otpExpiry');
+    const vendor = await Vendor.findByIdAndUpdate(req.user.id, updates, { new: true, runValidators: true }).select('-password -otp -otpExpiry +bankDetails.accountName +bankDetails.accountNumber +bankDetails.bankName +bankDetails.ifscCode +upiId +paypalEmail');
     res.status(200).json(new ApiResponse(200, vendor, 'Profile updated.'));
 });
 
 // PUT /api/vendor/auth/bank-details
 export const updateBankDetails = asyncHandler(async (req, res) => {
-    const { accountName, accountNumber, bankName, ifscCode } = req.body;
-    if (!accountName && !accountNumber && !bankName && !ifscCode) {
-        throw new ApiError(400, 'At least one bank detail field is required.');
+    const { accountName, accountNumber, bankName, ifscCode, paymentMethods, upiId, paypalEmail } = req.body;
+    if (!accountName && !accountNumber && !bankName && !ifscCode && !paymentMethods && upiId === undefined && paypalEmail === undefined) {
+        throw new ApiError(400, 'At least one payment detail field is required.');
     }
 
     const updates = {};
-    if (accountName) updates['bankDetails.accountName'] = accountName;
-    if (accountNumber) updates['bankDetails.accountNumber'] = accountNumber;
-    if (bankName) updates['bankDetails.bankName'] = bankName;
-    if (ifscCode) updates['bankDetails.ifscCode'] = ifscCode;
+    if (accountName !== undefined) updates['bankDetails.accountName'] = accountName;
+    if (accountNumber !== undefined) updates['bankDetails.accountNumber'] = accountNumber;
+    if (bankName !== undefined) updates['bankDetails.bankName'] = bankName;
+    if (ifscCode !== undefined) updates['bankDetails.ifscCode'] = ifscCode;
+    
+    if (paymentMethods) {
+        if (paymentMethods.bankTransfer !== undefined) updates['paymentMethods.bankTransfer'] = paymentMethods.bankTransfer;
+        if (paymentMethods.upi !== undefined) updates['paymentMethods.upi'] = paymentMethods.upi;
+        if (paymentMethods.paypal !== undefined) updates['paymentMethods.paypal'] = paymentMethods.paypal;
+    }
+    if (upiId !== undefined) updates['upiId'] = upiId;
+    if (paypalEmail !== undefined) updates['paypalEmail'] = paypalEmail;
 
     const vendor = await Vendor.findByIdAndUpdate(
         req.user.id,
         { $set: updates },
         { new: true, runValidators: true }
-    ).select('-password -otp -otpExpiry');
+    ).select('-password -otp -otpExpiry +bankDetails.accountName +bankDetails.accountNumber +bankDetails.bankName +bankDetails.ifscCode +upiId +paypalEmail');
 
-    res.status(200).json(new ApiResponse(200, vendor, 'Bank details updated.'));
+    res.status(200).json(new ApiResponse(200, vendor, 'Payment & bank details updated.'));
 });

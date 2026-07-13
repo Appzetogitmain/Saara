@@ -190,41 +190,7 @@ export const getVendorCustomers = (params = {}) =>
 export const getVendorCustomerById = (id, params = {}) =>
     api.get(`/vendor/customers/${id}`, { params });
 
-/**
- * Get vendor chat threads
- */
-export const getVendorChatThreads = () =>
-    api.get('/vendor/chat/threads');
 
-/**
- * Get vendor chat messages by thread id
- * @param {string} id
- */
-export const getVendorChatMessages = (id) =>
-    api.get(`/vendor/chat/threads/${id}/messages`);
-
-/**
- * Send vendor chat message
- * @param {string} id
- * @param {string} message
- */
-export const sendVendorChatMessage = (id, message) =>
-    api.post(`/vendor/chat/threads/${id}/messages`, { message });
-
-/**
- * Mark vendor chat as read
- * @param {string} id
- */
-export const markVendorChatRead = (id) =>
-    api.patch(`/vendor/chat/threads/${id}/read`);
-
-/**
- * Update vendor chat status
- * @param {string} id
- * @param {'active'|'resolved'} status
- */
-export const updateVendorChatStatus = (id, status) =>
-    api.patch(`/vendor/chat/threads/${id}/status`, { status });
 
 /**
  * Get vendor documents

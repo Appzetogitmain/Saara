@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import VendorSidebar from './VendorSidebar';
 import VendorHeader from './VendorHeader';
 import VendorBottomNav from './VendorBottomNav';
 import useAdminHeaderHeight from '../../../Admin/hooks/useAdminHeaderHeight';
+import { useVendorAuthStore } from '../../store/vendorAuthStore';
+import { getVendorProfile } from '../../services/vendorService';
 
 const VendorLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -12,6 +14,23 @@ const VendorLayout = () => {
   );
   const headerHeight = useAdminHeaderHeight();
   const location = useLocation();
+  const { syncVendor } = useVendorAuthStore();
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await getVendorProfile();
+        const data = response?.data ?? response;
+        const profile = data?.vendor || data;
+        if (profile && (profile.id || profile._id)) {
+          syncVendor(profile);
+        }
+      } catch (err) {
+        console.error('Failed to sync vendor profile:', err);
+      }
+    };
+    fetchProfile();
+  }, [syncVendor]);
 
   const toggleSidebar = () => {
     const nextVal = !isCollapsed;

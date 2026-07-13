@@ -57,13 +57,6 @@
                      ]
     },
     {
-        "title":  "Chat",
-        "route":  "/vendor/chat",
-        "children":  [
-
-                     ]
-    },
-    {
         "title": "Support Tickets",
         "route": "/vendor/support-tickets",
         "children": []
@@ -92,13 +85,6 @@
     {
         "title":  "Performance Metrics",
         "route":  "/vendor/performance-metrics",
-        "children":  [
-
-                     ]
-    },
-    {
-        "title":  "Documents",
-        "route":  "/vendor/documents",
         "children":  [
 
                      ]

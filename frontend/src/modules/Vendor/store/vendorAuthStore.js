@@ -157,6 +157,12 @@ export const useVendorAuthStore = create(
         }
       },
 
+      syncVendor: (updatedVendor) => {
+        if (updatedVendor) {
+          set({ vendor: updatedVendor });
+        }
+      },
+
       // Initialize vendor auth state from localStorage
       initialize: () => {
         const token = localStorage.getItem("vendor-token");
