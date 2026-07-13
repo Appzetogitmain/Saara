@@ -9,6 +9,14 @@ import {
   resetVendorPassword,
 } from "../services/vendorService";
 
+const normalizeVendor = (vendor) => {
+  if (!vendor) return null;
+  return {
+    ...vendor,
+    id: vendor.id || vendor._id,
+  };
+};
+
 export const useVendorAuthStore = create(
   persist(
     (set, get) => ({
@@ -35,8 +43,9 @@ export const useVendorAuthStore = create(
             throw new Error("Invalid login response");
           }
 
+          const normalized = normalizeVendor(vendor);
           set({
-            vendor,
+            vendor: normalized,
             token: accessToken,
             refreshToken,
             isAuthenticated: true,
@@ -47,7 +56,7 @@ export const useVendorAuthStore = create(
           localStorage.setItem("vendor-token", accessToken);
           localStorage.setItem("vendor-refresh-token", refreshToken);
 
-          return { success: true, vendor };
+          return { success: true, vendor: normalized };
         } catch (error) {
           set({ isLoading: false });
           throw error;
@@ -133,7 +142,6 @@ export const useVendorAuthStore = create(
         localStorage.removeItem("vendor-refresh-token");
       },
 
-      // Update vendor profile — calls real PUT /vendor/auth/profile
       updateProfile: async (profileData) => {
         set({ isLoading: true });
         try {
@@ -145,12 +153,13 @@ export const useVendorAuthStore = create(
               ? data
               : (data?.vendor ?? { ...get().vendor, ...profileData });
 
+          const normalized = normalizeVendor(updatedVendor);
           set({
-            vendor: updatedVendor,
+            vendor: normalized,
             isLoading: false,
           });
 
-          return { success: true, vendor: updatedVendor };
+          return { success: true, vendor: normalized };
         } catch (error) {
           set({ isLoading: false });
           throw error;
@@ -159,7 +168,7 @@ export const useVendorAuthStore = create(
 
       syncVendor: (updatedVendor) => {
         if (updatedVendor) {
-          set({ vendor: updatedVendor });
+          set({ vendor: normalizeVendor(updatedVendor) });
         }
       },
 
@@ -173,8 +182,9 @@ export const useVendorAuthStore = create(
           const refreshToken = localStorage.getItem("vendor-refresh-token");
           const persistedVendor = storedState.state?.vendor || null;
           if (persistedVendor) {
+            const normalized = normalizeVendor(persistedVendor);
             set({
-              vendor: persistedVendor,
+              vendor: normalized,
               token,
               refreshToken: refreshToken || null,
               isAuthenticated: true,

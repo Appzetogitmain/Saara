@@ -60,7 +60,7 @@ const AppBootstrap = () => {
         const res = await getPublicGeneralSettings();
         const data = res?.data ?? res ?? {};
         if (data) {
-          useSettingsStore.getState().updateSettings("general", data, true);
+          useSettingsStore.getState().setLocalSettings("general", data);
         }
       } catch (err) {
         console.error("Failed to load public general settings:", err);

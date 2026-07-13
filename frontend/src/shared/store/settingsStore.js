@@ -221,6 +221,22 @@ export const useSettingsStore = create(
           throw error;
         }
       },
+
+      setLocalSettings: (category, settingsData) => {
+        const currentSettings = get().settings;
+        const updatedSettings = {
+          ...currentSettings,
+          [category]: {
+            ...currentSettings[category],
+            ...settingsData,
+          },
+        };
+        set({ settings: updatedSettings });
+        localStorage.setItem(
+          "admin-settings",
+          JSON.stringify(updatedSettings)
+        );
+      },
     }),
     {
       name: "settings-storage",
