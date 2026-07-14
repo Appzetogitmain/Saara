@@ -2,6 +2,7 @@ import asyncHandler from '../../../utils/asyncHandler.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
 import ApiError from '../../../utils/ApiError.js';
 import Product from '../../../models/Product.model.js';
+import Vendor from '../../../models/Vendor.model.js';
 import Category from '../../../models/Category.model.js';
 import Brand from '../../../models/Brand.model.js';
 import Settings from '../../../models/Settings.model.js';
@@ -286,7 +287,27 @@ export const getProductById = asyncHandler(async (req, res) => {
 
 // POST /api/admin/products
 export const createProduct = asyncHandler(async (req, res) => {
-    const { name, stockQuantity = 0, stock, ...rest } = req.body;
+    const { name, stockQuantity = 0, stock, vendorId, ...rest } = req.body;
+
+    let targetVendorId = vendorId;
+    if (!targetVendorId) {
+        let adminVendor = await Vendor.findOne({ email: 'admin@admin.com' });
+        if (!adminVendor) {
+            adminVendor = await Vendor.create({
+                name: 'Platform Admin',
+                email: 'admin@admin.com',
+                password: 'dummy-password-not-used-for-admin-vendor',
+                phone: '0000000000',
+                storeName: 'Saara Platform Store',
+                storeDescription: 'Default vendor account for products uploaded by platform admin',
+                status: 'approved',
+                isVerified: true,
+                commissionRate: 0,
+            });
+        }
+        targetVendorId = adminVendor._id;
+    }
+
     const slug = slugify(name) + '-' + Date.now();
     const normalizedVariants = normalizeVariantsPayload(rest.variants, rest.price);
 
@@ -306,6 +327,7 @@ export const createProduct = asyncHandler(async (req, res) => {
         slug,
         stock: normalizedStock,
         stockQuantity: finalStockQuantity,
+        vendorId: targetVendorId,
         ...rest,
         variants: normalizedVariants,
         faqs: sanitizeFaqs(rest.faqs),
@@ -320,6 +342,9 @@ export const updateProduct = asyncHandler(async (req, res) => {
     const payload = { ...req.body };
     if (payload.name) {
         payload.slug = slugify(payload.name) + '-' + Date.now();
+    }
+    if (payload.vendorId === '' || payload.vendorId === null) {
+        delete payload.vendorId;
     }
 
     if (payload.stockQuantity !== undefined) {

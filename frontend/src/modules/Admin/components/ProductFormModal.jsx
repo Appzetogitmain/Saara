@@ -591,10 +591,6 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
       toast.error("Please fill in all required fields");
       return;
     }
-    if (!formData.vendorId) {
-      toast.error("Please select a vendor");
-      return;
-    }
 
     if (!formData.categoryId && !formData.subcategoryId) {
       toast.error("Please select a category");
@@ -810,24 +806,7 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-2">
-                          Vendor <span className="text-red-500">*</span>
-                        </label>
-                        <AnimatedSelect
-                          name="vendorId"
-                          value={formData.vendorId || ""}
-                          onChange={handleChange}
-                          placeholder="Select Vendor"
-                          options={[
-                            { value: "", label: "Select Vendor" },
-                            ...vendors.map((vendor) => ({
-                              value: String(vendor._id || vendor.id),
-                              label: vendor.storeName || vendor.name || "Vendor",
-                            })),
-                          ]}
-                        />
-                      </div>
+
 
                       <div className="md:col-span-2">
                         <label className="block text-sm font-semibold text-gray-700 mb-2">
