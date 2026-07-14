@@ -264,7 +264,7 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
                 recipientType: 'user',
                 title:         'Order Confirmed',
                 message:       `Your order #${order.orderId} has been confirmed successfully!`,
-                type:          'order_status',
+                type:          'order',
                 data:          { orderId: String(order._id) },
             });
 
@@ -276,7 +276,7 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
                     recipientType: 'admin',
                     title:         'New Order Placed',
                     message:       `A new order #${order.orderId} of total ₹${order.total} has been placed.`,
-                    type:          'order_status',
+                    type:          'order',
                     data:          { orderId: String(order._id) },
                 })
             ));
@@ -288,7 +288,7 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
                     recipientType: 'vendor',
                     title:         'New Order Received',
                     message:       `You have received a new order #${order.orderId}.`,
-                    type:          'order_status',
+                    type:          'order',
                     data:          { orderId: String(order._id) },
                 });
             }
@@ -296,14 +296,17 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
             console.error('[NOTIFICATION_ERROR] Post-payment notification failed:', notifErr.message);
         }
 
+        order.status = 'processing';
+        order.paymentStatus = 'paid';
+
         try {
-            await sendOrderConfirmationEmail(order._id);
+            await sendOrderConfirmationEmail(order, order.shippingAddress?.email);
         } catch (emailErr) {
             console.error('[EMAIL_ERROR] Order confirmation email failed:', emailErr.message);
         }
 
         try {
-            await notifyOrderUpdate(order._id, { status: 'processing', paymentStatus: 'paid' });
+            await notifyOrderUpdate(order);
         } catch (socketErr) {
             console.error('[SOCKET_ERROR] Socket update failed:', socketErr.message);
         }
