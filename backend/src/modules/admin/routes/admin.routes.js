@@ -19,6 +19,7 @@ import * as policyController from '../controllers/policy.controller.js';
 import * as reelController from '../controllers/reel.controller.js';
 import * as affiliateController from '../controllers/affiliate.controller.js';
 import * as escrowController from '../controllers/escrow.controller.js';
+import * as customerWalletController from '../controllers/customerWallet.controller.js';
 import { audit } from '../../../middlewares/audit.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
@@ -140,6 +141,14 @@ router.get('/customers/:id', ...adminAuth, validate(customerIdParamSchema, 'para
 router.put('/customers/:id', ...adminAuth, validate(customerIdParamSchema, 'params'), validate(customerUpdateSchema), customerController.updateCustomerDetail);
 router.patch('/customers/:id/status', ...adminAuth, validate(customerIdParamSchema, 'params'), customerController.updateCustomerStatus);
 router.delete('/customers/:customerId/addresses/:addressId', ...adminAuth, validate(customerAddressParamsSchema, 'params'), customerController.deleteCustomerAddress);
+
+// Wallet Management routes
+router.get('/wallet/summary', ...adminAuth, customerWalletController.getAdminWalletSummary);
+router.post('/wallet/admin-credit', ...adminAuth, customerWalletController.adminCreditWallet);
+router.post('/wallet/admin-debit', ...adminAuth, customerWalletController.adminDebitWallet);
+router.get('/customers/:id/wallet', ...adminAuth, customerWalletController.getAnyCustomerWallet);
+router.get('/customers/:id/wallet/transactions', ...adminAuth, customerWalletController.getAnyCustomerWalletTransactions);
+router.patch('/customers/:id/wallet/toggle-lock', ...adminAuth, customerWalletController.toggleLockCustomerWallet);
 
 // ─── Delivery ─────────────────────────────────────────────────────────────────
 router.get('/delivery-boys', ...adminAuth, validate(deliveryListQuerySchema, 'query'), deliveryController.getAllDeliveryBoys);

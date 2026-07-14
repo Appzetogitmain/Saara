@@ -6,6 +6,7 @@ import Commission from '../../../models/Commission.model.js';
 import Vendor from '../../../models/Vendor.model.js';
 import VendorWalletTransaction from '../../../models/VendorWalletTransaction.model.js';
 import Refund from '../../../models/Refund.model.js';
+import { creditWallet } from '../../../services/wallet.service.js';
 import PaymentAttempt from '../../../models/PaymentAttempt.model.js';
 import mongoose from 'mongoose';
 import crypto from 'crypto';
@@ -266,12 +267,50 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
                 } else if (status === 'completed') {
                     if (isExchange) {
                         updatedRequest = await exchangeWorkflow.completeExchange(request._id, 'out_for_delivery', actor, session);
+                        
+                        // Process exchange price difference refund to wallet
+                        const priceDelta = updatedRequest.exchangeDetails?.priceDelta;
+                        if (priceDelta && priceDelta < 0) {
+                            const refundAmount = Math.abs(priceDelta);
+                            await creditWallet(
+                                updatedRequest.userId?._id || updatedRequest.userId,
+                                refundAmount,
+                                'exchange_refund',
+                                {
+                                    returnRequestId: updatedRequest._id,
+                                    orderId: updatedRequest.orderId?._id || updatedRequest.orderId,
+                                    description: `Credited ₹${refundAmount} to wallet for exchange price difference on Return #${updatedRequest._id}`,
+                                    reference: `EXCHANGE_DOWNGRADE_REFUND_${updatedRequest._id}`
+                                },
+                                session
+                            );
+
+                            await Refund.create([{
+                                orderId: updatedRequest.orderId?._id || updatedRequest.orderId,
+                                returnRequestId: updatedRequest._id,
+                                userId: updatedRequest.userId?._id || updatedRequest.userId,
+                                amount: refundAmount,
+                                referenceId: `EXCHANGE_DOWNGRADE_REFUND_${updatedRequest._id}`,
+                                method: 'wallet_credit',
+                                destination: 'wallet',
+                                status: 'completed',
+                                notes: 'Exchange downgrade refund credited to wallet'
+                            }], { session });
+
+                            updatedRequest.exchangeDetails.priceDeltaStatus = 'refunded';
+                            await updatedRequest.save({ session });
+                        }
                     } else {
                         // Return completion logic + financial updates
+                        const commRecord = await Commission.findOne({
+                            orderId: order._id,
+                            vendorId: request.vendorId,
+                            status: { $ne: 'cancelled' }
+                        }).session(session);
+                        const originalEarnings = commRecord ? (commRecord.vendorNetEarnings || commRecord.vendorEarnings || 0) : 0;
+
                         updatedRequest = await exchangeWorkflow.transition(request._id, request.status, 'completed', actor, 'Return completed by admin.', session);
 
-                        const order = await Order.findById(request.orderId?._id || request.orderId).session(session);
-                        
                         // L-1 fix: Restore stock including variant stock
                         for (const item of (request.items || [])) {
                             const qty = Number(item?.quantity || 0);
@@ -295,53 +334,197 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
                             }
                         }
 
-                        // Create Refund record with idempotency key
+                        const vendorCompletedReturns = await ReturnRequest.find({
+                            orderId: order._id,
+                            vendorId: request.vendorId,
+                            status: 'completed',
+                            _id: { $ne: request._id }
+                        }).session(session);
+
+                        const returnedQuantities = {};
+                        const allReturns = [...vendorCompletedReturns, updatedRequest];
+                        for (const ret of allReturns) {
+                            if (Array.isArray(ret.items)) {
+                                for (const retItem of ret.items) {
+                                    const pid = String(retItem.productId || retItem.id || '');
+                                    if (!returnedQuantities[pid]) returnedQuantities[pid] = 0;
+                                    returnedQuantities[pid] += Number(retItem.quantity || 0);
+                                }
+                            }
+                        }
+
+                        const orderItems = Array.isArray(order.items) ? order.items : [];
+                        const vendorItems = orderItems.filter(item => String(item.vendorId) === String(request.vendorId));
+                        
+                        let keptSubtotal = 0;
+                        let totalItemsCount = 0;
+                        let returnedItemsCount = 0;
+
+                        for (const item of vendorItems) {
+                            const pid = String(item.productId || item.id || '');
+                            const purchasedQty = Number(item.quantity || 0);
+                            const retQty = Number(returnedQuantities[pid] || 0);
+                            const keptQty = Math.max(0, purchasedQty - retQty);
+                            
+                            keptSubtotal += item.price * keptQty;
+                            totalItemsCount += purchasedQty;
+                            returnedItemsCount += retQty;
+                        }
+
+                        if (returnedItemsCount >= totalItemsCount || keptSubtotal <= 0) {
+                            await Commission.updateMany(
+                                {
+                                    orderId: order._id,
+                                    vendorId: request.vendorId,
+                                    status: { $ne: 'cancelled' },
+                                },
+                                {
+                                    $set: {
+                                        status: 'cancelled',
+                                        paidAt: null,
+                                        settlementId: null,
+                                        subtotal: 0,
+                                        discountShare: 0,
+                                        effectiveSubtotal: 0,
+                                        commission: 0,
+                                        vendorEarnings: 0,
+                                        vendorSubtotal: 0,
+                                        vendorCouponDiscount: 0,
+                                        vendorDiscountedSubtotal: 0,
+                                        vendorTax: 0,
+                                        vendorTotalPaidByCustomer: 0,
+                                        commissionAmount: 0,
+                                        vendorNetEarnings: 0,
+                                        escrowAmount: 0,
+                                        escrowStatus: 'refunded',
+                                        settlementStatus: 'cancelled',
+                                        releasedAt: null
+                                    },
+                                },
+                                { session }
+                            );
+                        } else {
+                            const comm = await Commission.findOne({
+                                orderId: order._id,
+                                vendorId: request.vendorId,
+                                status: { $ne: 'cancelled' }
+                            }).session(session);
+                            if (comm) {
+                                const originalDiscountShare = comm.discountShare !== undefined ? comm.discountShare : 0;
+                                const originalSubtotal = comm.subtotal || 0;
+                                
+                                let newDiscountShare = 0;
+                                if (originalSubtotal > 0) {
+                                    newDiscountShare = parseFloat((keptSubtotal * (originalDiscountShare / originalSubtotal)).toFixed(2));
+                                }
+                                
+                                if (newDiscountShare > keptSubtotal) {
+                                    newDiscountShare = keptSubtotal;
+                                }
+                                
+                                const newEffectiveSubtotal = parseFloat((keptSubtotal - newDiscountShare).toFixed(2));
+                                const newCommission = parseFloat(((newEffectiveSubtotal * comm.commissionRate) / 100).toFixed(2));
+                                const newVendorEarnings = parseFloat((newEffectiveSubtotal - newCommission).toFixed(2));
+                                
+                                let itemDiscountSum = 0;
+                                let newVendorTax = 0;
+                                
+                                const sortedVendorItems = [...vendorItems].sort((a, b) =>
+                                    String(a.productId || a.id).localeCompare(String(b.productId || b.id))
+                                );
+                                
+                                sortedVendorItems.forEach((item, index) => {
+                                    const pid = String(item.productId || item.id || '');
+                                    const purchasedQty = Number(item.quantity || 0);
+                                    const retQty = Number(returnedQuantities[pid] || 0);
+                                    const keptQty = Math.max(0, purchasedQty - retQty);
+                                    
+                                    if (keptQty > 0) {
+                                        const itemSub = item.price * keptQty;
+                                        let itemDiscountShare = 0;
+                                        
+                                        if (newDiscountShare > 0 && keptSubtotal > 0) {
+                                            const isLastKept = sortedVendorItems.slice(index + 1).every(rem => {
+                                                const rPid = String(rem.productId || rem.id || '');
+                                                const rPurchasedQty = Number(rem.quantity || 0);
+                                                const rRetQty = Number(returnedQuantities[rPid] || 0);
+                                                return Math.max(0, rPurchasedQty - rRetQty) <= 0;
+                                            });
+                                            
+                                            if (isLastKept) {
+                                                itemDiscountShare = parseFloat((newDiscountShare - itemDiscountSum).toFixed(2));
+                                            } else {
+                                                itemDiscountShare = parseFloat(((newDiscountShare * itemSub) / keptSubtotal).toFixed(2));
+                                                itemDiscountSum = parseFloat((itemDiscountSum + itemDiscountShare).toFixed(2));
+                                            }
+                                        }
+                                        
+                                        const discountedItemSubtotal = parseFloat((itemSub - itemDiscountShare).toFixed(2));
+                                        const taxRate = Number(item.taxRate !== undefined ? item.taxRate : 18);
+                                        const itemTax = parseFloat(((discountedItemSubtotal * taxRate) / 100).toFixed(2));
+                                        newVendorTax = parseFloat((newVendorTax + itemTax).toFixed(2));
+                                    }
+                                });
+                                
+                                const vi = (order.vendorItems || []).find(vItem => String(vItem.vendorId) === String(request.vendorId)) || {};
+                                const newTotalPaid = parseFloat((newEffectiveSubtotal + (vi.shipping || 0) + newVendorTax).toFixed(2));
+
+                                comm.subtotal = keptSubtotal;
+                                comm.discountShare = newDiscountShare;
+                                comm.effectiveSubtotal = newEffectiveSubtotal;
+                                comm.commission = newCommission;
+                                comm.vendorEarnings = newVendorEarnings;
+                                
+                                comm.vendorSubtotal = keptSubtotal;
+                                comm.vendorCouponDiscount = newDiscountShare;
+                                comm.vendorDiscountedSubtotal = newEffectiveSubtotal;
+                                comm.vendorTax = newVendorTax;
+                                comm.vendorTotalPaidByCustomer = newTotalPaid;
+                                comm.commissionAmount = newCommission;
+                                comm.vendorNetEarnings = newVendorEarnings;
+                                comm.escrowAmount = newVendorEarnings;
+                                
+                                await comm.save({ session });
+                            }
+                        }
+
+                        const refundAmount = request.refundAmount || 0;
+
+                        if (refundAmount > 0) {
+                            await creditWallet(
+                                request.userId?._id || request.userId,
+                                refundAmount,
+                                'return_refund',
+                                {
+                                    returnRequestId: request._id,
+                                    orderId: order._id,
+                                    description: `Refunded ₹${refundAmount} to wallet for Return #${request._id}`,
+                                    reference: `RETURN_REFUND_${request._id}`
+                                },
+                                session
+                            );
+                        }
+
                         const refund = (await Refund.create([{
                             orderId:         request.orderId?._id || request.orderId,
                             returnRequestId: request._id,
                             userId:          request.userId?._id || request.userId,
-                            amount:          request.refundAmount || 0,
+                            amount:          refundAmount,
                             referenceId:     `RETURN_REFUND_${request._id}`,
-                            method:          request.refundDetails?.method === 'upi' ? 'upi' : 'bank_transfer',
-                            bankDetails:     request.refundDetails?.bankDetails,
-                            upiId:           request.refundDetails?.upiId,
-                            status:          'requested',
+                            method:          'wallet_credit',
+                            destination:     'wallet',
+                            status:          'completed',
+                            notes:           'Refund credited to customer wallet'
                         }], { session }))[0];
 
-                        // Auto-trigger Razorpay refund
-                        if (order?.paymentStatus === 'paid') {
-                            try {
-                                const paidAttempt = await PaymentAttempt.findOne({
-                                    orderId: order._id, status: 'paid',
-                                }).session(session);
-                                if (paidAttempt?.razorpayPaymentId && refund.amount > 0) {
-                                    const rzpRefund = await initiateRefund(
-                                        paidAttempt.razorpayPaymentId,
-                                        refund.amount,
-                                        { reason: 'return_approved' }
-                                    );
-                                    await Refund.findByIdAndUpdate(refund._id, {
-                                        razorpayRefundId: rzpRefund.id,
-                                        status: 'processing',
-                                        paymentAttemptId: paidAttempt._id,
-                                    }, { session });
-                                }
-                            } catch (rzpErr) {
-                                console.error('[RETURN_REFUND_ERROR]', request._id, rzpErr.message);
-                            }
-                        }
-
                         updatedRequest.refundId = refund._id;
+                        updatedRequest.refundStatus = 'processed';
 
-                        // Vendor clawback
-                        if (order?.escrowStatus === 'released' && request.vendorId) {
-                            const commission = await Commission.findOne({
-                                orderId:  order._id,
-                                vendorId: request.vendorId,
-                            }).session(session);
+                        const allItemsReturned = returnedItemsCount >= totalItemsCount || keptSubtotal <= 0;
+                        const isEscrowReleased = order.escrowStatus === 'released';
 
-                            const clawbackAmount = commission?.vendorEarnings || 0;
-
+                        if (isEscrowReleased) {
+                            const clawbackAmount = parseFloat(Math.max(0, originalEarnings - (allItemsReturned ? 0 : (commRecord ? (commRecord.vendorNetEarnings || commRecord.vendorEarnings || 0) : 0))).toFixed(2));
                             if (clawbackAmount > 0) {
                                 const vendor = await Vendor.findByIdAndUpdate(
                                     request.vendorId,
@@ -377,7 +560,45 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
                                     }
                                 }
                             }
+                        } else {
+                            let newEarnings = 0;
+                            if (!allItemsReturned && commRecord) {
+                                const freshComm = await Commission.findOne({
+                                    orderId: order._id,
+                                    vendorId: request.vendorId,
+                                    status: { $ne: 'cancelled' }
+                                }).session(session);
+                                if (freshComm) {
+                                    newEarnings = freshComm.vendorNetEarnings || freshComm.vendorEarnings || 0;
+                                }
+                            }
+                            const decrementAmount = parseFloat(Math.max(0, originalEarnings - newEarnings).toFixed(2));
+
+                            if (decrementAmount > 0) {
+                                await Vendor.findByIdAndUpdate(
+                                    request.vendorId,
+                                    { $inc: { onHoldBalance: -decrementAmount } },
+                                    { session }
+                                );
+                                console.log('[FINANCIAL_EVENT] Admin complete: onHoldBalance decremented', {
+                                    vendorId: String(request.vendorId),
+                                    amount: decrementAmount
+                                });
+                            }
                         }
+
+                        if (allItemsReturned) {
+                            if (order.status !== 'cancelled') {
+                                order.status = 'returned';
+                            }
+                            order.paymentStatus = 'refunded';
+                            order.escrowStatus = 'refunded';
+                        } else {
+                            order.status = 'delivered';
+                            order.escrowStatus = isEscrowReleased ? 'released' : 'held';
+                        }
+                        await order.save({ session });
+                        notifyOrderUpdate(order);
                     }
                 } else {
                     // Generic Transition (intermediate statuses)

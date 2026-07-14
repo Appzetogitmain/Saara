@@ -1196,6 +1196,24 @@ const MobileOrderDetail = () => {
                     <span>Total</span>
                     <span className="text-primary-600">{formatPrice(order.total)}</span>
                   </div>
+                  {order.walletAmountUsed > 0 && (
+                    <>
+                      <div className="flex justify-between text-purple-650 font-bold pt-1.5 border-t border-dashed border-gray-200">
+                        <span>Wallet Used</span>
+                        <span>-{formatPrice(order.walletAmountUsed)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-semibold text-gray-700">
+                        <span>Paid via {order.paymentMethod === 'cod' ? 'COD' : order.paymentMethod === 'wallet' ? 'Wallet' : 'Online'}</span>
+                        <span>{formatPrice(Math.max(0, order.total - order.walletAmountUsed))}</span>
+                      </div>
+                    </>
+                  )}
+                  {Array.isArray(order.returnRequests) && order.returnRequests.some(r => r.status === 'completed' && r.requestType !== 'exchange') && (
+                    <div className="flex justify-between text-xs text-green-700 font-black pt-2 border-t border-dashed border-gray-200 uppercase tracking-wide">
+                      <span>Refund Method</span>
+                      <span>Wallet Credit</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

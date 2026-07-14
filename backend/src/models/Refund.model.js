@@ -41,6 +41,11 @@ const refundSchema = new mongoose.Schema(
             type: String,
             enum: ['razorpay_auto', 'bank_transfer', 'upi', 'wallet_credit'],
         },
+        destination: {
+            type: String,
+            enum: ['bank', 'upi', 'wallet', 'original_source'],
+            default: 'wallet',
+        },
         status: {
             type: String,
             enum: [

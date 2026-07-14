@@ -4,6 +4,8 @@ import { useWishlistStore } from "../../../../shared/store/wishlistStore";
 import { useAuthStore } from "../../../../shared/store/authStore";
 import { useCategoryStore } from "../../../../shared/store/categoryStore";
 import { appLogo } from "../../../../data/logos";
+import api from "../../../../shared/utils/api";
+import { formatPrice } from "../../../../shared/utils/helpers";
 import {
   FiHeart,
   FiShoppingBag,
@@ -18,6 +20,7 @@ import {
   FiMenu,
   FiPercent,
   FiZap,
+  FiCreditCard,
 } from "react-icons/fi";
 import { HiOutlineUserCircle } from "react-icons/hi";
 import { useState, useRef, useEffect } from "react";
@@ -45,6 +48,22 @@ const DesktopHeader = () => {
 
   const [showNavCategories, setShowNavCategories] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    if (isAuthenticated) {
+      api.get('/user/wallet')
+        .then(res => {
+          const data = res?.data ?? res;
+          if (active && data) {
+            setWalletBalance(data.balance || 0);
+          }
+        })
+        .catch(() => null);
+    }
+    return () => { active = false; };
+  }, [isAuthenticated]);
 
   const categoryDropdownRef = useRef(null);
   const navCategoriesRef = useRef(null);
@@ -256,6 +275,8 @@ const DesktopHeader = () => {
               </span>
             </Link>
 
+
+
             {/* User Profile */}
             {isAuthenticated ? (
               <div ref={userMenuRef} className="relative">
@@ -306,6 +327,14 @@ const DesktopHeader = () => {
                       >
                         <FiUser className="text-gray-500 text-base" />
                         <span>Profile</span>
+                      </Link>
+                      <Link
+                        to="/user/wallet"
+                        onClick={() => setShowUserMenu(false)}
+                        className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 rounded-xl transition-colors text-left text-gray-700 text-sm font-semibold"
+                      >
+                        <FiCreditCard className="text-gray-500 text-base" />
+                        <span>Wallet</span>
                       </Link>
                       <Link
                         to="/orders"

@@ -139,6 +139,7 @@ const orderSchema = new mongoose.Schema(
             type: String,
             enum: ["bank", "upi"]
         },
+        walletAmountUsed: { type: Number, default: 0 },
         bankDetails: {
             accountHolder: String,
             accountNumber: String,

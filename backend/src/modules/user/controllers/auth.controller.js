@@ -2,6 +2,7 @@ import asyncHandler from '../../../utils/asyncHandler.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
 import ApiError from '../../../utils/ApiError.js';
 import User from '../../../models/User.model.js';
+import { createWalletIfMissing } from '../../../services/wallet.service.js';
 import { generateTokens } from '../../../utils/generateToken.js';
 import { sendOTP } from '../../../services/otp.service.js';
 import { sendEmail } from '../../../services/email.service.js';
@@ -46,6 +47,7 @@ export const register = asyncHandler(async (req, res) => {
         password,
         ...(normalizedPhone ? { phone: normalizedPhone } : {}),
     });
+    await createWalletIfMissing(user._id);
     await sendOTP(user, 'email_verification');
 
     res.status(201).json(new ApiResponse(201, { email: user.email }, 'Registration successful. Please verify your email.'));

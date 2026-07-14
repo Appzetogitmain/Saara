@@ -24,6 +24,13 @@ const startServer = async () => {
     setInterval(() => {
       releaseEscrowPayments().catch(err => console.error("Escrow release scan error:", err));
     }, 24 * 60 * 60 * 1000);
+
+    // Auto-expire promotional balances scanner (run on startup and every 24 hours)
+    const { expirePromotionalBalances } = await import("./cron/walletCron.js");
+    expirePromotionalBalances().catch(err => console.error("Wallet balance expiry scan error:", err));
+    setInterval(() => {
+      expirePromotionalBalances().catch(err => console.error("Wallet balance expiry scan error:", err));
+    }, 24 * 60 * 60 * 1000);
     
     httpServer.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);

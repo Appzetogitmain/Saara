@@ -82,27 +82,31 @@ const AppBootstrap = () => {
 
     const handleOrderUpdate = (updatedOrder) => {
       const currentPath = window.location.pathname;
-      const orderId = updatedOrder.orderId || updatedOrder._id;
+      const orderIdObj = updatedOrder.orderId || updatedOrder._id;
+      const orderId = orderIdObj && typeof orderIdObj === "object" ? (orderIdObj._id || orderIdObj.id) : orderIdObj;
+      if (!orderId) return;
+
       const isViewingThisOrder = currentPath.includes(`/orders/${orderId}`);
 
       // Centralized order store update
       useOrderStore.getState().fetchOrderById(orderId);
 
       if (!isViewingThisOrder) {
-        const orderDisplayId = String(updatedOrder.orderId || updatedOrder._id).slice(-6).toUpperCase();
+        const orderDisplayId = String(updatedOrder.orderId && typeof updatedOrder.orderId === "object" ? (updatedOrder.orderId.orderId || updatedOrder.orderId._id) : updatedOrder.orderId || updatedOrder._id).slice(-6).toUpperCase();
         toast.success(`Order #${orderDisplayId} status updated to: ${String(updatedOrder.status).replace(/_/g, ' ').toUpperCase()}`);
       }
     };
 
     const handleReturnUpdate = (updatedReturn) => {
       const currentPath = window.location.pathname;
-      const orderId = updatedReturn.orderId;
-      const isViewingThisOrder = orderId ? currentPath.includes(`/orders/${orderId}`) : false;
+      const orderIdObj = updatedReturn.orderId;
+      const orderId = orderIdObj && typeof orderIdObj === "object" ? (orderIdObj._id || orderIdObj.id) : orderIdObj;
+      if (!orderId) return;
+
+      const isViewingThisOrder = currentPath.includes(`/orders/${orderId}`);
 
       // Centralized store update by re-fetching order details
-      if (orderId) {
-        useOrderStore.getState().fetchOrderById(orderId);
-      }
+      useOrderStore.getState().fetchOrderById(orderId);
 
       if (!isViewingThisOrder) {
         toast.success(`Return status updated to: ${String(updatedReturn.status).replace(/_/g, ' ').toUpperCase()}`);

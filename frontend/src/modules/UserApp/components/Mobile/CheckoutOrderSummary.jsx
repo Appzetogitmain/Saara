@@ -3,7 +3,7 @@ import { formatPrice } from "../../../../shared/utils/helpers";
 import { formatVariantLabel, getVariantSignature } from "../../../../shared/utils/variant";
 import { useCartStore } from "../../../../shared/store/useStore";
 
-const OrderSummary = ({ itemsByVendor, total, discount, shipping, tax, finalTotal }) => {
+const OrderSummary = ({ itemsByVendor, total, discount, shipping, tax, finalTotal, walletAmountUsed = 0, remainingPayable = finalTotal }) => {
   const removeItem = useCartStore((state) => state.removeItem);
 
   return (
@@ -77,6 +77,18 @@ const OrderSummary = ({ itemsByVendor, total, discount, shipping, tax, finalTota
           <span>Total</span>
           <span className="text-primary-600">{formatPrice(finalTotal)}</span>
         </div>
+        {walletAmountUsed > 0 && (
+          <>
+            <div className="flex justify-between text-purple-600 font-bold">
+              <span>Wallet Applied</span>
+              <span>-{formatPrice(walletAmountUsed)}</span>
+            </div>
+            <div className="flex justify-between text-lg font-black text-gray-900 pt-2 border-t border-dashed border-gray-200">
+              <span>Payable Amount</span>
+              <span className="text-purple-700">{formatPrice(remainingPayable)}</span>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

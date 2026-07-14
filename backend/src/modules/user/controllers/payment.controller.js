@@ -11,6 +11,7 @@ import Vendor from '../../../models/Vendor.model.js';
 import ReturnRequest from '../../../models/ReturnRequest.model.js';
 import mongoose from 'mongoose';
 import { createRazorpayOrder, verifyPaymentSignature } from '../../../services/payment.service.js';
+import { getWallet, debitWallet } from '../../../services/wallet.service.js';
 import { processCapturedPayment } from '../../../services/paymentProcessor.js';
 import { getDefaultCommissionRate, isPaymentMethodEnabled } from '../../../services/settingsService.js';
 
@@ -313,9 +314,21 @@ export const initializePayment = asyncHandler(async (req, res) => {
     // ─── Online Payment: Create payment_pending order + Razorpay order ─────────
     const session = await mongoose.startSession();
     let order, payment, attempt;
+    let rzpOrder = null;
+    let walletAmountUsed = 0;
     try {
         await session.withTransaction(async () => {
             const orderId = generateOrderId();
+
+            // 1. Calculate wallet deductions if useWallet is true
+            if (req.body.useWallet) {
+                const wallet = await getWallet(userId);
+                walletAmountUsed = Math.min(wallet.balance, total);
+            }
+
+            const remainingTotal = Number((total - walletAmountUsed).toFixed(2));
+            const isFullyPaidByWallet = walletAmountUsed === total;
+
             const [createdOrder] = await Order.create([{
                 orderId,
                 userId,
@@ -323,14 +336,15 @@ export const initializePayment = asyncHandler(async (req, res) => {
                 vendorItems,
 
                 shippingAddress,
-                paymentMethod: normalizedPaymentMethod,
-                status: 'payment_pending',  // No stock deducted yet
-                paymentStatus: 'pending',
+                paymentMethod: isFullyPaidByWallet ? 'wallet' : normalizedPaymentMethod,
+                status: isFullyPaidByWallet ? 'processing' : 'payment_pending',  // No stock deducted yet unless fully paid
+                paymentStatus: isFullyPaidByWallet ? 'paid' : 'pending',
                 subtotal,
                 shipping,
                 tax,
                 discount: couponDiscount,
                 total,
+                walletAmountUsed,
                 couponCode: couponCode?.toUpperCase(),
                 couponDiscount,
                 discountedSubtotal: financials.discountedSubtotal,
@@ -349,44 +363,137 @@ export const initializePayment = asyncHandler(async (req, res) => {
             }], { session });
             order = createdOrder;
 
-            // Create Payment summary record
-            const [createdPayment] = await Payment.create([{
-                orderId: order._id,
-                userId,
-                amount: total,
-                status: 'pending',
-            }], { session });
-            payment = createdPayment;
+            // 2. Debit wallet if needed
+            if (walletAmountUsed > 0) {
+                await debitWallet(userId, walletAmountUsed, 'wallet_payment', {
+                    orderId: order._id,
+                    description: `Paid ₹${walletAmountUsed} via wallet for order #${order.orderId}`
+                }, session);
+            }
+
+            if (isFullyPaidByWallet) {
+                // Fully paid by wallet - complete order setups (stock, commissions, coupon count)
+                for (const item of enrichedItems) {
+                    const updatedProduct = await Product.findOneAndUpdate(
+                        { _id: item.productId, stock: { $ne: 'out_of_stock' }, stockQuantity: { $gte: Number(item.quantity) } },
+                        { $inc: { stockQuantity: -Number(item.quantity) } },
+                        { new: true, session }
+                    );
+                    if (!updatedProduct) throw new ApiError(409, `Insufficient stock for ${item.name}.`);
+
+                    const nextStock = updatedProduct.stockQuantity <= 0 ? 'out_of_stock'
+                        : updatedProduct.stockQuantity <= updatedProduct.lowStockThreshold ? 'low_stock' : 'in_stock';
+                    await Product.updateOne({ _id: updatedProduct._id }, { $set: { stock: nextStock } }, { session });
+                }
+
+                // Commissions
+                const commissionDocs = financials.vendorCalculations.map(vc => ({
+                    orderId:                   order._id,
+                    vendorId:                  vc.vendorId,
+                    vendorName:                vendorMap[String(vc.vendorId)]?.vendorName || '',
+                    subtotal:                  vc.subtotal,
+                    vendorSubtotal:            vc.subtotal,
+                    discountShare:             vc.discountShare,
+                    vendorCouponDiscount:      vc.discountShare,
+                    effectiveSubtotal:         vc.effectiveSubtotal,
+                    vendorDiscountedSubtotal:  vc.effectiveSubtotal,
+                    commissionRate:            vc.commissionRate,
+                    commission:                vc.commission,
+                    commissionAmount:          vc.commission,
+                    vendorEarnings:            vc.vendorEarnings,
+                    vendorNetEarnings:         vc.vendorEarnings,
+                    escrowAmount:              vc.vendorEarnings,
+                    walletCredit:              0,
+                    escrowStatus:              'held',
+                    settlementStatus:          'pending',
+                    vendorTax:                 vc.vendorTax || 0,
+                    vendorTotalPaidByCustomer: vc.vendorTotalPaidByCustomer || vc.subtotal,
+                    ...(appliedCoupon ? {
+                        couponId:    appliedCoupon._id,
+                        couponCode:  appliedCoupon.code,
+                        couponType:  appliedCoupon.type,
+                        couponValue: appliedCoupon.value,
+                    } : {}),
+                }));
+                await Commission.insertMany(commissionDocs, { session });
+
+                if (appliedCoupon) {
+                    await Coupon.updateOne({ _id: appliedCoupon._id }, { $inc: { usedCount: 1 } }, { session });
+                }
+
+                // Create Payment record
+                await Payment.create([{
+                    orderId: order._id,
+                    userId,
+                    amount: total,
+                    status: 'paid',
+                    method: 'wallet',
+                }], { session });
+
+            } else {
+                // Partially paid by wallet - we need to charge remaining via Razorpay
+                const [createdPayment] = await Payment.create([{
+                    orderId: order._id,
+                    userId,
+                    amount: remainingTotal,
+                    status: 'pending',
+                }], { session });
+                payment = createdPayment;
+
+                // Create Razorpay order INSIDE DB transaction (external API call)
+                try {
+                    rzpOrder = await createRazorpayOrder(remainingTotal, 'INR', order.orderId, { userId: String(userId) });
+                } catch (err) {
+                    console.error('[RAZORPAY_INITIALIZE_ERROR] Failed to create order:', err);
+                    throw new ApiError(502, 'Payment gateway error. Please try again.');
+                }
+
+                // Create PaymentAttempt
+                attempt = (await PaymentAttempt.create([{
+                    orderId: order._id,
+                    paymentId: payment._id,
+                    razorpayOrderId: rzpOrder.id,
+                    purpose: 'ORDER_PAYMENT',
+                    status: 'created',
+                    attemptNumber: 1,
+                }], { session }))[0];
+            }
         });
     } finally {
         await session.endSession();
     }
 
-    // Create Razorpay order OUTSIDE DB transaction (external API call)
-    let rzpOrder;
-    try {
-        rzpOrder = await createRazorpayOrder(total, 'INR', order.orderId, { userId: String(userId) });
-    } catch (err) {
-        // If Razorpay fails, mark order as payment_failed
-        console.error('[RAZORPAY_INITIALIZE_ERROR] Failed to create order:', err);
-        await Order.findByIdAndUpdate(order._id, { status: 'payment_failed' });
-        throw new ApiError(502, 'Payment gateway error. Please try again.');
-    }
+    if (walletAmountUsed === total) {
+        // Fully paid by wallet - trigger async side effects
+        createNotification({
+            recipientId: userId,
+            recipientType: 'user',
+            title: 'Order Confirmed',
+            message: `Your order #${order.orderId} has been confirmed successfully!`,
+            type: 'order_status',
+            data: { orderId: String(order._id) },
+        }).catch(console.error);
 
-    // Create PaymentAttempt
-    attempt = await PaymentAttempt.create({
-        orderId: order._id,
-        paymentId: payment._id,
-        razorpayOrderId: rzpOrder.id,
-        purpose: 'ORDER_PAYMENT',
-        status: 'created',
-        attemptNumber: 1,
-    });
+        try {
+            await sendOrderConfirmationEmail(order._id);
+        } catch (e) {
+            console.error('[Email Error]', e.message);
+        }
+
+        notifyOrderUpdate(order._id, { status: 'processing', paymentStatus: 'paid' }).catch(console.error);
+
+        return res.status(201).json(new ApiResponse(201, {
+            orderId: order.orderId,
+            total,
+            paymentMethod: 'wallet',
+            paymentStatus: 'paid',
+        }, 'Order placed successfully using wallet balance.'));
+    }
 
     return res.status(201).json(new ApiResponse(201, {
         orderId: order.orderId,
         razorpayOrderId: rzpOrder.id,
-        amount: total,
+        amount: Number((total - walletAmountUsed).toFixed(2)),
         currency: 'INR',
         key: process.env.RAZORPAY_KEY_ID,
     }, 'Payment initialized. Complete payment to confirm order.'));

@@ -11,6 +11,7 @@ import ReturnRequest from '../models/ReturnRequest.model.js';
 import Vendor from '../models/Vendor.model.js';
 import Admin from '../models/Admin.model.js';
 import { initiateRefund } from './payment.service.js';
+import { creditWallet } from './wallet.service.js';
 import { calculateOrderFinancials } from './financial.service.js';
 import { createNotification } from './notification.service.js';
 import { sendOrderConfirmationEmail } from './email.service.js';
@@ -217,23 +218,61 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
             await Payment.findByIdAndUpdate(attempt.paymentId, { status: 'refund_pending' });
             await Order.findByIdAndUpdate(order._id, { status: 'payment_failed', paymentStatus: 'failed' });
 
-            try {
-                const rzpRefund = await initiateRefund(razorpayPaymentId, order.total, { reason: 'stock_exhausted' });
-                await Refund.create({
-                    orderId:          order._id,
-                    amount:           order.total,
-                    referenceId:      `STOCK_FAIL_REFUND_${attempt._id}`,
-                    method:           'razorpay_auto',
-                    status:           'processing',
-                    razorpayRefundId: rzpRefund.id,
-                    paymentAttemptId: attempt._id,
-                    notes:            'Auto-refund: stock exhausted after payment',
-                });
-                console.warn('[FINANCIAL_EVENT] Auto-refund triggered due to stock fail', {
-                    orderId: String(order._id), amount: order.total, timestamp: new Date().toISOString()
-                });
-            } catch (refundErr) {
-                console.error('[REFUND_ERROR] Auto-refund failed:', refundErr.message);
+            const rzpRefundAmount = Number((order.total - (order.walletAmountUsed || 0)).toFixed(2));
+            const walletRefundAmount = order.walletAmountUsed || 0;
+
+            // 1. Process Razorpay refund if any cash was paid online
+            if (rzpRefundAmount > 0) {
+                try {
+                    const rzpRefund = await initiateRefund(razorpayPaymentId, rzpRefundAmount, { reason: 'stock_exhausted' });
+                    await Refund.create({
+                        orderId:          order._id,
+                        amount:           rzpRefundAmount,
+                        referenceId:      `STOCK_FAIL_REFUND_RZP_${attempt._id}`,
+                        method:           'razorpay_auto',
+                        destination:      'original_source',
+                        status:           'processing',
+                        razorpayRefundId: rzpRefund.id,
+                        paymentAttemptId: attempt._id,
+                        notes:            'Auto-refund: stock exhausted after payment (Razorpay portion)',
+                    });
+                    console.warn('[FINANCIAL_EVENT] Auto-refund Razorpay triggered due to stock fail', {
+                        orderId: String(order._id), amount: rzpRefundAmount, timestamp: new Date().toISOString()
+                    });
+                } catch (refundErr) {
+                    console.error('[REFUND_ERROR] Razorpay auto-refund failed:', refundErr.message);
+                }
+            }
+
+            // 2. Process Wallet refund if any wallet balance was used
+            if (walletRefundAmount > 0) {
+                try {
+                    await creditWallet(
+                        order.userId,
+                        walletRefundAmount,
+                        'cancel_refund',
+                        {
+                            orderId: order._id,
+                            description: `Reversed ₹${walletRefundAmount} wallet payment due to stock failure after payment capture`,
+                            reference: `STOCK_FAIL_REFUND_WALLET_${attempt._id}`
+                        }
+                    );
+                    await Refund.create({
+                        orderId:          order._id,
+                        amount:           walletRefundAmount,
+                        referenceId:      `STOCK_FAIL_REFUND_WALLET_${attempt._id}`,
+                        method:           'wallet_credit',
+                        destination:      'wallet',
+                        status:           'completed',
+                        paymentAttemptId: attempt._id,
+                        notes:            'Auto-refund: stock exhausted after payment (Wallet portion)',
+                    });
+                    console.warn('[FINANCIAL_EVENT] Auto-refund Wallet triggered due to stock fail', {
+                        orderId: String(order._id), amount: walletRefundAmount, timestamp: new Date().toISOString()
+                    });
+                } catch (walletErr) {
+                    console.error('[REFUND_ERROR] Wallet auto-refund failed:', walletErr.message);
+                }
             }
         } else {
             // Non-stock error — rethrow and let finally clean up
