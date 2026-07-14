@@ -47,6 +47,7 @@ const commissionSchema = new mongoose.Schema(
         },
         paidAt: Date,
         settlementId: { type: mongoose.Schema.Types.ObjectId, ref: 'Settlement' },
+        legacyFinancialSnapshot: { type: Boolean, default: false },
     },
     { timestamps: true }
 );

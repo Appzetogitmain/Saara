@@ -73,6 +73,11 @@ const refundSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'VendorWalletTransaction',
         },
+        // --- FINANCIAL SNAPSHOT FIELDS ---
+        refundBase: { type: Number },
+        refundTax: { type: Number },
+        refundShipping: { type: Number },
+        refundTotal: { type: Number },
     },
     { timestamps: true }
 );

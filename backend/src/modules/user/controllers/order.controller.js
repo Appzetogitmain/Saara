@@ -377,33 +377,52 @@ export const placeOrder = asyncHandler(async (req, res) => {
     const tax = financials.tax;
     const total = financials.finalTotal;
 
-    // 5. Build vendor item groups with dynamic tax
+    // 5. Build vendor item groups with dynamic tax snapshot
     const vendorItems = Object.values(vendorMap).map((v) => {
-        const vCalc = financials.vendorCalculations.find(vc => String(vc.vendorId) === String(v.vendorId)) || {};
-        const vTax = financials.items
-            .filter(item => String(item.vendorId) === String(v.vendorId))
-            .reduce((acc, item) => acc + item.itemTax, 0);
-
-        v.items.forEach(item => {
-            const fItem = financials.items.find(fi => String(fi.productId) === String(item.productId));
-            if (fItem) {
-                item.tax = fItem.itemTax;
-            }
-        });
+        const vendorIdStr = String(v.vendorId);
+        const vCalc = financials.vendorCalculations.find(vc => String(vc.vendorId) === vendorIdStr) || {};
+        
+        const groupItems = financials.items
+            .filter(item => String(item.vendorId) === vendorIdStr)
+            .map(item => ({
+                productId: item.productId,
+                vendorId: item.vendorId,
+                name: item.name,
+                image: item.image,
+                price: item.price,
+                quantity: item.quantity,
+                variant: item.variantKey ? { variantKey: item.variantKey } : {},
+                variantKey: item.variantKey || undefined,
+                // --- FINANCIAL SNAPSHOT FIELDS ---
+                taxRate: item.taxRate,
+                taxIncluded: item.taxIncluded,
+                lineSubtotal: item.lineSubtotal,
+                couponDiscount: item.couponDiscount,
+                discountedSubtotal: item.discountedSubtotal,
+                baseAmount: item.baseAmount,
+                taxAmount: item.taxAmount,
+                shippingCharge: item.shippingCharge,
+                shippingTax: item.shippingTax,
+                commissionRate: item.commissionRate,
+                commissionAmount: item.commissionAmount,
+                vendorEarnings: item.vendorEarnings,
+                platformCommission: item.platformCommission,
+                finalLineTotal: item.finalLineTotal,
+            }));
 
         return {
             vendorId: v.vendorId,
             vendorName: v.vendorName,
-            items: v.items,
+            items: groupItems,
             subtotal: v.subtotal,
-            shipping: Number(shippingByVendor[String(v.vendorId)] || 0),
-            tax: parseFloat(vTax.toFixed(2)),
+            shipping: Number(shippingByVendor[vendorIdStr] || 0),
+            tax: vCalc.vendorTax,
             discount: vCalc.discountShare || 0,
             status: 'pending',
             commissionRate: vCalc.commissionRate !== undefined && vCalc.commissionRate !== null ? vCalc.commissionRate : defaultRate,
             commissionAmount: vCalc.commission || 0,
             vendorEarnings: vCalc.vendorEarnings || 0,
-            isOnHoldBalanceAdded: false
+            isOnHoldBalanceAdded: false,
         };
     });
 
@@ -429,7 +448,31 @@ export const placeOrder = asyncHandler(async (req, res) => {
             const [createdOrder] = await Order.create([{
                 orderId,
                 userId,
-                items: enrichedItems,
+                items: financials.items.map(item => ({
+                    productId: item.productId,
+                    vendorId: item.vendorId,
+                    name: item.name,
+                    image: item.image,
+                    price: item.price,
+                    quantity: item.quantity,
+                    variant: item.variantKey ? { variantKey: item.variantKey } : {},
+                    variantKey: item.variantKey || undefined,
+                    // --- FINANCIAL SNAPSHOT FIELDS ---
+                    taxRate: item.taxRate,
+                    taxIncluded: item.taxIncluded,
+                    lineSubtotal: item.lineSubtotal,
+                    couponDiscount: item.couponDiscount,
+                    discountedSubtotal: item.discountedSubtotal,
+                    baseAmount: item.baseAmount,
+                    taxAmount: item.taxAmount,
+                    shippingCharge: item.shippingCharge,
+                    shippingTax: item.shippingTax,
+                    commissionRate: item.commissionRate,
+                    commissionAmount: item.commissionAmount,
+                    vendorEarnings: item.vendorEarnings,
+                    platformCommission: item.platformCommission,
+                    finalLineTotal: item.finalLineTotal,
+                })),
                 vendorItems,
                 shippingAddress,
                 paymentMethod: normalizedPaymentMethod,

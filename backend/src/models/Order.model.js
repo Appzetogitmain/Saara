@@ -10,6 +10,21 @@ const orderItemSchema = new mongoose.Schema({
     quantity: Number,
     variant: { type: mongoose.Schema.Types.Mixed, default: {} },
     variantKey: String,
+    // --- FINANCIAL SNAPSHOT FIELDS ---
+    taxRate: { type: Number },
+    taxIncluded: { type: Boolean },
+    lineSubtotal: { type: Number },
+    couponDiscount: { type: Number },
+    discountedSubtotal: { type: Number },
+    baseAmount: { type: Number },
+    taxAmount: { type: Number },
+    shippingCharge: { type: Number },
+    shippingTax: { type: Number },
+    commissionRate: { type: Number },
+    commissionAmount: { type: Number },
+    vendorEarnings: { type: Number },
+    platformCommission: { type: Number },
+    finalLineTotal: { type: Number }
 });
 
 const vendorItemGroupSchema = new mongoose.Schema({
@@ -125,6 +140,7 @@ const orderSchema = new mongoose.Schema(
         cancelledAt: Date,
         cancellationReason: String,
         isDeleted: { type: Boolean, default: false, index: true },
+        legacyFinancialSnapshot: { type: Boolean, default: false },
         deletedAt: Date,
         deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
         deliveryPriority: { type: Number, default: 0, index: true },

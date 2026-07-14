@@ -174,6 +174,7 @@ export const initializePayment = asyncHandler(async (req, res) => {
         couponDiscount,
         shipping,
         vendorCommissions,
+        vendorShippings: shippingByVendor,
     });
 
     const { finalTotal: total, discountedSubtotal: subtotal, tax } = financials;
@@ -182,7 +183,7 @@ export const initializePayment = asyncHandler(async (req, res) => {
     const vendorItems = financials.vendorCalculations.map(vc => {
         const vendorIdStr = String(vc.vendorId);
         const doc = vendorDocsMap[vendorIdStr] || {};
-        const groupItems = enrichedItems
+        const groupItems = financials.items
             .filter(item => String(item.vendorId) === vendorIdStr)
             .map(item => ({
                 productId: item.productId,
@@ -193,6 +194,21 @@ export const initializePayment = asyncHandler(async (req, res) => {
                 quantity: item.quantity,
                 variant: item.variantKey ? { variantKey: item.variantKey } : {},
                 variantKey: item.variantKey || undefined,
+                // --- FINANCIAL SNAPSHOT FIELDS ---
+                taxRate: item.taxRate,
+                taxIncluded: item.taxIncluded,
+                lineSubtotal: item.lineSubtotal,
+                couponDiscount: item.couponDiscount,
+                discountedSubtotal: item.discountedSubtotal,
+                baseAmount: item.baseAmount,
+                taxAmount: item.taxAmount,
+                shippingCharge: item.shippingCharge,
+                shippingTax: item.shippingTax,
+                commissionRate: item.commissionRate,
+                commissionAmount: item.commissionAmount,
+                vendorEarnings: item.vendorEarnings,
+                platformCommission: item.platformCommission,
+                finalLineTotal: item.finalLineTotal,
             }));
 
         return {
@@ -221,7 +237,31 @@ export const initializePayment = asyncHandler(async (req, res) => {
                 const [createdOrder] = await Order.create([{
                     orderId,
                     userId,
-                    items: enrichedItems,
+                    items: financials.items.map(item => ({
+                        productId: item.productId,
+                        vendorId: item.vendorId,
+                        name: item.name,
+                        image: item.image,
+                        price: item.price,
+                        quantity: item.quantity,
+                        variant: item.variantKey ? { variantKey: item.variantKey } : {},
+                        variantKey: item.variantKey || undefined,
+                        // --- FINANCIAL SNAPSHOT FIELDS ---
+                        taxRate: item.taxRate,
+                        taxIncluded: item.taxIncluded,
+                        lineSubtotal: item.lineSubtotal,
+                        couponDiscount: item.couponDiscount,
+                        discountedSubtotal: item.discountedSubtotal,
+                        baseAmount: item.baseAmount,
+                        taxAmount: item.taxAmount,
+                        shippingCharge: item.shippingCharge,
+                        shippingTax: item.shippingTax,
+                        commissionRate: item.commissionRate,
+                        commissionAmount: item.commissionAmount,
+                        vendorEarnings: item.vendorEarnings,
+                        platformCommission: item.platformCommission,
+                        finalLineTotal: item.finalLineTotal,
+                    })),
                     vendorItems,
                     shippingAddress,
                     paymentMethod: 'cod',
@@ -319,7 +359,31 @@ export const initializePayment = asyncHandler(async (req, res) => {
             const [createdOrder] = await Order.create([{
                 orderId,
                 userId,
-                items: enrichedItems,
+                items: financials.items.map(item => ({
+                    productId: item.productId,
+                    vendorId: item.vendorId,
+                    name: item.name,
+                    image: item.image,
+                    price: item.price,
+                    quantity: item.quantity,
+                    variant: item.variantKey ? { variantKey: item.variantKey } : {},
+                    variantKey: item.variantKey || undefined,
+                    // --- FINANCIAL SNAPSHOT FIELDS ---
+                    taxRate: item.taxRate,
+                    taxIncluded: item.taxIncluded,
+                    lineSubtotal: item.lineSubtotal,
+                    couponDiscount: item.couponDiscount,
+                    discountedSubtotal: item.discountedSubtotal,
+                    baseAmount: item.baseAmount,
+                    taxAmount: item.taxAmount,
+                    shippingCharge: item.shippingCharge,
+                    shippingTax: item.shippingTax,
+                    commissionRate: item.commissionRate,
+                    commissionAmount: item.commissionAmount,
+                    vendorEarnings: item.vendorEarnings,
+                    platformCommission: item.platformCommission,
+                    finalLineTotal: item.finalLineTotal,
+                })),
                 vendorItems,
 
                 shippingAddress,

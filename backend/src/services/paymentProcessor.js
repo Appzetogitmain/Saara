@@ -108,58 +108,30 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
             }
 
             // ── All stock deducted successfully ──
-            // FINANCIAL SNAPSHOT RULE: use stored order.items prices — not live product prices.
-            const vendorIds = [...new Set(order.items.map(i => String(i.vendorId)).filter(Boolean))];
-            const vendors = await Vendor.find({ _id: { $in: vendorIds } })
-                .select('_id commissionRate vendorName name')
-                .session(session)
-                .lean();
-
-            const defaultRate = await getDefaultCommissionRate();
-            const vendorCommissionMap = Object.fromEntries(vendors.map(v => [
-                String(v._id),
-                v.commissionRate !== undefined && v.commissionRate !== null ? v.commissionRate : defaultRate
-            ]));
-            const vendorNameMap       = Object.fromEntries(vendors.map(v => [String(v._id), v.vendorName || v.name || '']));
-
-            const financials = calculateOrderFinancials({
-                items: order.items.map(i => ({
-                    productId:   i.productId,
-                    price:       i.price,
-                    quantity:    i.quantity,
-                    taxRate:     i.taxRate     ?? 18,
-                    taxIncluded: i.taxIncluded ?? false,
-                    vendorId:    i.vendorId,
-                })),
-                couponDiscount:    order.couponDiscount || 0,
-                shipping:          order.shipping       || 0,
-                vendorCommissions: vendorCommissionMap,
-            });
-
             // IDEMPOTENCY: only create commissions if none exist for this order yet
             const existingCount = await Commission.countDocuments({ orderId: order._id }).session(session);
             if (existingCount === 0) {
-                const commissionDocs = financials.vendorCalculations.map(vc => ({
+                const commissionDocs = (order.vendorItems || []).map(vc => ({
                     orderId:                   order._id,
                     vendorId:                  vc.vendorId,
-                    vendorName:                vendorNameMap[String(vc.vendorId)] || '',
+                    vendorName:                vc.vendorName || '',
                     subtotal:                  vc.subtotal,
                     vendorSubtotal:            vc.subtotal,
-                    discountShare:             vc.discountShare,
-                    vendorCouponDiscount:      vc.discountShare,
-                    effectiveSubtotal:         vc.effectiveSubtotal,
-                    vendorDiscountedSubtotal:  vc.effectiveSubtotal,
+                    discountShare:             vc.discount || 0,
+                    vendorCouponDiscount:      vc.discount || 0,
+                    effectiveSubtotal:         parseFloat((vc.subtotal - (vc.discount || 0)).toFixed(2)),
+                    vendorDiscountedSubtotal:  parseFloat((vc.subtotal - (vc.discount || 0)).toFixed(2)),
                     commissionRate:            vc.commissionRate,
-                    commission:                vc.commission,
-                    commissionAmount:          vc.commission,
-                    vendorEarnings:            vc.vendorEarnings,
-                    vendorNetEarnings:         vc.vendorEarnings,
-                    escrowAmount:              vc.vendorEarnings,
+                    commission:                vc.commissionAmount || 0,
+                    commissionAmount:          vc.commissionAmount || 0,
+                    vendorEarnings:            vc.vendorEarnings || 0,
+                    vendorNetEarnings:         vc.vendorEarnings || 0,
+                    escrowAmount:              vc.vendorEarnings || 0,
                     walletCredit:              0,
                     escrowStatus:              'held',
                     settlementStatus:          'pending',
-                    vendorTax:                 vc.vendorTax || 0,
-                    vendorTotalPaidByCustomer: vc.vendorTotalPaidByCustomer || vc.subtotal,
+                    vendorTax:                 vc.tax || 0,
+                    vendorTotalPaidByCustomer: parseFloat((vc.subtotal - (vc.discount || 0) + (vc.shipping || 0) + (vc.tax || 0)).toFixed(2)),
                     ...(order.couponId ? { couponId: order.couponId, couponCode: order.couponCode } : {}),
                 }));
                 await Commission.insertMany(commissionDocs, { session });
@@ -168,7 +140,7 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
                     orderId:         String(order._id),
                     customerId:      String(order.userId),
                     vendorCount:     commissionDocs.length,
-                    totalCommission: financials.commissionAmount,
+                    totalCommission: order.commissionAmount,
                     timestamp:       new Date().toISOString(),
                 });
             }

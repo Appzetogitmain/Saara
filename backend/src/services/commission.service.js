@@ -14,17 +14,19 @@ import { getDefaultCommissionRate } from './settingsService.js';
  * @param {boolean} [taxIncluded]  - Whether tax is already baked into the subtotal
  * @returns {{ commission, vendorEarnings, commissionRate }}
  */
-export const calculateCommission = async (vendorId, subtotal, taxRate = 18, taxIncluded = false) => {
+export const calculateCommission = async (vendorId, subtotal, taxRate = 18, taxIncluded = false, precalculatedBase = null) => {
     const vendor = await Vendor.findById(vendorId).select('commissionRate');
     if (!vendor) throw new Error(`Vendor not found: ${vendorId}`);
 
     const defaultRate = await getDefaultCommissionRate();
     const commissionRate = vendor.commissionRate !== undefined && vendor.commissionRate !== null ? vendor.commissionRate : defaultRate;
 
-    // If tax is baked in, extract the pre-tax base (backward extraction)
-    const commissionBase = taxIncluded
-        ? parseFloat((subtotal / (1 + taxRate / 100)).toFixed(2))
-        : subtotal;
+    // If precalculated base is provided, use it directly (target architecture snapshot base)
+    const commissionBase = precalculatedBase !== null && precalculatedBase !== undefined
+        ? precalculatedBase
+        : taxIncluded
+            ? parseFloat((subtotal / (1 + taxRate / 100)).toFixed(2))
+            : subtotal;
 
     const commission     = parseFloat(((commissionBase * commissionRate) / 100).toFixed(2));
     const vendorEarnings = parseFloat((commissionBase - commission).toFixed(2));

@@ -13,7 +13,7 @@
  * - Exact reconciliation across all vendor-wise splits
  */
 export const calculateOrderFinancials = ({
-    items, // array of { productId, price, quantity, taxRate, vendorId }
+    items, // array of { productId, price, quantity, taxRate, taxIncluded, vendorId }
     couponDiscount,
     shipping, // total shipping
     vendorCommissions, // object of { [vendorId]: commissionRate }
@@ -24,7 +24,7 @@ export const calculateOrderFinancials = ({
 
     // 1. Sort items deterministically
     const sortedItems = [...items].sort((a, b) =>
-        String(a.productId).localeCompare(String(b.productId))
+        String(a.productId || a.id).localeCompare(String(b.productId || b.id))
     );
 
     // Calculate original subtotals
@@ -77,12 +77,25 @@ export const calculateOrderFinancials = ({
     // 4. Proportional Coupon Distribution across items under each vendor, and tax calculation
     const itemsWithDiscount = [];
     let totalTax = 0;
+    let totalCommission = 0;
+    let totalVendorEarnings = 0;
 
     sortedVendors.forEach(v => {
         let itemDiscountSum = 0;
-        let vendorEffectiveSubtotal = 0;
+        let itemShippingSum = 0;
+        let itemTaxSum = 0;
+        let itemCommissionSum = 0;
+        let itemVendorEarningsSum = 0;
+
+        const commissionRate = vendorCommissions[v.vendorId];
+        if (commissionRate === undefined || commissionRate === null) {
+            throw new Error(`Commission rate not found for vendor ${v.vendorId}. Ensure vendorCommissions is fully populated.`);
+        }
+
+        const vendorShipping = Number(vendorShippings[v.vendorId] || 0);
 
         v.items.forEach((item, index) => {
+            // A. Coupon Discount Share
             let itemDiscountShare = 0;
             if (v.discountShare > 0 && v.subtotal > 0) {
                 if (index === v.items.length - 1) {
@@ -96,10 +109,10 @@ export const calculateOrderFinancials = ({
             const discountedItemSubtotal = parseFloat((item.sub - itemDiscountShare).toFixed(2));
             const rate = Number(item.taxRate !== undefined ? item.taxRate : 18);
 
-            let itemTax;
-            let commissionBase;
+            // B. Tax Included / Excluded calculation
+            let itemTax = 0;
+            let commissionBase = 0;
             if (item.taxIncluded) {
-                // Backward tax extraction: base = discounted / (1 + rate/100), tax = discounted - base
                 const base = parseFloat((discountedItemSubtotal / (1 + rate / 100)).toFixed(2));
                 itemTax = parseFloat((discountedItemSubtotal - base).toFixed(2));
                 commissionBase = base;
@@ -107,64 +120,94 @@ export const calculateOrderFinancials = ({
                 itemTax = parseFloat(((discountedItemSubtotal * rate) / 100).toFixed(2));
                 commissionBase = discountedItemSubtotal;
             }
-            totalTax = parseFloat((totalTax + itemTax).toFixed(2));
-            vendorEffectiveSubtotal = parseFloat((vendorEffectiveSubtotal + commissionBase).toFixed(2));
+
+            // C. Shipping Charge and Shipping Tax (at 18%) allocation
+            let itemShipping = 0;
+            let itemShippingTax = 0;
+            if (vendorShipping > 0 && v.subtotal > 0) {
+                if (index === v.items.length - 1) {
+                    itemShipping = parseFloat((vendorShipping - itemShippingSum).toFixed(2));
+                } else {
+                    itemShipping = parseFloat(((vendorShipping * item.sub) / v.subtotal).toFixed(2));
+                    itemShippingSum = parseFloat((itemShippingSum + itemShipping).toFixed(2));
+                }
+                itemShippingTax = parseFloat((itemShipping * 0.18).toFixed(2));
+            }
+
+            // D. Item Commission & Vendor Earnings
+            const itemCommission = parseFloat(((commissionBase * commissionRate) / 100).toFixed(2));
+            const itemVendorEarnings = parseFloat((commissionBase - itemCommission).toFixed(2));
+
+            // E. Final Line Total Paid by Customer
+            const totalTaxAmount = parseFloat((itemTax + itemShippingTax).toFixed(2));
+            const finalLineTotal = parseFloat((discountedItemSubtotal + itemShipping + itemShippingTax).toFixed(2));
 
             itemsWithDiscount.push({
-                ...item,
-                discountShare: itemDiscountShare,
-                discountedItemSubtotal,
-                commissionBase,
-                itemTax
+                productId: item.productId,
+                name: item.name,
+                image: item.image || '',
+                price: item.price,
+                quantity: item.quantity,
+                taxRate: rate,
+                taxIncluded: !!item.taxIncluded,
+                lineSubtotal: item.sub,
+                couponDiscount: itemDiscountShare,
+                discountedSubtotal: discountedItemSubtotal,
+                baseAmount: commissionBase,
+                taxAmount: totalTaxAmount,
+                shippingCharge: itemShipping,
+                shippingTax: itemShippingTax,
+                commissionRate: commissionRate,
+                commissionAmount: itemCommission,
+                vendorEarnings: itemVendorEarnings,
+                platformCommission: itemCommission,
+                finalLineTotal: finalLineTotal,
+                vendorId: item.vendorId,
+                variantKey: item.variantKey || null,
             });
+
+            totalTax = parseFloat((totalTax + totalTaxAmount).toFixed(2));
+            totalCommission = parseFloat((totalCommission + itemCommission).toFixed(2));
+            totalVendorEarnings = parseFloat((totalVendorEarnings + itemVendorEarnings).toFixed(2));
+
+            itemTaxSum = parseFloat((itemTaxSum + totalTaxAmount).toFixed(2));
+            itemCommissionSum = parseFloat((itemCommissionSum + itemCommission).toFixed(2));
+            itemVendorEarningsSum = parseFloat((itemVendorEarningsSum + itemVendorEarnings).toFixed(2));
         });
 
-        v.effectiveSubtotal = vendorEffectiveSubtotal;
+        // Store aggregated sums on vendor object for vendor calculations section below
+        v.vendorTax = itemTaxSum;
+        v.commission = itemCommissionSum;
+        v.vendorEarnings = itemVendorEarningsSum;
+        v.vendorShipping = vendorShipping;
     });
 
-    // Sort itemsWithDiscount back to match original sortedItems order
-    itemsWithDiscount.sort((a, b) =>
-        String(a.productId).localeCompare(String(b.productId))
-    );
-
     // 5. Vendor final calculations (commission, earnings, tax, total paid by customer)
-    let totalCommission = 0;
-    let totalVendorEarnings = 0;
-
     const vendorCalculations = sortedVendors.map(v => {
-        // T5.2: Removed hardcoded || 10 fallback — silently applying a wrong rate causes financial loss.
-        // The caller (placeOrder) must always populate vendorCommissions map correctly.
-        // If a key is missing, it's a data integrity issue that should surface loudly, not silently apply 10%.
         const commissionRate = vendorCommissions[v.vendorId];
-        if (commissionRate === undefined || commissionRate === null) {
-            throw new Error(`Commission rate not found for vendor ${v.vendorId}. Ensure vendorCommissions is fully populated.`);
-        }
-        const commission = parseFloat(((v.effectiveSubtotal * commissionRate) / 100).toFixed(2));
-        const vendorEarnings = parseFloat((v.effectiveSubtotal - commission).toFixed(2));
-
-        totalCommission = parseFloat((totalCommission + commission).toFixed(2));
-        totalVendorEarnings = parseFloat((totalVendorEarnings + vendorEarnings).toFixed(2));
-
-        // Calculate vendor tax from itemTax
-        const vendorTax = parseFloat(
+        const effectiveSubtotal = parseFloat(
             itemsWithDiscount
                 .filter(item => String(item.vendorId) === String(v.vendorId))
-                .reduce((sum, item) => sum + item.itemTax, 0)
+                .reduce((sum, item) => sum + item.baseAmount, 0)
                 .toFixed(2)
         );
 
-        const vendorShipping = Number(vendorShippings[v.vendorId] || 0);
-        const vendorTotalPaidByCustomer = parseFloat((v.effectiveSubtotal + vendorShipping + vendorTax).toFixed(2));
+        const vendorTotalPaidByCustomer = parseFloat(
+            itemsWithDiscount
+                .filter(item => String(item.vendorId) === String(v.vendorId))
+                .reduce((sum, item) => sum + item.finalLineTotal, 0)
+                .toFixed(2)
+        );
 
         return {
             vendorId: v.vendorId,
             subtotal: v.subtotal,
             discountShare: v.discountShare,
-            effectiveSubtotal: v.effectiveSubtotal,
+            effectiveSubtotal,
             commissionRate,
-            commission,
-            vendorEarnings,
-            vendorTax,
+            commission: v.commission,
+            vendorEarnings: v.vendorEarnings,
+            vendorTax: v.vendorTax,
             vendorTotalPaidByCustomer
         };
     });

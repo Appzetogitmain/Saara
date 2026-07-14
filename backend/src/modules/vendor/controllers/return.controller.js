@@ -354,79 +354,127 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                                     status: { $ne: 'cancelled' }
                                 }).session(session);
                                 if (comm) {
-                                    const originalDiscountShare = comm.discountShare !== undefined ? comm.discountShare : 0;
-                                    const originalSubtotal = comm.subtotal || 0;
-                                    
-                                    let newDiscountShare = 0;
-                                    if (originalSubtotal > 0) {
-                                        newDiscountShare = parseFloat((keptSubtotal * (originalDiscountShare / originalSubtotal)).toFixed(2));
-                                    }
-                                    
-                                    if (newDiscountShare > keptSubtotal) {
-                                        newDiscountShare = keptSubtotal;
-                                    }
-                                    
-                                    const newEffectiveSubtotal = parseFloat((keptSubtotal - newDiscountShare).toFixed(2));
-                                    const newCommission = parseFloat(((newEffectiveSubtotal * comm.commissionRate) / 100).toFixed(2));
-                                    const newVendorEarnings = parseFloat((newEffectiveSubtotal - newCommission).toFixed(2));
-                                    
-                                    let itemDiscountSum = 0;
-                                    let newVendorTax = 0;
-                                    
-                                    const sortedVendorItems = [...vendorItems].sort((a, b) =>
-                                        String(a.productId || a.id).localeCompare(String(b.productId || b.id))
-                                    );
-                                    
-                                    sortedVendorItems.forEach((item, index) => {
-                                        const pid = String(item.productId || item.id || '');
-                                        const purchasedQty = Number(item.quantity || 0);
-                                        const retQty = Number(returnedQuantities[pid] || 0);
-                                        const keptQty = Math.max(0, purchasedQty - retQty);
+                                    if (order.legacyFinancialSnapshot) {
+                                        const originalDiscountShare = comm.discountShare !== undefined ? comm.discountShare : 0;
+                                        const originalSubtotal = comm.subtotal || 0;
                                         
-                                        if (keptQty > 0) {
-                                            const itemSub = item.price * keptQty;
-                                            let itemDiscountShare = 0;
-                                            
-                                            if (newDiscountShare > 0 && keptSubtotal > 0) {
-                                                const isLastKept = sortedVendorItems.slice(index + 1).every(rem => {
-                                                    const rPid = String(rem.productId || rem.id || '');
-                                                    const rPurchasedQty = Number(rem.quantity || 0);
-                                                    const rRetQty = Number(returnedQuantities[rPid] || 0);
-                                                    return Math.max(0, rPurchasedQty - rRetQty) <= 0;
-                                                });
-                                                
-                                                if (isLastKept) {
-                                                    itemDiscountShare = parseFloat((newDiscountShare - itemDiscountSum).toFixed(2));
-                                                } else {
-                                                    itemDiscountShare = parseFloat(((newDiscountShare * itemSub) / keptSubtotal).toFixed(2));
-                                                    itemDiscountSum = parseFloat((itemDiscountSum + itemDiscountShare).toFixed(2));
-                                                }
-                                            }
-                                            
-                                            const discountedItemSubtotal = parseFloat((itemSub - itemDiscountShare).toFixed(2));
-                                            const taxRate = Number(item.taxRate !== undefined ? item.taxRate : 18);
-                                            const itemTax = parseFloat(((discountedItemSubtotal * taxRate) / 100).toFixed(2));
-                                            newVendorTax = parseFloat((newVendorTax + itemTax).toFixed(2));
+                                        let newDiscountShare = 0;
+                                        if (originalSubtotal > 0) {
+                                            newDiscountShare = parseFloat((keptSubtotal * (originalDiscountShare / originalSubtotal)).toFixed(2));
                                         }
-                                    });
-                                    
-                                    const vi = (order.vendorItems || []).find(vItem => String(vItem.vendorId) === String(req.user.id)) || {};
-                                    const newTotalPaid = parseFloat((newEffectiveSubtotal + (vi.shipping || 0) + newVendorTax).toFixed(2));
+                                        
+                                        if (newDiscountShare > keptSubtotal) {
+                                            newDiscountShare = keptSubtotal;
+                                        }
+                                        
+                                        const newEffectiveSubtotal = parseFloat((keptSubtotal - newDiscountShare).toFixed(2));
+                                        const newCommission = parseFloat(((newEffectiveSubtotal * comm.commissionRate) / 100).toFixed(2));
+                                        const newVendorEarnings = parseFloat((newEffectiveSubtotal - newCommission).toFixed(2));
+                                        
+                                        let itemDiscountSum = 0;
+                                        let newVendorTax = 0;
+                                        
+                                        const sortedVendorItems = [...vendorItems].sort((a, b) =>
+                                            String(a.productId || a.id).localeCompare(String(b.productId || b.id))
+                                        );
+                                        
+                                        sortedVendorItems.forEach((item, index) => {
+                                            const pid = String(item.productId || item.id || '');
+                                            const purchasedQty = Number(item.quantity || 0);
+                                            const retQty = Number(returnedQuantities[pid] || 0);
+                                            const keptQty = Math.max(0, purchasedQty - retQty);
+                                            
+                                            if (keptQty > 0) {
+                                                const itemSub = item.price * keptQty;
+                                                let itemDiscountShare = 0;
+                                                
+                                                if (newDiscountShare > 0 && keptSubtotal > 0) {
+                                                    const isLastKept = sortedVendorItems.slice(index + 1).every(rem => {
+                                                        const rPid = String(rem.productId || rem.id || '');
+                                                        const rPurchasedQty = Number(rem.quantity || 0);
+                                                        const rRetQty = Number(returnedQuantities[rPid] || 0);
+                                                        return Math.max(0, rPurchasedQty - rRetQty) <= 0;
+                                                    });
+                                                    
+                                                    if (isLastKept) {
+                                                        itemDiscountShare = parseFloat((newDiscountShare - itemDiscountSum).toFixed(2));
+                                                    } else {
+                                                        itemDiscountShare = parseFloat(((newDiscountShare * itemSub) / keptSubtotal).toFixed(2));
+                                                        itemDiscountSum = parseFloat((itemDiscountSum + itemDiscountShare).toFixed(2));
+                                                    }
+                                                }
+                                                
+                                                const discountedItemSubtotal = parseFloat((itemSub - itemDiscountShare).toFixed(2));
+                                                const taxRate = Number(item.taxRate !== undefined ? item.taxRate : 18);
+                                                const itemTax = parseFloat(((discountedItemSubtotal * taxRate) / 100).toFixed(2));
+                                                newVendorTax = parseFloat((newVendorTax + itemTax).toFixed(2));
+                                            }
+                                        });
+                                        
+                                        const vi = (order.vendorItems || []).find(vItem => String(vItem.vendorId) === String(req.user.id)) || {};
+                                        const newTotalPaid = parseFloat((newEffectiveSubtotal + (vi.shipping || 0) + newVendorTax).toFixed(2));
 
-                                    comm.subtotal = keptSubtotal;
-                                    comm.discountShare = newDiscountShare;
-                                    comm.effectiveSubtotal = newEffectiveSubtotal;
-                                    comm.commission = newCommission;
-                                    comm.vendorEarnings = newVendorEarnings;
-                                    
-                                    comm.vendorSubtotal = keptSubtotal;
-                                    comm.vendorCouponDiscount = newDiscountShare;
-                                    comm.vendorDiscountedSubtotal = newEffectiveSubtotal;
-                                    comm.vendorTax = newVendorTax;
-                                    comm.vendorTotalPaidByCustomer = newTotalPaid;
-                                    comm.commissionAmount = newCommission;
-                                    comm.vendorNetEarnings = newVendorEarnings;
-                                    comm.escrowAmount = newVendorEarnings;
+                                        comm.subtotal = keptSubtotal;
+                                        comm.discountShare = newDiscountShare;
+                                        comm.effectiveSubtotal = newEffectiveSubtotal;
+                                        comm.commission = newCommission;
+                                        comm.vendorEarnings = newVendorEarnings;
+                                        
+                                        comm.vendorSubtotal = keptSubtotal;
+                                        comm.vendorCouponDiscount = newDiscountShare;
+                                        comm.vendorDiscountedSubtotal = newEffectiveSubtotal;
+                                        comm.vendorTax = newVendorTax;
+                                        comm.vendorTotalPaidByCustomer = newTotalPaid;
+                                        comm.commissionAmount = newCommission;
+                                        comm.vendorNetEarnings = newVendorEarnings;
+                                        comm.escrowAmount = newVendorEarnings;
+                                    } else {
+                                        let newDiscountShare = 0;
+                                        let newEffectiveSubtotal = 0;
+                                        let newCommission = 0;
+                                        let newVendorEarnings = 0;
+                                        let newVendorTax = 0;
+
+                                        vendorItems.forEach(item => {
+                                            const pid = String(item.productId || item.id || '');
+                                            const purchasedQty = Number(item.quantity || 1);
+                                            const retQty = Number(returnedQuantities[pid] || 0);
+                                            const keptQty = Math.max(0, purchasedQty - retQty);
+
+                                            if (keptQty > 0) {
+                                                const factor = keptQty / purchasedQty;
+                                                newDiscountShare += (item.couponDiscount || 0) * factor;
+                                                newEffectiveSubtotal += (item.baseAmount || 0) * factor;
+                                                newCommission += (item.commissionAmount || 0) * factor;
+                                                newVendorEarnings += (item.vendorEarnings || 0) * factor;
+                                                newVendorTax += (item.taxAmount || 0) * factor;
+                                            }
+                                        });
+
+                                        newDiscountShare = parseFloat(newDiscountShare.toFixed(2));
+                                        newEffectiveSubtotal = parseFloat(newEffectiveSubtotal.toFixed(2));
+                                        newCommission = parseFloat(newCommission.toFixed(2));
+                                        newVendorEarnings = parseFloat(newVendorEarnings.toFixed(2));
+                                        newVendorTax = parseFloat(newVendorTax.toFixed(2));
+
+                                        const vi = (order.vendorItems || []).find(vItem => String(vItem.vendorId) === String(req.user.id)) || {};
+                                        const newTotalPaid = parseFloat((newEffectiveSubtotal + (vi.shipping || 0) + newVendorTax).toFixed(2));
+
+                                        comm.subtotal = keptSubtotal;
+                                        comm.discountShare = newDiscountShare;
+                                        comm.effectiveSubtotal = newEffectiveSubtotal;
+                                        comm.commission = newCommission;
+                                        comm.vendorEarnings = newVendorEarnings;
+                                        
+                                        comm.vendorSubtotal = keptSubtotal;
+                                        comm.vendorCouponDiscount = newDiscountShare;
+                                        comm.vendorDiscountedSubtotal = newEffectiveSubtotal;
+                                        comm.vendorTax = newVendorTax;
+                                        comm.vendorTotalPaidByCustomer = newTotalPaid;
+                                        comm.commissionAmount = newCommission;
+                                        comm.vendorNetEarnings = newVendorEarnings;
+                                        comm.escrowAmount = newVendorEarnings;
+                                    }
                                     
                                     await comm.save({ session });
                                 }

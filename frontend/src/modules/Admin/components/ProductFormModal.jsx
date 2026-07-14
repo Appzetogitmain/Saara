@@ -57,6 +57,7 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
     returnable: true,
     cancelable: true,
     taxIncluded: false,
+    taxRate: 18,
     description: "",
     tags: [],
     variants: {
@@ -153,6 +154,8 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
               product.cancelable !== undefined ? product.cancelable : true,
             taxIncluded:
               product.taxIncluded !== undefined ? product.taxIncluded : false,
+            taxRate:
+              product.taxRate !== undefined ? product.taxRate : 18,
             description: product.description || "",
             tags: product.tags || [],
             variants: {
@@ -208,6 +211,7 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
         returnable: true,
         cancelable: true,
         taxIncluded: false,
+        taxRate: 18,
         description: "",
         tags: [],
         variants: {
@@ -1119,6 +1123,22 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                           onChange={handleChange}
                           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                           placeholder="Enter HSN Code"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">
+                          GST Rate (%)
+                        </label>
+                        <input
+                          type="number"
+                          name="taxRate"
+                          value={formData.taxRate !== undefined ? formData.taxRate : 18}
+                          onChange={handleChange}
+                          min="0"
+                          max="100"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          placeholder="e.g. 18"
                         />
                       </div>
                     </div>

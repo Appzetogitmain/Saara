@@ -56,6 +56,7 @@ const ProductForm = () => {
     returnable: true,
     cancelable: true,
     taxIncluded: false,
+    taxRate: 18,
     description: "",
     tags: [],
     variants: {
@@ -168,7 +169,8 @@ const ProductForm = () => {
       codAllowed: product.codAllowed !== undefined ? product.codAllowed : true,
       returnable: product.returnable !== undefined ? product.returnable : true,
       cancelable: product.cancelable !== undefined ? product.cancelable : true,
-      taxIncluded: product.taxIncluded || false,
+      taxIncluded: product.taxIncluded !== undefined ? product.taxIncluded : false,
+      taxRate: product.taxRate !== undefined ? product.taxRate : 18,
       description: product.description || "",
       tags: product.tags || [],
       variants: normalizedVariants,
@@ -183,7 +185,7 @@ const ProductForm = () => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === "checkbox" ? checked : type === "number" ? parseFloat(value) : value,
     }));
   };
 
@@ -1135,6 +1137,33 @@ const ProductForm = () => {
                 Visible to Customers
               </span>
             </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                name="taxIncluded"
+                checked={formData.taxIncluded}
+                onChange={handleChange}
+                className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+              />
+              <span className="text-xs font-semibold text-gray-700">
+                Tax Included in Prices
+              </span>
+            </label>
+            <div className="flex flex-col gap-1 w-full max-w-xs mt-2">
+              <label className="text-xs font-semibold text-gray-700">
+                GST Rate (%)
+              </label>
+              <input
+                type="number"
+                name="taxRate"
+                value={formData.taxRate !== undefined ? formData.taxRate : 18}
+                onChange={handleChange}
+                min="0"
+                max="100"
+                className="w-full px-3 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm bg-white"
+                placeholder="e.g. 18"
+              />
+            </div>
           </div>
         </div>
 
