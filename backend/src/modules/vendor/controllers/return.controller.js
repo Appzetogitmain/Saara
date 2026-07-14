@@ -4,6 +4,7 @@ import ApiResponse from '../../../utils/ApiResponse.js';
 import ApiError from '../../../utils/ApiError.js';
 import ReturnRequest from '../../../models/ReturnRequest.model.js';
 import Refund from '../../../models/Refund.model.js';
+import { creditWallet } from '../../../services/wallet.service.js';
 import PaymentAttempt from '../../../models/PaymentAttempt.model.js';
 import Vendor from '../../../models/Vendor.model.js';
 import crypto from 'crypto';
@@ -204,10 +205,15 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
         );
     }
 
+    const vendorAllowedStatuses = ['approved', 'rejected', 'replacement_preparing', 'replacement_ready', 'completed'];
+    if (status && !vendorAllowedStatuses.includes(status)) {
+        throw new ApiError(400, `Vendors are not authorized to update status to '${status}'. Only delivery partners and system triggers can update delivery states.`);
+    }
+
     if (status && status !== request.status) {
         const allowedNext = transitionMap[request.status] || [];
         if (!allowedNext.includes(status)) {
-            throw new ApiError(409, `Cannot move return request from ${request.status} to ${status}.`);
+            throw new ApiError(400, `Invalid transition. Cannot move return request from ${request.status} to ${status}.`);
         }
     }
 
@@ -215,7 +221,7 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
     if (refundStatus && refundStatus !== request.refundStatus) {
         const allowedRefundNext = refundTransitions[currentRefundStatus] || [];
         if (!allowedRefundNext.includes(refundStatus)) {
-            throw new ApiError(409, `Cannot move refund status from ${currentRefundStatus} to ${refundStatus}.`);
+            throw new ApiError(400, `Invalid transition. Cannot move refund status from ${currentRefundStatus} to ${refundStatus}.`);
         }
     }
 
@@ -243,6 +249,39 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                 } else if (status === 'completed') {
                     if (isExchange) {
                         updatedRequest = await exchangeWorkflow.completeExchange(request._id, 'out_for_delivery', actor, session);
+                        
+                        // Process exchange price difference refund to wallet
+                        const priceDelta = updatedRequest.exchangeDetails?.priceDelta;
+                        if (priceDelta && priceDelta < 0) {
+                            const refundAmount = Math.abs(priceDelta);
+                            await creditWallet(
+                                updatedRequest.userId?._id || updatedRequest.userId,
+                                refundAmount,
+                                'exchange_refund',
+                                {
+                                    returnRequestId: updatedRequest._id,
+                                    orderId: updatedRequest.orderId?._id || updatedRequest.orderId,
+                                    description: `Credited ₹${refundAmount} to wallet for exchange price difference on Return #${updatedRequest._id}`,
+                                    reference: `EXCHANGE_DOWNGRADE_REFUND_${updatedRequest._id}`
+                                },
+                                session
+                            );
+
+                            await Refund.create([{
+                                orderId: updatedRequest.orderId?._id || updatedRequest.orderId,
+                                returnRequestId: updatedRequest._id,
+                                userId: updatedRequest.userId?._id || updatedRequest.userId,
+                                amount: refundAmount,
+                                referenceId: `EXCHANGE_DOWNGRADE_REFUND_${updatedRequest._id}`,
+                                method: 'wallet_credit',
+                                destination: 'wallet',
+                                status: 'completed',
+                                notes: 'Exchange downgrade refund credited to wallet'
+                            }], { session });
+
+                            updatedRequest.exchangeDetails.priceDeltaStatus = 'refunded';
+                            await updatedRequest.save({ session });
+                        }
                     } else {
                         // Returns completions + financial logic (reversals, clawbacks, refunds)
                         updatedRequest = await exchangeWorkflow.transition(request._id, request.status, 'completed', actor, 'Return completed. Refund processed.', session);
@@ -277,6 +316,13 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                                 await product.save({ session });
                             });
                             await Promise.all(stockRestores);
+
+                            const commRecord = await Commission.findOne({
+                                orderId: order._id,
+                                vendorId: req.user.id,
+                                status: { $ne: 'cancelled' }
+                            }).session(session);
+                            const originalEarnings = commRecord ? (commRecord.vendorNetEarnings || commRecord.vendorEarnings || 0) : 0;
 
                             const vendorCompletedReturns = await ReturnRequest.find({
                                 orderId: order._id,
@@ -480,11 +526,31 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                                 }
                             }
 
-                            await Vendor.findByIdAndUpdate(
-                                req.user.id,
-                                { $inc: { onHoldBalance: -(request.refundAmount || 0) } },
-                                { session }
-                            );
+                            const allItemsReturnedCalculated = returnedItemsCount >= totalItemsCount || keptSubtotal <= 0;
+                            let newEarnings = 0;
+                            if (!allItemsReturnedCalculated && commRecord) {
+                                const freshComm = await Commission.findOne({
+                                    orderId: order._id,
+                                    vendorId: req.user.id,
+                                    status: { $ne: 'cancelled' }
+                                }).session(session);
+                                if (freshComm) {
+                                    newEarnings = freshComm.vendorNetEarnings || freshComm.vendorEarnings || 0;
+                                }
+                            }
+                            const decrementAmount = parseFloat(Math.max(0, originalEarnings - newEarnings).toFixed(2));
+
+                            if (decrementAmount > 0) {
+                                await Vendor.findByIdAndUpdate(
+                                    req.user.id,
+                                    { $inc: { onHoldBalance: -decrementAmount } },
+                                    { session }
+                                );
+                                console.log('[FINANCIAL_EVENT] onHoldBalance decremented on return', {
+                                    vendorId: String(req.user.id),
+                                    amount: decrementAmount
+                                });
+                            }
 
                             const completedReturnRequests = await ReturnRequest.find({
                                 orderId: order._id,
@@ -526,48 +592,42 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                             }
 
                             const refundAmount = request.refundAmount || 0;
+
+                            if (refundAmount > 0) {
+                                await creditWallet(
+                                    request.userId?._id || request.userId,
+                                    refundAmount,
+                                    'return_refund',
+                                    {
+                                        returnRequestId: request._id,
+                                        orderId: order._id,
+                                        description: `Refunded ₹${refundAmount} to wallet for Return #${request._id}`,
+                                        reference: `RETURN_REFUND_${request._id}`
+                                    },
+                                    session
+                                );
+                            }
+
                             const refund = (await Refund.create([{
                                 orderId: order._id,
                                 returnRequestId: request._id,
                                 userId: request.userId?._id || request.userId,
                                 amount: refundAmount,
                                 referenceId: `RETURN_REFUND_${request._id}`,
-                                method: request.refundDetails?.method === 'upi' ? 'upi' : 'bank_transfer',
-                                bankDetails: request.refundDetails?.bankDetails,
-                                upiId: request.refundDetails?.upiId,
-                                status: 'requested',
+                                method: 'wallet_credit',
+                                destination: 'wallet',
+                                status: 'completed',
+                                notes: 'Refund credited to customer wallet'
                             }], { session }))[0];
 
                             updatedRequest.refundId = refund._id;
-
-                            if (order.paymentStatus === 'paid' && refundAmount > 0) {
-                                try {
-                                    const paidAttempt = await PaymentAttempt.findOne({
-                                        orderId: order._id,
-                                        status: 'paid',
-                                    }).session(session);
-
-                                    if (paidAttempt?.razorpayPaymentId) {
-                                        const rzpRefund = await initiateRefund(
-                                            paidAttempt.razorpayPaymentId,
-                                            refundAmount,
-                                            { reason: 'return_approved' }
-                                        );
-                                        await Refund.findByIdAndUpdate(refund._id, {
-                                            razorpayRefundId: rzpRefund.id,
-                                            status: 'processing',
-                                            paymentAttemptId: paidAttempt._id,
-                                        }, { session });
-                                    }
-                                } catch (rzpErr) {
-                                    console.error('[VENDOR_RETURN_REFUND_ERROR]', request._id, rzpErr.message);
-                                }
-                            }
+                            updatedRequest.refundStatus = 'processed';
 
                             if (allItemsReturned) {
                                 if (order.status !== 'cancelled') {
                                     order.status = 'returned';
                                 }
+                                order.paymentStatus = 'refunded';
                                 order.escrowStatus = 'refunded';
                             } else {
                                 order.status = 'delivered';

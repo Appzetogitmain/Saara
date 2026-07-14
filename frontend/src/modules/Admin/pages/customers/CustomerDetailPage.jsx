@@ -16,6 +16,7 @@ import { useCustomerStore } from '../../../../shared/store/customerStore';
 import Badge from '../../../../shared/components/Badge';
 import DataTable from '../../components/DataTable';
 import { formatPrice } from '../../../../shared/utils/helpers';
+import api from '../../../../shared/utils/api';
 import { formatDateTime } from '../../utils/adminHelpers';
 import { getCustomerOrders } from '../../services/adminService';
 
@@ -30,6 +31,45 @@ const CustomerDetailPage = () => {
   const [orders, setOrders] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
+
+  const [wallet, setWallet] = useState(null);
+  const [walletTransactions, setWalletTransactions] = useState([]);
+  const [walletPage, setWalletPage] = useState(1);
+  const [walletTotal, setWalletTotal] = useState(0);
+  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [adjustmentType, setAdjustmentType] = useState('credit');
+  const [adjustmentAmount, setAdjustmentAmount] = useState('');
+  const [adjustmentDescription, setAdjustmentDescription] = useState('');
+  const [adjustmentReason, setAdjustmentReason] = useState('Compensation');
+  const [isAdjusting, setIsAdjusting] = useState(false);
+
+  const fetchWalletDetails = async () => {
+    try {
+      const response = await api.get(`/admin/customers/${id}/wallet`);
+      const payload = response?.data ?? response;
+      setWallet(payload);
+    } catch (err) {
+      console.error('Failed to load customer wallet:', err);
+    }
+  };
+
+  const fetchWalletTxns = async () => {
+    try {
+      const response = await api.get(`/admin/customers/${id}/wallet/transactions?page=${walletPage}&limit=10`);
+      const payload = response?.data ?? response;
+      setWalletTransactions(payload?.transactions || []);
+      setWalletTotal(payload?.total || 0);
+    } catch (err) {
+      console.error('Failed to load customer wallet transactions:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'wallet') {
+      fetchWalletDetails();
+      fetchWalletTxns();
+    }
+  }, [activeTab, id, walletPage]);
 
   useEffect(() => {
     const loadCustomer = async () => {
@@ -120,7 +160,7 @@ const CustomerDetailPage = () => {
   // Set active tab from URL query parameter
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab && ['overview', 'orders', 'transactions', 'addresses'].includes(tab)) {
+    if (tab && ['overview', 'orders', 'transactions', 'addresses', 'wallet'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -466,6 +506,18 @@ const CustomerDetailPage = () => {
             >
               Addresses ({customer.addresses?.length || 0})
             </button>
+            <button
+              onClick={() => {
+                setActiveTab('wallet');
+                navigate(`/admin/customers/${id}?tab=wallet`);
+              }}
+              className={`px-6 py-4 font-semibold text-sm border-b-2 transition-colors whitespace-nowrap ${activeTab === 'wallet'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-600 hover:text-gray-800'
+                }`}
+            >
+              Wallet
+            </button>
           </div>
         </div>
 
@@ -618,11 +670,320 @@ const CustomerDetailPage = () => {
               )}
             </div>
           )}
+
+          {/* Wallet Tab */}
+          {activeTab === 'wallet' && (
+            <div className="space-y-6">
+              
+              {/* Wallet Summary Metrics */}
+              {wallet ? (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-5 border border-indigo-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider block">Available Balance</span>
+                      <p className="text-2xl font-black text-indigo-900 mt-2">{formatPrice(wallet.balance)}</p>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 border border-green-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-green-600 uppercase tracking-wider block">Cashback Balance</span>
+                      <p className="text-2xl font-black text-green-900 mt-2">{formatPrice(wallet.cashbackBalance || 0)}</p>
+                    </div>
+                  </div>
+                  <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-xl p-5 border border-yellow-200 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-yellow-600 uppercase tracking-wider block">Reward Points</span>
+                      <p className="text-2xl font-black text-yellow-900 mt-2">{wallet.rewardPoints || 0} pts</p>
+                    </div>
+                  </div>
+                  <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm flex flex-col justify-between gap-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">Wallet Status</span>
+                        <span className={`inline-block mt-2 px-2 py-0.5 rounded text-xs font-bold uppercase ${
+                          wallet.isLocked ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                        }`}>
+                          {wallet.isLocked ? 'Locked' : 'Active'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!window.confirm(`Are you sure you want to ${wallet.isLocked ? 'unlock' : 'lock'} this user's wallet?` + (wallet.isLocked ? '' : ' Locked wallets block customer debits.'))) return;
+                          try {
+                            const response = await api.patch(`/admin/customers/${id}/wallet/toggle-lock`);
+                            const data = response?.data ?? response;
+                            setWallet(data);
+                            toast.success(`Wallet successfully ${data.isLocked ? 'locked' : 'unlocked'}!`);
+                            fetchWalletTxns();
+                          } catch (err) {
+                            toast.error(err.message || 'Failed to toggle wallet lock status');
+                          }
+                        }}
+                        className={`px-3 py-1 rounded text-xs font-black uppercase transition-all ${
+                          wallet.isLocked 
+                            ? 'bg-green-600 text-white hover:bg-green-700' 
+                            : 'bg-red-600 text-white hover:bg-red-700'
+                        }`}
+                      >
+                        {wallet.isLocked ? 'Unlock' : 'Lock'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 text-center py-8 rounded-xl border border-gray-200">
+                  <p className="text-gray-500 text-sm font-semibold">Loading wallet summary details...</p>
+                </div>
+              )}
+
+              {/* Adjust Balance buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setAdjustmentType('credit');
+                    setAdjustmentAmount('');
+                    setAdjustmentDescription('');
+                    setShowAdjustmentModal(true);
+                  }}
+                  className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-bold shadow-sm transition-all"
+                >
+                  + Manual Credit (Add Money)
+                </button>
+                <button
+                  onClick={() => {
+                    setAdjustmentType('debit');
+                    setAdjustmentAmount('');
+                    setAdjustmentDescription('');
+                    setShowAdjustmentModal(true);
+                  }}
+                  className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-bold shadow-sm transition-all"
+                >
+                  - Manual Debit (Deduct Money)
+                </button>
+              </div>
+
+              {/* Wallet Transaction Ledger List */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-bold text-gray-800">Wallet Transaction Ledger</h3>
+                {walletTransactions.length > 0 ? (
+                  <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <DataTable
+                      data={walletTransactions}
+                      columns={[
+                        {
+                          key: '_id',
+                          label: 'Transaction ID',
+                          sortable: false,
+                          render: (value, row) => <span className="font-semibold text-gray-800" title={value}>{row.reference || value}</span>,
+                        },
+                        {
+                          key: 'type',
+                          label: 'Direction',
+                          sortable: true,
+                          render: (value) => (
+                            <Badge variant={value === 'credit' ? 'success' : 'error'}>
+                              {value.toUpperCase()}
+                            </Badge>
+                          ),
+                        },
+                        {
+                          key: 'transactionType',
+                          label: 'Type',
+                          sortable: true,
+                          render: (value) => (
+                            <span className="text-xs font-semibold uppercase text-gray-650 bg-gray-100 px-2 py-0.5 rounded">
+                              {String(value || '').replace('_', ' ')}
+                            </span>
+                          ),
+                        },
+                        {
+                          key: 'amount',
+                          label: 'Amount',
+                          sortable: true,
+                          render: (value, row) => (
+                            <span className={`font-bold ${row.type === 'credit' ? 'text-green-600' : 'text-red-600'}`}>
+                              {row.type === 'credit' ? '+' : '-'}
+                              {formatPrice(value)}
+                            </span>
+                          ),
+                        },
+                        {
+                          key: 'description',
+                          label: 'Remarks',
+                          sortable: false,
+                          render: (value) => <span className="text-xs text-gray-700 font-medium block max-w-xs truncate" title={value}>{value}</span>,
+                        },
+                        {
+                          key: 'status',
+                          label: 'Status',
+                          sortable: true,
+                          render: (value) => (
+                            <Badge variant={value === 'completed' ? 'success' : value === 'reversed' ? 'error' : 'pending'}>
+                              {value}
+                            </Badge>
+                          ),
+                        },
+                        {
+                          key: 'createdAt',
+                          label: 'Date',
+                          sortable: true,
+                          render: (value) => formatDateTime(value),
+                        },
+                      ]}
+                      pagination={true}
+                      itemsPerPage={10}
+                    />
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-gray-50 border border-gray-200 rounded-xl">
+                    <FiCreditCard className="text-4xl text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 font-semibold">No wallet transaction records found</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Manual Wallet Adjustment Modal */}
+      {showAdjustmentModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl border border-gray-100 space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-gray-150">
+              <h3 className="text-lg font-bold text-gray-800">
+                Manual Wallet {adjustmentType === 'credit' ? 'Credit' : 'Debit'}
+              </h3>
+              <button
+                onClick={() => setShowAdjustmentModal(false)}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors focus:outline-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const amountNum = Number(adjustmentAmount);
+                if (!amountNum || amountNum <= 0) {
+                  toast.error('Please enter a valid amount greater than 0');
+                  return;
+                }
+                const remark = String(adjustmentDescription).trim();
+                if (remark.length < 10) {
+                  toast.error('Remarks must be at least 10 characters long');
+                  return;
+                }
+
+                if (adjustmentType === 'debit') {
+                  if (wallet && wallet.balance < amountNum) {
+                    toast.error(`Cannot debit ₹${amountNum}. Customer only has ₹${wallet.balance} available.`);
+                    return;
+                  }
+                  if (!window.confirm(`CONFIRM DEBIT: Are you sure you want to manually DEBIT (deduct) ₹${amountNum} from the customer's wallet? This action is permanent.`)) {
+                    return;
+                  }
+                } else {
+                  if (!window.confirm(`CONFIRM CREDIT: Are you sure you want to manually CREDIT (add) ₹${amountNum} to the customer's wallet?`)) {
+                    return;
+                  }
+                }
+
+                setIsAdjusting(true);
+                try {
+                  const endpoint = adjustmentType === 'credit' ? '/admin/wallet/admin-credit' : '/admin/wallet/admin-debit';
+                  await api.post(endpoint, {
+                    userId: id,
+                    amount: amountNum,
+                    description: remark,
+                    reason: adjustmentReason
+                  });
+                  toast.success(`Wallet adjusted successfully!`);
+                  setAdjustmentAmount('');
+                  setAdjustmentDescription('');
+                  setAdjustmentReason('Compensation');
+                  setShowAdjustmentModal(false);
+                  fetchWalletDetails();
+                  fetchWalletTxns();
+                } catch (err) {
+                  toast.error(err.message || 'Failed to adjust wallet balance');
+                } finally {
+                  setIsAdjusting(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase">Adjustment Reason Category</label>
+                <select
+                  value={adjustmentReason}
+                  onChange={(e) => setAdjustmentReason(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mt-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm bg-white"
+                  required
+                >
+                  <option value="Compensation">Compensation</option>
+                  <option value="Promotional Credit">Promotional Credit</option>
+                  <option value="Refund Correction">Refund Correction</option>
+                  <option value="Fraud Recovery">Fraud Recovery</option>
+                  <option value="Manual Refund">Manual Refund</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase">Adjustment Amount (₹)</label>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={adjustmentAmount}
+                  onChange={(e) => setAdjustmentAmount(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mt-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                  placeholder="e.g. 500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase">Detailed Remark (Min 10 characters)</label>
+                <textarea
+                  value={adjustmentDescription}
+                  onChange={(e) => setAdjustmentDescription(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl mt-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm h-24 resize-none"
+                  placeholder="Provide adjustment reason..."
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdjustmentModal(false)}
+                  className="w-1/2 py-2.5 border border-gray-250 rounded-xl text-gray-700 font-semibold text-sm hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAdjusting}
+                  className={`w-1/2 py-2.5 text-white font-bold rounded-xl text-sm transition-colors ${
+                    adjustmentType === 'credit'
+                      ? 'bg-green-600 hover:bg-green-700'
+                      : 'bg-red-600 hover:bg-red-700'
+                  } disabled:opacity-50`}
+                >
+                  {isAdjusting ? 'Processing...' : 'Confirm'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };
 
 export default CustomerDetailPage;
+
 

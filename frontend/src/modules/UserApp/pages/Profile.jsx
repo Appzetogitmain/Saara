@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { FiUser, FiMail, FiPhone, FiLock, FiEye, FiEyeOff, FiSave, FiCamera, FiPackage, FiMapPin, FiLogOut, FiChevronRight, FiBell, FiMessageCircle } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiLock, FiEye, FiEyeOff, FiSave, FiCamera, FiPackage, FiMapPin, FiLogOut, FiChevronRight, FiBell, FiMessageCircle, FiCreditCard } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -67,6 +67,7 @@ const MobileProfile = () => {
   const menuItems = [
     { label: 'Personal Information', icon: FiUser, color: 'text-blue-600', bg: 'bg-blue-50', action: () => { setEditTab('personal'); setShowMenu(false); } },
     { label: 'My Orders', icon: FiPackage, color: 'text-orange-600', bg: 'bg-orange-50', action: () => { navigate('/orders'); setShowMenu(false); } },
+    { label: 'My Wallet', icon: FiCreditCard, color: 'text-yellow-600', bg: 'bg-yellow-50', action: () => { navigate('/user/wallet'); setShowMenu(false); } },
     { label: 'My Addresses', icon: FiMapPin, color: 'text-green-600', bg: 'bg-green-50', action: () => { navigate('/addresses'); setShowMenu(false); } },
     { label: 'Notifications', icon: FiBell, color: 'text-indigo-600', bg: 'bg-indigo-50', badge: unreadNotificationCount > 0 ? unreadNotificationCount : null, action: () => { navigate('/notifications'); setShowMenu(false); } },
     { label: 'Change Password', icon: FiLock, color: 'text-purple-600', bg: 'bg-purple-50', action: () => { setEditTab('password'); setShowMenu(false); } },

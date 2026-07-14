@@ -6,6 +6,8 @@ import Vendor from '../src/models/Vendor.model.js';
 import Commission from '../src/models/Commission.model.js';
 import ReturnRequest from '../src/models/ReturnRequest.model.js';
 import Settlement from '../src/models/Settlement.model.js';
+import User from '../src/models/User.model.js';
+import UserWallet from '../src/models/UserWallet.model.js';
 import mongoose from 'mongoose';
 import { releaseEscrowPayments } from '../src/cron/escrowCron.js';
 import { updateVendorReturnRequestStatus } from '../src/modules/vendor/controllers/return.controller.js';
@@ -13,6 +15,15 @@ import { updateVendorReturnRequestStatus } from '../src/modules/vendor/controlle
 const runVerification = async () => {
     await connectDB();
     console.log('Connected to Database.');
+
+    // 0. Create a mock customer
+    const mockUser = await User.create({
+        name: 'Test Customer',
+        email: `customer-${Date.now()}@test.com`,
+        phone: '9999999999',
+        password: 'password123',
+    });
+    console.log(`Created mock User: ${mockUser._id}`);
 
     // 1. Create a mock vendor
     const mockVendor = await Vendor.create({
@@ -51,6 +62,7 @@ const runVerification = async () => {
 
     const mockOrder = await Order.create({
         orderId: `ORD-TEST-${Date.now()}`,
+        userId: mockUser._id,
         status: 'delivered',
         deliveredAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000), // Delivered 8 days ago (bypass 7 day constraint)
         paymentStatus: 'paid',
@@ -110,9 +122,13 @@ const runVerification = async () => {
         vendorId: mockVendor._id,
         vendorName: mockVendor.storeName,
         subtotal: 500,
+        vendorSubtotal: 500,
         commissionRate: 10,
         commission: 50,
+        commissionAmount: 50,
         vendorEarnings: 450,
+        vendorNetEarnings: 450,
+        escrowAmount: 450,
         status: 'pending',
     });
     console.log(`Created mock Commission: ${mockCommission._id}`);
@@ -120,6 +136,7 @@ const runVerification = async () => {
     // 5. Create a mock ReturnRequest for Item 1
     const mockReturn = await ReturnRequest.create({
         orderId: mockOrder._id,
+        userId: mockUser._id,
         vendorId: mockVendor._id,
         items: [
             {
@@ -188,10 +205,18 @@ const runVerification = async () => {
     // Verify Vendor onHoldBalance reduction
     const updatedVendor = await Vendor.findById(mockVendor._id);
     console.log('\n--- Verifying Vendor Balances After Return ---');
-    // Starting onHoldBalance (500) - refundAmount (150) = 350
-    console.log(`Expected Vendor onHoldBalance: 350, Actual: ${updatedVendor.onHoldBalance}`);
-    if (updatedVendor.onHoldBalance !== 350) {
+    // Starting onHoldBalance (500) - decrementAmount (135) = 365
+    console.log(`Expected Vendor onHoldBalance: 365, Actual: ${updatedVendor.onHoldBalance}`);
+    if (updatedVendor.onHoldBalance !== 365) {
         throw new Error('Verification failed: Vendor onHoldBalance was not reduced correctly.');
+    }
+
+    // Verify Customer Wallet Balance
+    const customerWallet = await UserWallet.findOne({ userId: mockUser._id });
+    console.log('\n--- Verifying Customer Wallet Balance After Return ---');
+    console.log(`Expected Wallet Balance: 150, Actual: ${customerWallet?.balance}`);
+    if (!customerWallet || customerWallet.balance !== 150) {
+        throw new Error('Verification failed: Customer wallet balance was not credited.');
     }
 
     // 8. Execute Escrow Cron Release Payments
@@ -238,6 +263,7 @@ const runVerification = async () => {
     await Vendor.deleteOne({ _id: mockVendor._id });
     await Commission.deleteOne({ _id: mockCommission._id });
     await ReturnRequest.deleteOne({ _id: mockReturn._id });
+    await User.deleteOne({ _id: mockUser._id });
     await Settlement.deleteMany({ vendorId: mockVendor._id });
 
     console.log('\nVerification run successfully and all assertions passed!');

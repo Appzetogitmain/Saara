@@ -35,8 +35,8 @@ export const EXCHANGE_TRANSITIONS = {
 
 export const RETURN_TRANSITIONS = {
     pending: ['approved', 'rejected'],
-    approved: ['pickup_pending', 'completed'],
-    pickup_pending: ['pickup_assigned', 'completed'],
+    approved: ['pickup_pending'],
+    pickup_pending: ['pickup_assigned'],
     pickup_assigned: ['picked_up'],
     picked_up: ['delivered_to_vendor'],
     delivered_to_vendor: ['completed', 'rejected'],

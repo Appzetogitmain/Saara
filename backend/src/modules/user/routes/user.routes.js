@@ -4,6 +4,7 @@ import * as addressController from '../controllers/address.controller.js';
 import * as wishlistController from '../controllers/wishlist.controller.js';
 import * as reviewController from '../controllers/review.controller.js';
 import * as orderController from '../controllers/order.controller.js';
+import * as walletController from '../controllers/wallet.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
 import * as cartController from '../controllers/cart.controller.js';
 import * as supportController from '../controllers/support.controller.js';
@@ -99,5 +100,10 @@ router.get('/support/tickets', ...customerAuth, supportController.getUserTickets
 router.get('/support/tickets/:id', ...customerAuth, supportController.getTicketById);
 router.post('/support/tickets/:id/messages', ...customerAuth, supportController.addTicketMessage);
 router.get('/support/ticket-types', ...customerAuth, supportController.getActiveTicketTypes);
+
+// Wallet routes (protected)
+router.get('/wallet', ...customerAuth, walletController.getCustomerWallet);
+router.get('/wallet/transactions', ...customerAuth, walletController.getCustomerWalletTransactions);
+router.post('/wallet/pay', ...customerAuth, walletController.payWithWallet);
 
 export default router;

@@ -66,6 +66,27 @@ const MobileCheckout = () => {
 
   const [paymentSettings, setPaymentSettings] = useState(null);
   const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [useWallet, setUseWallet] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const fetchWallet = async () => {
+      if (isAuthenticated) {
+        try {
+          const response = await api.get("/user/wallet");
+          const data = response?.data ?? response;
+          if (active && data) {
+            setWalletBalance(data.balance || 0);
+          }
+        } catch (err) {
+          console.error("Failed to fetch user wallet balance:", err);
+        }
+      }
+    };
+    fetchWallet();
+    return () => { active = false; };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -205,6 +226,8 @@ const MobileCheckout = () => {
   const taxableAmount = Math.max(0, total - discount);
   const tax = taxableAmount * 0.18;
   const finalTotal = Math.max(0, total + shipping + tax - discount);
+  const walletAmountUsed = useWallet ? Math.min(walletBalance, finalTotal) : 0;
+  const remainingPayable = Number((finalTotal - walletAmountUsed).toFixed(2));
 
   const prevTotalRef = useRef(total);
   useEffect(() => {
@@ -427,12 +450,13 @@ const MobileCheckout = () => {
             ? appliedCoupon.code || couponCode.trim().toUpperCase()
             : undefined,
           shippingOption,
+          useWallet,
         });
 
         const payload = initData?.data ?? initData;
 
-        // ── COD: order already created, navigate to confirmation ──
-        if (paymentMethod === "cash" || paymentMethod === "cod") {
+        // ── COD or Wallet Fully Paid: order already created, navigate to confirmation ──
+        if (paymentMethod === "cash" || paymentMethod === "cod" || payload.paymentStatus === "paid") {
           clearCart();
           toast.success("Order placed successfully!");
           navigate(`/order-confirmation/${payload.orderId}`);
@@ -667,36 +691,78 @@ const MobileCheckout = () => {
                       <FiCreditCard className="text-primary-600" />
                       Payment Method
                     </h2>
-                    <div className="space-y-3 mb-6">
-                      {activePaymentMethods.length > 0 ? (
-                        activePaymentMethods.map((method) => (
-                          <label
-                            key={method.id}
-                            className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                              formData.paymentMethod === method.id
-                                ? "border-primary-500 bg-primary-50"
-                                : "border-gray-200"
-                            }`}
-                          >
+
+                    {/* Wallet Apply Box */}
+                    {isAuthenticated && walletBalance > 0 && (
+                      <div className="bg-white p-4 rounded-xl border border-gray-200 mb-6 shadow-sm flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-xs text-gray-500 font-bold uppercase tracking-wider block">Wallet Balance</span>
+                            <span className="text-base font-black text-gray-800">{formatPrice(walletBalance)}</span>
+                          </div>
+                          <label className="flex items-center gap-2 cursor-pointer bg-purple-50 text-purple-700 hover:bg-purple-100 px-4 py-2 rounded-xl transition-all border border-purple-200 font-bold text-xs select-none">
                             <input
-                              type="radio"
-                              name="paymentMethod"
-                              value={method.id}
-                              checked={formData.paymentMethod === method.id}
-                              onChange={handleInputChange}
-                              className="w-5 h-5 text-primary-500"
+                              type="checkbox"
+                              checked={useWallet}
+                              onChange={(e) => setUseWallet(e.target.checked)}
+                              className="w-4 h-4 text-purple-650 rounded focus:ring-purple-500 cursor-pointer"
                             />
-                            <span className="font-semibold text-gray-800 capitalize text-sm">
-                              {method.label}
-                            </span>
+                            Apply Wallet
                           </label>
-                        ))
-                      ) : (
-                        <div className="p-4 bg-red-50 text-red-700 rounded-xl border border-red-200 text-sm font-semibold">
-                          No payment methods are currently available. Please contact support.
                         </div>
-                      )}
-                    </div>
+                        {useWallet && (
+                          <div className="bg-purple-50/50 p-2.5 rounded-lg border border-purple-100 flex items-center justify-between text-xs text-purple-800 font-semibold">
+                            <span>Applying Wallet Amount:</span>
+                            <span className="font-black">-{formatPrice(walletAmountUsed)}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {useWallet && remainingPayable === 0 ? (
+                      <div className="bg-green-50 p-4 rounded-xl border border-green-200 text-green-700 text-sm font-semibold mb-6 flex items-center gap-2">
+                        <span>✓</span>
+                        <span>Your order is fully covered by your wallet. No additional payment is required!</span>
+                      </div>
+                    ) : (
+                      <>
+                        {useWallet && (
+                          <h3 className="text-xs font-semibold text-gray-700 mb-3">
+                            Select payment method for remaining {formatPrice(remainingPayable)}:
+                          </h3>
+                        )}
+                        <div className="space-y-3 mb-6">
+                          {activePaymentMethods.length > 0 ? (
+                            activePaymentMethods.map((method) => (
+                              <label
+                                key={method.id}
+                                className={`flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                                  formData.paymentMethod === method.id
+                                    ? "border-primary-500 bg-primary-50"
+                                    : "border-gray-200"
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name="paymentMethod"
+                                  value={method.id}
+                                  checked={formData.paymentMethod === method.id}
+                                  onChange={handleInputChange}
+                                  className="w-5 h-5 text-primary-500"
+                                />
+                                <span className="font-semibold text-gray-800 capitalize text-sm">
+                                  {method.label}
+                                </span>
+                              </label>
+                            ))
+                          ) : (
+                            <div className="p-4 bg-red-50 text-red-700 rounded-xl border border-red-200 text-sm font-semibold">
+                              No payment methods are currently available. Please contact support.
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
 
                     {/* Shipping Options */}
                     {total < 100 && (
@@ -870,6 +936,8 @@ const MobileCheckout = () => {
                         tax={tax}
                         finalTotal={finalTotal}
                         formatPrice={formatPrice}
+                        walletAmountUsed={walletAmountUsed}
+                        remainingPayable={remainingPayable}
                       />
                     </div>
                   </motion.div>
@@ -888,6 +956,8 @@ const MobileCheckout = () => {
                       tax={tax}
                       finalTotal={finalTotal}
                       formatPrice={formatPrice}
+                      walletAmountUsed={walletAmountUsed}
+                      remainingPayable={remainingPayable}
                     />
                     <div className="p-4 border-t border-gray-100 bg-gray-50">
                       <button

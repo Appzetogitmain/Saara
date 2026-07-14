@@ -10,6 +10,7 @@ import Admin from '../../../models/Admin.model.js';
 import Payment from '../../../models/Payment.model.js';
 import PaymentAttempt from '../../../models/PaymentAttempt.model.js';
 import Refund from '../../../models/Refund.model.js';
+import { creditWallet } from '../../../services/wallet.service.js';
 import { generateOrderId } from '../../../utils/generateOrderId.js';
 import { generateTrackingNumber } from '../../../utils/generateTrackingNumber.js';
 import mongoose from 'mongoose';
@@ -722,7 +723,12 @@ export const getUserOrders = asyncHandler(async (req, res) => {
 
 // GET /api/user/orders/:id
 export const getOrderDetail = asyncHandler(async (req, res) => {
-    const order = await Order.findOne({ orderId: req.params.id, userId: req.user.id }).select('+deliveryOtpDebug');
+    const isMongoId = mongoose.Types.ObjectId.isValid(req.params.id);
+    const query = isMongoId
+        ? { _id: req.params.id, userId: req.user.id }
+        : { orderId: req.params.id, userId: req.user.id };
+
+    const order = await Order.findOne(query).select('+deliveryOtpDebug');
     if (!order) throw new ApiError(404, 'Order not found.');
 
     const returnRequests = await ReturnRequest.find({ orderId: order._id }).populate('vendorId', 'storeName email');
@@ -736,10 +742,14 @@ export const getOrderDetail = asyncHandler(async (req, res) => {
 export const cancelOrder = asyncHandler(async (req, res) => {
     const session = await mongoose.startSession();
     let order = null;
-    let shouldRefund = null;
     try {
         await session.withTransaction(async () => {
-            order = await Order.findOne({ orderId: req.params.id, userId: req.user.id }).session(session);
+            const isMongoId = mongoose.Types.ObjectId.isValid(req.params.id);
+            const query = isMongoId
+                ? { _id: req.params.id, userId: req.user.id }
+                : { orderId: req.params.id, userId: req.user.id };
+
+            order = await Order.findOne(query).session(session);
             if (!order) throw new ApiError(404, 'Order not found.');
             if (!['pending', 'processing', 'payment_pending'].includes(order.status)) throw new ApiError(400, 'Order cannot be cancelled at this stage.');
 
@@ -763,24 +773,40 @@ export const cancelOrder = asyncHandler(async (req, res) => {
                 { session }
             );
 
-            // Queue refund for online-paid orders (COD = no refund, customer hasn't paid)
+            // Credit refund to wallet directly inside transaction
+            let refundAmount = 0;
             if (order.paymentStatus === 'paid') {
-                const paidAttempt = await PaymentAttempt.findOne({
-                    orderId: order._id, status: 'paid',
-                }).session(session);
-                if (paidAttempt?.razorpayPaymentId) {
-                    shouldRefund = {
-                        razorpayPaymentId: paidAttempt.razorpayPaymentId,
-                        amount: order.total,
-                        orderId: order._id,
-                        paymentId: paidAttempt.paymentId,
-                    };
-                }
-                // T1.3: Use 'refund_queued' inside transaction.
-                // Only flip to 'refunded' AFTER Razorpay call succeeds (below).
-                order.paymentStatus = 'refund_queued';
+                refundAmount = order.total;
+            } else if (order.walletAmountUsed > 0) {
+                refundAmount = order.walletAmountUsed;
             }
-            // COD cancellation: no refund needed (customer has not paid yet)
+
+            if (refundAmount > 0) {
+                await creditWallet(
+                    order.userId,
+                    refundAmount,
+                    'cancel_refund',
+                    {
+                        orderId: order._id,
+                        description: `Refunded ₹${refundAmount} to wallet for cancelled Order #${order.orderId}`,
+                        reference: `ORDER_CANCEL_REFUND_${order._id}`
+                    },
+                    session
+                );
+
+                await Refund.create([{
+                    orderId:          order._id,
+                    amount:           refundAmount,
+                    referenceId:      `ORDER_CANCEL_REFUND_${order._id}`,
+                    method:           'wallet_credit',
+                    destination:      'wallet',
+                    status:           'completed',
+                    notes:            'Refund: customer cancelled order',
+                }], { session });
+
+                await Payment.updateMany({ orderId: order._id }, { status: 'refunded' }, { session });
+                order.paymentStatus = 'refunded';
+            }
 
             await order.save({ session });
 
@@ -845,31 +871,7 @@ export const cancelOrder = asyncHandler(async (req, res) => {
         await session.endSession();
     }
 
-    // After transaction: initiate Razorpay refund for online-paid orders
-    if (shouldRefund) {
-        try {
-            const rzpRefund = await initiateRefund(shouldRefund.razorpayPaymentId, shouldRefund.amount, {
-                reason: 'customer_cancellation',
-            });
-            await Refund.create({
-                orderId:          shouldRefund.orderId,
-                amount:           shouldRefund.amount,
-                referenceId:      `ORDER_CANCEL_REFUND_${shouldRefund.orderId}`, // unique — prevents double refund
-                method:           'razorpay_auto',
-                status:           'processing',
-                razorpayRefundId: rzpRefund.id,
-                paymentAttemptId: shouldRefund.paymentId,
-                notes:            'Refund: customer cancelled order',
-            });
-            await Payment.findOneAndUpdate({ orderId: shouldRefund.orderId }, { status: 'refunded' });
-            // T1.3: Razorpay refund succeeded — now safely mark order as 'refunded'
-            await Order.findByIdAndUpdate(shouldRefund.orderId, { paymentStatus: 'refunded' });
-        } catch (refundErr) {
-            // Log but don't fail the cancel — order is already cancelled
-            // paymentStatus stays 'refund_queued' — visible in admin for manual follow-up
-            console.error('[CANCEL_REFUND_ERROR]', shouldRefund.orderId, refundErr.message);
-        }
-    }
+
 
     if (order) {
         notifyOrderUpdate(order);
@@ -893,7 +895,12 @@ const normalizeReturnRequest = (requestDoc) => {
 
 // POST /api/user/orders/:id/returns
 export const createReturnRequest = asyncHandler(async (req, res) => {
-    const order = await Order.findOne({ orderId: req.params.id, userId: req.user.id });
+    const isMongoId = mongoose.Types.ObjectId.isValid(req.params.id);
+    const query = isMongoId
+        ? { _id: req.params.id, userId: req.user.id }
+        : { orderId: req.params.id, userId: req.user.id };
+
+    const order = await Order.findOne(query);
     if (!order) throw new ApiError(404, 'Order not found.');
     if (order.status !== 'delivered') {
         throw new ApiError(400, 'Return can only be requested for delivered orders.');
