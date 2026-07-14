@@ -646,10 +646,13 @@ export const placeOrder = asyncHandler(async (req, res) => {
 
 // GET /api/user/orders
 export const getUserOrders = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
-    const skip = (page - 1) * limit;
-    const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 }).skip(skip).limit(Number(limit));
+    // A-8: Parse as integers to prevent skip(NaN). Clamp limit to prevent full collection dumps.
+    const numPage  = Math.max(1, parseInt(req.query.page,  10) || 1);
+    const numLimit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const skip = (numPage - 1) * numLimit;
+    const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 }).skip(skip).limit(numLimit);
     const total = await Order.countDocuments({ userId: req.user.id });
+
 
     // Fetch return requests for these orders
     const orderIds = orders.map(o => o._id);
@@ -670,7 +673,8 @@ export const getUserOrders = asyncHandler(async (req, res) => {
         return orderObj;
     });
 
-    res.status(200).json(new ApiResponse(200, { orders: ordersWithReturns, total, page: Number(page), pages: Math.ceil(total / limit) }, 'Orders fetched.'));
+    res.status(200).json(new ApiResponse(200, { orders: ordersWithReturns, total, page: numPage, pages: Math.ceil(total / numLimit) }, 'Orders fetched.'));
+
 });
 
 // GET /api/user/orders/:id
@@ -729,7 +733,9 @@ export const cancelOrder = asyncHandler(async (req, res) => {
                         paymentId: paidAttempt.paymentId,
                     };
                 }
-                order.paymentStatus = 'refunded';
+                // T1.3: Use 'refund_queued' inside transaction.
+                // Only flip to 'refunded' AFTER Razorpay call succeeds (below).
+                order.paymentStatus = 'refund_queued';
             }
             // COD cancellation: no refund needed (customer has not paid yet)
 
@@ -766,6 +772,14 @@ export const cancelOrder = asyncHandler(async (req, res) => {
                         { session }
                     );
                 }
+            }
+
+            // T1.4: Release coupon usage slot so cancelled orders don't permanently exhaust coupons
+            if (order.couponCode) {
+                const couponFilter = order.couponId
+                    ? { _id: order.couponId, usedCount: { $gt: 0 } }
+                    : { code: order.couponCode.toUpperCase(), usedCount: { $gt: 0 } };
+                await Coupon.updateOne(couponFilter, { $inc: { usedCount: -1 } }, { session });
             }
 
             // Reverse vendor earnings visibility for this order.
@@ -805,8 +819,11 @@ export const cancelOrder = asyncHandler(async (req, res) => {
                 notes:            'Refund: customer cancelled order',
             });
             await Payment.findOneAndUpdate({ orderId: shouldRefund.orderId }, { status: 'refunded' });
+            // T1.3: Razorpay refund succeeded — now safely mark order as 'refunded'
+            await Order.findByIdAndUpdate(shouldRefund.orderId, { paymentStatus: 'refunded' });
         } catch (refundErr) {
             // Log but don't fail the cancel — order is already cancelled
+            // paymentStatus stays 'refund_queued' — visible in admin for manual follow-up
             console.error('[CANCEL_REFUND_ERROR]', shouldRefund.orderId, refundErr.message);
         }
     }

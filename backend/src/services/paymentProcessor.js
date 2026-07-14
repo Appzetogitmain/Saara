@@ -9,6 +9,7 @@ import Coupon from '../models/Coupon.model.js';
 import Refund from '../models/Refund.model.js';
 import ReturnRequest from '../models/ReturnRequest.model.js';
 import Vendor from '../models/Vendor.model.js';
+import Admin from '../models/Admin.model.js';
 import { initiateRefund } from './payment.service.js';
 import { calculateOrderFinancials } from './financial.service.js';
 import { createNotification } from './notification.service.js';
@@ -43,10 +44,25 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
 
     // ─── Handle EXCHANGE_UPGRADE payment ─────────────────────────────────────
     if (attempt.purpose === 'EXCHANGE_UPGRADE') {
-        await PaymentAttempt.findByIdAndUpdate(attempt._id, { status: 'paid' });
-        await ReturnRequest.findByIdAndUpdate(attempt.relatedReturnId, {
-            'exchangeDetails.priceDeltaStatus': 'collected',
-        });
+        // T4.2: Both writes must be atomic — if server crashes between them,
+        // the PaymentAttempt would show 'paid' but priceDeltaStatus stays 'pending'.
+        const xSess = await mongoose.startSession();
+        try {
+            await xSess.withTransaction(async () => {
+                await PaymentAttempt.findByIdAndUpdate(
+                    attempt._id,
+                    { status: 'paid' },
+                    { session: xSess }
+                );
+                await ReturnRequest.findByIdAndUpdate(
+                    attempt.relatedReturnId,
+                    { 'exchangeDetails.priceDeltaStatus': 'collected' },
+                    { session: xSess }
+                );
+            });
+        } finally {
+            await xSess.endSession();
+        }
         return;
     }
 
@@ -231,32 +247,38 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
     // ─── Post-transaction notifications (fire-and-forget) ─────────────────────
     if (!stockFailed) {
         try {
+            // T1.2: Fixed recipient → recipientId (notification.service.js requires 'recipientId')
             await createNotification({
-                recipient:     order.userId,
+                recipientId:   order.userId,
                 recipientType: 'user',
                 title:         'Order Confirmed',
                 message:       `Your order #${order.orderId} has been confirmed successfully!`,
                 type:          'order_status',
-                referenceId:   order._id,
+                data:          { orderId: String(order._id) },
             });
 
-            await createNotification({
-                recipientType: 'admin',
-                title:         'New Order Placed',
-                message:       `A new order #${order.orderId} of total ${order.total} has been placed.`,
-                type:          'order_status',
-                referenceId:   order._id,
-            });
+            // Notify each admin individually with their recipientId
+            const admins = await Admin.find({ isActive: true }).select('_id').lean();
+            await Promise.allSettled(admins.map(adm =>
+                createNotification({
+                    recipientId:   adm._id,
+                    recipientType: 'admin',
+                    title:         'New Order Placed',
+                    message:       `A new order #${order.orderId} of total ₹${order.total} has been placed.`,
+                    type:          'order_status',
+                    data:          { orderId: String(order._id) },
+                })
+            ));
 
             const vendorIds = [...new Set(order.items.map(i => String(i.vendorId)).filter(Boolean))];
             for (const vId of vendorIds) {
                 await createNotification({
-                    recipient:     vId,
+                    recipientId:   vId,
                     recipientType: 'vendor',
                     title:         'New Order Received',
                     message:       `You have received a new order #${order.orderId}.`,
                     type:          'order_status',
-                    referenceId:   order._id,
+                    data:          { orderId: String(order._id) },
                 });
             }
         } catch (notifErr) {

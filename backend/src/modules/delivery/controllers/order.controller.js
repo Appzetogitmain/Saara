@@ -24,7 +24,10 @@ const hashDeliveryOtp = (otp) => {
     return crypto.createHash('sha256').update(`${String(otp)}:${secret}`).digest('hex');
 };
 
-const generateDeliveryOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+const generateDeliveryOtp = () => {
+    const { randomInt } = crypto;
+    return String(randomInt(100000, 1000000)); // T5.1: cryptographically secure
+};
 
 const getCustomerEmail = (order) => {
     return (
@@ -117,20 +120,15 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
                 { deliveredAt: null, updatedAt: { $gte: todayStart } },
             ],
         }),
-        Order.aggregate([
+        // T1.1: Use DeliveryWalletTransaction to get actual driver earnings, not order.shipping
+        DeliveryWalletTransaction.aggregate([
             {
                 $match: {
                     deliveryBoyId: new mongoose.Types.ObjectId(deliveryBoyId),
-                    isDeleted: { $ne: true },
-                    status: 'delivered',
+                    type: 'DELIVERY_EARNING',
                 },
             },
-            {
-                $group: {
-                    _id: null,
-                    totalDeliveryFees: { $sum: { $ifNull: ['$shipping', 0] } },
-                },
-            },
+            { $group: { _id: null, totalDeliveryFees: { $sum: '$amount' } } },
         ]),
         Order.find({ deliveryBoyId, isDeleted: { $ne: true } }).sort({ createdAt: -1 }).limit(3),
     ]);
@@ -168,19 +166,19 @@ export const getProfileSummary = asyncHandler(async (req, res) => {
     todayStart.setHours(0, 0, 0, 0);
 
     const [deliveredStats, completedTodayCount] = await Promise.all([
-        Order.aggregate([
+        // T1.1: Aggregate actual driver earnings from DeliveryWalletTransaction, not order.shipping
+        DeliveryWalletTransaction.aggregate([
             {
                 $match: {
                     deliveryBoyId: new mongoose.Types.ObjectId(deliveryBoyId),
-                    isDeleted: { $ne: true },
-                    status: 'delivered',
+                    type: 'DELIVERY_EARNING',
                 },
             },
             {
                 $group: {
                     _id: null,
                     totalDeliveries: { $sum: 1 },
-                    earnings: { $sum: { $ifNull: ['$shipping', 0] } },
+                    earnings: { $sum: '$amount' },
                 },
             },
         ]),
@@ -337,10 +335,24 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
         } finally {
             await session.endSession();
         }
-        order.deliveryPayoutProcessed = true;
-        order.deliveryPayoutProcessedAt = new Date();
+        // T3.3: Use targeted findByIdAndUpdate instead of order.save() to avoid stale
+        // in-memory snapshot overwriting atomic writes made inside the transaction.
+        await Order.findByIdAndUpdate(order._id, {
+            $set: {
+                status: 'delivered',
+                deliveredAt: order.deliveredAt,
+                vendorItems: order.vendorItems,
+                deliveryPayoutProcessed: true,
+                deliveryPayoutProcessedAt: new Date(),
+                deliveryOtpVerifiedAt: order.deliveryOtpVerifiedAt,
+                deliveryOtpHash: undefined,
+                deliveryOtpExpiry: undefined,
+                deliveryOtpSentAt: undefined,
+                deliveryOtpAttempts: 0,
+                deliveryOtpDebug: undefined,
+            }
+        });
         await handleOrderDeliveryBalances(order);
-        await order.save();
     } else {
         await handleOrderDeliveryBalances(order);
         await order.save();

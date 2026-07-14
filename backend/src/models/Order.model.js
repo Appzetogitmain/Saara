@@ -28,7 +28,7 @@ const vendorItemGroupSchema = new mongoose.Schema({
     // 5.1: per-vendor escrow status for multi-vendor order split tracking
     escrowStatus: {
         type: String,
-        enum: ['held', 'processing', 'released', 'refunded', 'cancelled'],
+        enum: ['held', 'processing', 'release_pending', 'partially_released', 'released', 'refunded', 'cancelled'],
         default: 'held',
     },
     commissionRate: { type: Number, default: 0 },
@@ -58,7 +58,7 @@ const orderSchema = new mongoose.Schema(
         paymentMethod: { type: String, enum: ['card', 'cash', 'bank', 'wallet', 'upi', 'cod'] },
         paymentStatus: {
             type: String,
-            enum: ['pending', 'paid', 'failed', 'refunded', 'partially_refunded'],
+            enum: ['pending', 'paid', 'failed', 'refund_queued', 'refunded', 'partially_refunded'],
             default: 'pending',
         },
         status: {
@@ -171,6 +171,8 @@ orderSchema.index({ isDeleted: 1, createdAt: -1 });
 orderSchema.index({ isDeleted: 1, status: 1, createdAt: -1 });
 orderSchema.index({ 'vendorItems.vendorId': 1, createdAt: -1 });
 orderSchema.index({ status: 1, escrowStatus: 1, deliveredAt: 1 });
+// T4.4: COD settlement query: admin settleCash filters by all 4 fields \u2014 compound index prevents full scan
+orderSchema.index({ deliveryBoyId: 1, status: 1, isCashSettled: 1 });
 
 orderSchema.pre('save', function (next) {
     if (this.isModified('status')) {

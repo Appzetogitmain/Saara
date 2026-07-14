@@ -20,8 +20,10 @@ export const getWalletSummary = asyncHandler(async (req, res) => {
 
   const earningsBalance = parseFloat((boy.walletBalance || 0).toFixed(2));
   const codLiability = parseFloat((boy.cashInHand || 0).toFixed(2));
+  // T5.3: Clamp to 0 — negative display is confusing; the withdrawal guard at requestWithdrawal
+  // already correctly prevents withdrawals when codLiability > earningsBalance.
   const availableWithdrawal = parseFloat(
-    (earningsBalance - codLiability).toFixed(2),
+    Math.max(0, earningsBalance - codLiability).toFixed(2),
   );
 
   res.status(200).json(
@@ -162,8 +164,15 @@ export const updatePayoutSettings = asyncHandler(async (req, res) => {
     throw new ApiError(400, 'Payout method must be either "bank" or "upi".');
   }
 
-  if (method === "upi" && !upiId) {
-    throw new ApiError(400, "UPI ID is required for UPI payout method.");
+  if (method === "upi") {
+    if (!upiId) {
+      throw new ApiError(400, "UPI ID is required for UPI payout method.");
+    }
+    // T3.1: Validate UPI ID format (e.g. name@bank) to catch invalid entries before payout fails
+    const upiRegex = /^[\w.\-]{2,256}@[a-zA-Z]{2,64}$/;
+    if (!upiRegex.test(upiId.trim())) {
+      throw new ApiError(400, 'Invalid UPI ID format. Expected format: name@bank (e.g. john@upi, 9876543210@paytm).');
+    }
   }
 
   if (method === "bank") {

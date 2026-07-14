@@ -135,6 +135,19 @@ async function _runEscrowRelease() {
 
                     const walletBalanceBefore = vendor.walletBalance || 0;
 
+                    // T2.6: Check onHoldBalance BEFORE updating wallet.
+                    // Previously this check used stale data AFTER the update — false positives possible.
+                    // Now: abort and mark failed if the vendor's onHoldBalance is less than what we're releasing.
+                    const onHoldNow = vendor.onHoldBalance || 0;
+                    if (onHoldNow < netPayout) {
+                        console.error(`[ACCOUNTING_CRITICAL] onHoldBalance shortfall for vendor:${vendor._id} order:${order._id}. Required: ${netPayout}, Available: ${onHoldNow}`);
+                        await Commission.findByIdAndUpdate(comm._id, {
+                            escrowStatus: 'failed',
+                            notes: `onHoldBalance shortfall: available=${onHoldNow}, required=${netPayout}. Manual review required.`,
+                        }, { session });
+                        return; // exit transaction, skip wallet update
+                    }
+
                     // 1. Update vendor wallet balances atomically
                     const updatedVendor = await Vendor.findByIdAndUpdate(
                         vendor._id,
@@ -148,10 +161,6 @@ async function _runEscrowRelease() {
                     );
 
                     const walletBalanceAfter = updatedVendor.walletBalance;
-
-                    if ((vendor.onHoldBalance || 0) < netPayout) {
-                        console.error(`[ACCOUNTING_ERROR] onHoldBalance shortfall for vendor:${vendor._id} order:${order._id}. Expected: ${netPayout}, Have: ${vendor.onHoldBalance || 0}`);
-                    }
 
                     // 2. Create Settlement document
                     const settlement = await Settlement.create([{

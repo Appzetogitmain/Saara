@@ -24,6 +24,8 @@ const deliveryWithdrawalSchema = new mongoose.Schema(
 );
 
 deliveryWithdrawalSchema.index({ status: 1, createdAt: -1 });
+// T4.4: Compound index for withdrawal idempotency check: { deliveryBoyId, status: { $in: ['pending','processing'] } }
+deliveryWithdrawalSchema.index({ deliveryBoyId: 1, status: 1 });
 
 const DeliveryWithdrawal = mongoose.model('DeliveryWithdrawal', deliveryWithdrawalSchema);
 export default DeliveryWithdrawal;

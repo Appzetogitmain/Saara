@@ -132,7 +132,13 @@ export const calculateOrderFinancials = ({
     let totalVendorEarnings = 0;
 
     const vendorCalculations = sortedVendors.map(v => {
-        const commissionRate = vendorCommissions[v.vendorId] || 10;
+        // T5.2: Removed hardcoded || 10 fallback — silently applying a wrong rate causes financial loss.
+        // The caller (placeOrder) must always populate vendorCommissions map correctly.
+        // If a key is missing, it's a data integrity issue that should surface loudly, not silently apply 10%.
+        const commissionRate = vendorCommissions[v.vendorId];
+        if (commissionRate === undefined || commissionRate === null) {
+            throw new Error(`Commission rate not found for vendor ${v.vendorId}. Ensure vendorCommissions is fully populated.`);
+        }
         const commission = parseFloat(((v.effectiveSubtotal * commissionRate) / 100).toFixed(2));
         const vendorEarnings = parseFloat((v.effectiveSubtotal - commission).toFixed(2));
 

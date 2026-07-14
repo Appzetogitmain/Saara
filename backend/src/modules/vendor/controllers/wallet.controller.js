@@ -18,36 +18,28 @@ export const getWalletStats = asyncHandler(async (req, res) => {
     const vendor = await Vendor.findById(vendorId);
     if (!vendor) throw new ApiError(404, 'Vendor not found.');
 
-    // Expected Payout Releases (delivered but on hold)
-    const heldOrders = await Order.find({
-        status: 'delivered',
+    // T2.7: Query Commission directly for accurate per-vendor escrow amounts.
+    // Old approach: Order.find({ 'items.vendorId': vendorId }) returned inflated amounts
+    // because order.escrowAmount is the TOTAL for ALL vendors, not just this vendor's share.
+    const heldCommissions = await Commission.find({
+        vendorId: vendorId,
         escrowStatus: 'held',
-        'items.vendorId': vendorId
-    }).lean();
+        status: { $ne: 'cancelled' },
+    }).populate('orderId', 'orderId escrowReleaseDate').lean();
 
-    const heldOrderIds = heldOrders.map(order => order._id);
-    const expectedCommissions = await Commission.find({
-        orderId: { $in: heldOrderIds },
-        vendorId: vendorId
-    }).lean();
-
-    const expectedCommMap = expectedCommissions.reduce((acc, comm) => {
-        const earnings = comm.vendorEarnings !== undefined
-            ? comm.vendorEarnings
-            : parseFloat((comm.subtotal - comm.commission).toFixed(2));
-        acc[String(comm.orderId)] = earnings;
-        return acc;
-    }, {});
-
-    const expectedReleases = heldOrders.map(order => {
-        const amount = expectedCommMap[String(order._id)] || 0;
+    const expectedReleases = heldCommissions.map(comm => {
+        const amount = comm.vendorNetEarnings !== undefined ? comm.vendorNetEarnings : (comm.vendorEarnings || 0);
+        const releaseDate = comm.escrowReleaseDate || (comm.orderId && comm.orderId.escrowReleaseDate);
         return {
-            orderId: order.orderId,
-            amount: parseFloat(amount.toFixed(2)),
-            releaseDate: order.escrowReleaseDate,
-            daysRemaining: Math.max(0, Math.ceil((new Date(order.escrowReleaseDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+            orderId: comm.orderId?.orderId || String(comm.orderId?._id || comm.orderId),
+            amount: parseFloat((amount || 0).toFixed(2)),
+            releaseDate: releaseDate || null,
+            daysRemaining: releaseDate
+                ? Math.max(0, Math.ceil((new Date(releaseDate).getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+                : null,
         };
     });
+
 
     // Recent Releases (released in last 30 days)
     const recentReleasedOrders = await Order.find({

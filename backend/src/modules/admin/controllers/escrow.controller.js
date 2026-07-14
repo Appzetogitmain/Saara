@@ -150,7 +150,9 @@ export const updateWithdrawalStatus = asyncHandler(async (req, res) => {
                         walletBalanceAfter:  vendor.walletBalance,   // no further change
                         performedBy:         { role: 'admin', id: req.user?.id },
                         relatedWithdrawalId: withdrawal._id,
-                        notes:               `Withdrawal completed. Transaction ref: ${transactionReference || 'N/A'}. ${notes || ''}`.trim(),
+                        // T5.4: Same before/after balance is intentional \u2014 wallet was deducted at WITHDRAWAL_HOLD.
+                        // This entry records physical fund disbursement, not a wallet deduction.
+                        notes: `Withdrawal completed. Transaction ref: ${transactionReference || 'N/A'}. ${notes || ''} [Balance deducted at WITHDRAWAL_HOLD stage \u2014 this is an informational disbursement record]`.trim(),
                     }], { session });
                 }
             }

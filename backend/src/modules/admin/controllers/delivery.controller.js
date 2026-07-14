@@ -9,6 +9,7 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import CashSettlement from '../../../models/CashSettlement.model.js';
 import DeliveryWalletTransaction from '../../../models/DeliveryWalletTransaction.model.js';
+import DeliveryWithdrawal from '../../../models/DeliveryWithdrawal.model.js';
 
 const DOC_TOKEN_TTL_MS = 10 * 60 * 1000;
 const DOC_TOKEN_QUERY_KEY = 'docToken';
@@ -386,12 +387,26 @@ export const deleteDeliveryBoy = asyncHandler(async (req, res) => {
         throw new ApiError(409, 'Cannot delete delivery boy with active assigned orders');
     }
 
+    // T3.4: Block deletion if financial obligations exist — prevents orphaned records
+    const pendingWithdrawals = await DeliveryWithdrawal.countDocuments({
+        deliveryBoyId: boy._id,
+        status: { $in: ['pending', 'processing'] },
+    });
+    if (pendingWithdrawals > 0) {
+        throw new ApiError(409, 'Cannot delete delivery boy with pending withdrawal requests. Please process or reject all withdrawals first.');
+    }
+
+    if ((boy.cashInHand || 0) > 0) {
+        throw new ApiError(409, `Cannot delete delivery boy with unsettled cash in hand (₹${boy.cashInHand}). Please complete cash settlement first.`);
+    }
+
     await DeliveryBoy.findByIdAndDelete(req.params.id);
 
     res.status(200).json(
         new ApiResponse(200, null, 'Delivery boy deleted successfully')
     );
 });
+
 
 /**
  * @desc    Settle cash in hand for a delivery boy

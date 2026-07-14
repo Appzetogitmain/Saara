@@ -532,8 +532,8 @@ export const verifyPayment = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Invalid payment signature. Verification failed.');
     }
 
-    // Retrieve order and resolve payment method
-    const order = await Order.findOne({ orderId }).lean();
+    // T3.2: Enforce order ownership — prevent any user from triggering payment processing on another user's order.
+    const order = await Order.findOne({ orderId, userId: req.user.id }).lean();
     if (!order) throw new ApiError(404, 'Order not found.');
 
     // Process using the shared, concurrent-safe payment processor

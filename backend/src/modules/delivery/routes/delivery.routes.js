@@ -49,7 +49,10 @@ router.get('/orders', ...deliveryAuth, orderController.getAssignedOrders);
 router.get('/orders/dashboard-summary', ...deliveryAuth, orderController.getDashboardSummary);
 router.get('/orders/profile-summary', ...deliveryAuth, orderController.getProfileSummary);
 router.get('/orders/:id', ...deliveryAuth, orderController.getOrderDetail);
-if (!IS_PRODUCTION) {
+// T1.5: Require an explicit opt-in flag to activate the debug OTP endpoint.
+// NODE_ENV alone is unreliable (staging/CI may not set it to 'production').
+// This route must NEVER be active in production — add ENABLE_DEBUG_OTP=true to .env only in local dev.
+if (process.env.ENABLE_DEBUG_OTP === 'true') {
     router.get('/orders/:id/debug-otp', ...deliveryAuth, orderController.getDeliveryOtpForDebug);
 }
 router.patch('/orders/:id/status', ...deliveryAuth, orderController.updateDeliveryStatus);
