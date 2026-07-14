@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { FiBell, FiCheck, FiTrash2, FiInbox, FiRefreshCw } from "react-icons/fi";
 import MobileLayout from "../components/Layout/MobileLayout";
@@ -24,6 +25,32 @@ const UserNotifications = () => {
     markAllAsRead,
     removeNotification,
   } = useUserNotificationStore();
+
+  const navigate = useNavigate();
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification) return;
+    
+    // Mark as read if unread
+    if (!notification.isRead) {
+      await markAsRead(notification._id);
+    }
+
+    const data = notification.data || {};
+    const titleLower = (notification.title || '').toLowerCase();
+    const msgLower = (notification.message || '').toLowerCase();
+
+    // Determine target route
+    if (data.orderId) {
+      navigate(`/orders/${data.orderId}`);
+    } else if (titleLower.includes('wallet') || msgLower.includes('wallet') || data.walletId) {
+      navigate('/user/wallet');
+    } else if (titleLower.includes('support') || titleLower.includes('ticket') || data.ticketId) {
+      navigate('/support');
+    } else if (notification.type === 'order') {
+      navigate('/orders');
+    }
+  };
 
   useEffect(() => {
     fetchNotifications(1);
@@ -84,10 +111,11 @@ const UserNotifications = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.03 }}
-                  className={`rounded-2xl p-4 shadow-sm border ${
+                  onClick={() => handleNotificationClick(notification)}
+                  className={`rounded-2xl p-4 shadow-sm border cursor-pointer transition-all duration-200 hover:shadow-md hover:scale-[1.01] ${
                     notification?.isRead
-                      ? "bg-white border-gray-200"
-                      : "bg-blue-50 border-blue-200"
+                      ? "bg-white border-gray-200 hover:border-gray-300"
+                      : "bg-blue-50 border-blue-200 hover:bg-blue-100/50"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -109,7 +137,10 @@ const UserNotifications = () => {
                     <div className="flex items-center gap-2 shrink-0">
                       {!notification?.isRead && (
                         <button
-                          onClick={() => markAsRead(notification?._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            markAsRead(notification?._id);
+                          }}
                           className="p-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-white"
                           title="Mark as read"
                           type="button"
@@ -118,7 +149,10 @@ const UserNotifications = () => {
                         </button>
                       )}
                       <button
-                        onClick={() => removeNotification(notification?._id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeNotification(notification?._id);
+                        }}
                         className="p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50"
                         title="Delete notification"
                         type="button"

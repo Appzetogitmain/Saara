@@ -87,5 +87,16 @@ export const useVendorNotificationStore = create((set, get) => ({
       toast.error("Failed to delete notification");
     }
   },
+
+  addNotification: (notification) => {
+    set((state) => {
+      const exists = state.notifications.some((n) => n._id === notification._id);
+      if (exists) return {};
+      return {
+        notifications: [notification, ...state.notifications],
+        unreadCount: (state.unreadCount || 0) + 1,
+      };
+    });
+  },
 }));
 

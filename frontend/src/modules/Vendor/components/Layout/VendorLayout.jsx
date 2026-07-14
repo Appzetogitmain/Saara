@@ -6,6 +6,9 @@ import VendorBottomNav from './VendorBottomNav';
 import useAdminHeaderHeight from '../../../Admin/hooks/useAdminHeaderHeight';
 import { useVendorAuthStore } from '../../store/vendorAuthStore';
 import { getVendorProfile } from '../../services/vendorService';
+import { getSocket, joinRoom, leaveRoom } from '../../../../shared/utils/socket';
+import { useVendorNotificationStore } from '../../store/vendorNotificationStore';
+import toast from 'react-hot-toast';
 
 const VendorLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -14,7 +17,8 @@ const VendorLayout = () => {
   );
   const headerHeight = useAdminHeaderHeight();
   const location = useLocation();
-  const { syncVendor } = useVendorAuthStore();
+  const { syncVendor, vendor, token } = useVendorAuthStore();
+  const { addNotification } = useVendorNotificationStore();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -31,6 +35,38 @@ const VendorLayout = () => {
     };
     fetchProfile();
   }, [syncVendor]);
+
+  useEffect(() => {
+    if (!token || !vendor) return;
+    const socket = getSocket(token);
+    if (!socket) return;
+
+    const vendorId = vendor.id || vendor._id;
+    joinRoom(`vendor_${vendorId}`);
+
+    const handleNewNotification = (notif) => {
+      addNotification(notif);
+      toast.success(
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-sm">{notif.title}</p>
+          <p className="text-xs text-gray-600">{notif.message}</p>
+        </div>,
+        {
+          duration: 6000,
+          position: 'top-right',
+        }
+      );
+    };
+
+    socket.on('new_notification', handleNewNotification);
+    socket.on('notification', handleNewNotification);
+
+    return () => {
+      socket.off('new_notification', handleNewNotification);
+      socket.off('notification', handleNewNotification);
+      leaveRoom(`vendor_${vendorId}`);
+    };
+  }, [token, vendor, addNotification]);
 
   const toggleSidebar = () => {
     const nextVal = !isCollapsed;

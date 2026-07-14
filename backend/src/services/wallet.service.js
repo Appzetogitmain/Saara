@@ -147,7 +147,7 @@ export const creditWallet = async (userId, amount, transactionType, details = {}
         recipientType: 'user',
         title: 'Wallet Credited',
         message: notificationMsg,
-        type: 'wallet_credit',
+        type: 'payment',
         data: {
             walletId: String(wallet._id),
             transactionId: String(transaction._id),
@@ -233,7 +233,7 @@ export const debitWallet = async (userId, amount, transactionType, details = {},
         recipientType: 'user',
         title: 'Wallet Debited',
         message: notificationMsg,
-        type: 'wallet_debit',
+        type: 'payment',
         data: {
             walletId: String(wallet._id),
             transactionId: String(transaction._id),
