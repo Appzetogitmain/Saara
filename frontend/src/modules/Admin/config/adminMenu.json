@@ -32,13 +32,17 @@
     "route": "/admin/categories",
     "children": [
       "Manage Categories",
+      "Category Requests",
       "Category Order"
     ]
   },
   {
     "title": "Brands",
     "route": "/admin/brands",
-    "children": []
+    "children": [
+      "Manage Brands",
+      "Brand Requests"
+    ]
   },
   {
     "title": "Customers",

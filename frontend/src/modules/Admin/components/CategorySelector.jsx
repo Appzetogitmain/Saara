@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from "react";
-import { FiChevronDown, FiChevronRight } from "react-icons/fi";
+import { FiChevronDown, FiChevronRight, FiPlus, FiUpload, FiX } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCategoryStore } from "../../../shared/store/categoryStore";
+import { uploadVendorImage } from "../../../modules/Vendor/services/vendorService";
+import AnimatedSelect from "./AnimatedSelect";
+import toast from "react-hot-toast";
 
 const CategorySelector = ({
   value,
@@ -10,11 +13,13 @@ const CategorySelector = ({
   required = false,
   className = "",
 }) => {
+  const isVendorArea = typeof window !== "undefined" && window.location.pathname.startsWith("/vendor");
   const {
     categories,
     getRootCategories,
     getCategoriesByParent,
     getCategoryById,
+    requestCategory,
   } = useCategoryStore();
   const [isOpen, setIsOpen] = useState(false);
   const [hoveredCategoryId, setHoveredCategoryId] = useState(null);
@@ -22,6 +27,59 @@ const CategorySelector = ({
   const parentDropdownRef = useRef(null);
   const subcategoryDropdownRef = useRef(null);
   const closeTimeoutRef = useRef(null);
+
+  // Category Request Popup state
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [requestFormData, setRequestFormData] = useState({
+    categoryName: "",
+    description: "",
+    image: "",
+    reason: "",
+    requestedParentCategoryId: "",
+  });
+
+  const handleRequestSubmit = async (e) => {
+    e.preventDefault();
+    if (!requestFormData.categoryName.trim()) {
+      toast.error("Category name is required");
+      return;
+    }
+    try {
+      await requestCategory(requestFormData);
+      setShowRequestModal(false);
+      setRequestFormData({
+        categoryName: "",
+        description: "",
+        image: "",
+        reason: "",
+        requestedParentCategoryId: "",
+      });
+    } catch (err) {
+      // Handled
+    }
+  };
+
+  const handleRequestImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type?.startsWith("image/")) {
+      toast.error("Please upload an image file");
+      return;
+    }
+    setIsUploadingImage(true);
+    try {
+      const res = await uploadVendorImage(file, "categories");
+      if (res?.data?.url) {
+        setRequestFormData((prev) => ({ ...prev, image: res.data.url }));
+        toast.success("Image uploaded");
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
 
   // Get root categories (parent categories)
   const rootCategories = useMemo(() => {
@@ -316,6 +374,18 @@ const CategorySelector = ({
                     );
                   })
                 )}
+                {isVendorArea && (
+                  <div
+                    onClick={() => {
+                      setIsOpen(false);
+                      setShowRequestModal(true);
+                    }}
+                    className="border-t border-gray-100 mt-1 py-2.5 px-4 text-center text-xs font-semibold text-primary-600 hover:bg-primary-50 cursor-pointer flex items-center justify-center gap-1.5 transition-colors"
+                  >
+                    <FiPlus size={14} />
+                    <span>Request New Category</span>
+                  </div>
+                )}
               </div>
             </motion.div>
 
@@ -399,6 +469,171 @@ const CategorySelector = ({
       {required && (
         <input type="hidden" value={value || ""} required={required} />
       )}
+
+      {/* Category Request Modal inside Selector */}
+      <AnimatePresence>
+        {showRequestModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowRequestModal(false)}
+              className="fixed inset-0 bg-black/50 z-[9999]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-6 space-y-4 text-left">
+                <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+                  <h3 className="text-lg font-bold text-gray-800">
+                    Request New Category
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowRequestModal(false)}
+                    className="p-1 hover:bg-gray-100 rounded-full text-gray-500"
+                  >
+                    <FiX size={18} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleRequestSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Category Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="categoryName"
+                      value={requestFormData.categoryName}
+                      onChange={(e) =>
+                        setRequestFormData((prev) => ({ ...prev, categoryName: e.target.value }))
+                      }
+                      required
+                      placeholder="e.g. Smart Watches"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm bg-white text-gray-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Parent Category
+                    </label>
+                    <AnimatedSelect
+                      name="requestedParentCategoryId"
+                      value={requestFormData.requestedParentCategoryId}
+                      onChange={(e) =>
+                        setRequestFormData((prev) => ({
+                          ...prev,
+                          requestedParentCategoryId: e.target.value,
+                        }))
+                      }
+                      options={[
+                        { value: "", label: "No Parent (Root Category)" },
+                        ...categories
+                          .filter((c) => c.isActive !== false)
+                          .map((c) => ({
+                            value: String(c.id || c._id),
+                            label: c.name,
+                          })),
+                      ]}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Category Image
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 px-3 py-2 border-2 border-dashed border-gray-300 hover:border-primary-500 rounded-lg cursor-pointer text-xs font-semibold transition-colors bg-white">
+                        <FiUpload />
+                        <span>{isUploadingImage ? "Uploading..." : "Upload Image"}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleRequestImageUpload}
+                          className="hidden"
+                          disabled={isUploadingImage}
+                        />
+                      </label>
+                      {requestFormData.image && (
+                        <div className="relative">
+                          <img
+                            src={requestFormData.image}
+                            alt="Category preview"
+                            className="w-12 h-12 object-contain rounded border border-gray-200 p-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setRequestFormData((prev) => ({ ...prev, image: "" }))}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"
+                          >
+                            <FiX size={10} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Description
+                    </label>
+                    <textarea
+                      name="description"
+                      value={requestFormData.description}
+                      onChange={(e) =>
+                        setRequestFormData((prev) => ({ ...prev, description: e.target.value }))
+                      }
+                      rows={2}
+                      placeholder="Enter description..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      Reason for Request
+                    </label>
+                    <textarea
+                      name="reason"
+                      value={requestFormData.reason}
+                      onChange={(e) =>
+                        setRequestFormData((prev) => ({ ...prev, reason: e.target.value }))
+                      }
+                      rows={2}
+                      placeholder="Why request this category?"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => setShowRequestModal(false)}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isUploadingImage}
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm font-semibold transition-colors shadow-md disabled:opacity-50"
+                    >
+                      Submit Request
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

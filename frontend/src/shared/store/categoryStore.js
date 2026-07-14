@@ -9,12 +9,18 @@ import {
   deleteCategory,
   reorderCategories as reorderCategoriesApi,
 } from '../../modules/Admin/services/adminService';
+import {
+  getVendorCategoryRequests,
+  requestVendorCategory,
+  resubmitVendorCategoryRequest,
+} from '../../modules/Vendor/services/vendorService';
 import toast from 'react-hot-toast';
 
 export const useCategoryStore = create(
   persist(
     (set, get) => ({
       categories: [],
+      categoryRequests: [],
       isLoading: false,
 
       // Initialize categories
@@ -187,6 +193,51 @@ export const useCategoryStore = create(
         } catch (error) {
           set({ isLoading: false });
           return false;
+        }
+      },
+
+      // Fetch Category Requests for current vendor
+      fetchCategoryRequests: async (params = {}) => {
+        set({ isLoading: true });
+        try {
+          const response = await getVendorCategoryRequests(params);
+          const payload = response.data;
+          set({
+            categoryRequests: payload.requests || payload,
+            isLoading: false
+          });
+          return payload;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      // Vendor submits a new category request
+      requestCategory: async (categoryData) => {
+        set({ isLoading: true });
+        try {
+          const response = await requestVendorCategory(categoryData);
+          set({ isLoading: false });
+          toast.success('Category request submitted successfully');
+          return response.data;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      // Vendor resubmits a rejected category request
+      resubmitCategoryRequest: async (id, categoryData) => {
+        set({ isLoading: true });
+        try {
+          const response = await resubmitVendorCategoryRequest(id, categoryData);
+          set({ isLoading: false });
+          toast.success('Category request resubmitted successfully');
+          return response.data;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
         }
       },
     }),

@@ -27,6 +27,7 @@ import {
   FiTrendingUp,
   FiFile,
   FiAward,
+  FiLayers,
 } from "react-icons/fi";
 import { useVendorAuthStore } from "../../store/vendorAuthStore";
 import vendorMenu from "../../config/vendorMenu.json";
@@ -36,6 +37,8 @@ const iconMap = {
   Dashboard: FiHome,
   Products: FiPackage,
   "Affiliate Program": FiAward,
+  "Brand Requests": FiTag,
+  "Category Requests": FiLayers,
   "Website Builder": FiLayout,
   Orders: FiShoppingBag,
   "Returns & Exchanges": FiRefreshCw,

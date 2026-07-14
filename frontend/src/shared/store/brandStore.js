@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { getAllBrands, getPublicBrands, createBrand, updateBrand, deleteBrand } from '../../modules/Admin/services/adminService';
+import { getVendorBrands, getVendorBrandRequests, requestVendorBrand, resubmitVendorBrandRequest } from '../../modules/Vendor/services/vendorService';
 import toast from 'react-hot-toast';
 
 export const useBrandStore = create(
   persist(
     (set, get) => ({
       brands: [],
+      brandRequests: [],
       isLoading: false,
 
       // Initialize brands
@@ -17,7 +19,7 @@ export const useBrandStore = create(
             typeof window !== 'undefined' &&
             window.location.pathname.startsWith('/vendor');
           const response = isVendorArea
-            ? await getPublicBrands()
+            ? await getVendorBrands()
             : await getAllBrands();
           const normalizedBrands = response.data.map(brand => ({
             ...brand,
@@ -123,6 +125,51 @@ export const useBrandStore = create(
         } catch (error) {
           set({ isLoading: false });
           return false;
+        }
+      },
+
+      // Fetch Brand Requests for current vendor
+      fetchBrandRequests: async (params = {}) => {
+        set({ isLoading: true });
+        try {
+          const response = await getVendorBrandRequests(params);
+          const payload = response.data;
+          set({
+            brandRequests: payload.requests || payload,
+            isLoading: false
+          });
+          return payload;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      // Vendor submits a new brand request
+      requestBrand: async (brandData) => {
+        set({ isLoading: true });
+        try {
+          const response = await requestVendorBrand(brandData);
+          set({ isLoading: false });
+          toast.success('Brand request submitted successfully');
+          return response.data;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+
+      // Vendor resubmits a rejected brand request
+      resubmitBrand: async (id, brandData) => {
+        set({ isLoading: true });
+        try {
+          const response = await resubmitVendorBrandRequest(id, brandData);
+          set({ isLoading: false });
+          toast.success('Brand request resubmitted successfully');
+          return response.data;
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
         }
       },
 

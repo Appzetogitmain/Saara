@@ -15,6 +15,16 @@
                      ]
     },
     {
+        "title": "Brand Requests",
+        "route": "/vendor/brand-requests",
+        "children": []
+    },
+    {
+        "title": "Category Requests",
+        "route": "/vendor/category-requests",
+        "children": []
+    },
+    {
         "title": "Affiliate Program",
         "route": "/vendor/affiliate",
         "children": []

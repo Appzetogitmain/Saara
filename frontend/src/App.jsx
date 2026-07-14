@@ -21,6 +21,8 @@ import ReturnRequests from "./modules/Admin/pages/ReturnRequests";
 import ReturnRequestDetail from "./modules/Admin/pages/ReturnRequestDetail";
 import Categories from "./modules/Admin/pages/Categories";
 import BrandManagement from "./modules/Admin/pages/BrandManagement";
+import AdminBrandRequests from "./modules/Admin/pages/BrandRequests";
+import AdminCategoryRequests from "./modules/Admin/pages/CategoryRequests";
 import Customers from "./modules/Admin/pages/Customers";
 
 import Campaigns from "./modules/Admin/pages/Campaigns";
@@ -169,6 +171,8 @@ import VendorProducts from "./modules/Vendor/pages/Products";
 import VendorManageProducts from "./modules/Vendor/pages/products/ManageProducts";
 import VendorAddProduct from "./modules/Vendor/pages/products/AddProduct";
 import VendorProductForm from "./modules/Vendor/pages/products/ProductForm";
+import VendorBrandRequests from "./modules/Vendor/pages/BrandRequests";
+import VendorCategoryRequests from "./modules/Vendor/pages/CategoryRequests";
 import VendorOrders from "./modules/Vendor/pages/Orders";
 import VendorAllOrders from "./modules/Vendor/pages/orders/AllOrders";
 import VendorOrderTracking from "./modules/Vendor/pages/orders/OrderTracking";
@@ -548,7 +552,9 @@ const AppRoutes = () => {
           element={<ManageCategories />}
         />
         <Route path="categories/category-order" element={<CategoryOrder />} />
+        <Route path="categories/requests" element={<AdminCategoryRequests />} />
         <Route path="brands" element={<BrandManagement />} />
+        <Route path="brands/requests" element={<AdminBrandRequests />} />
         <Route path="orders" element={<AdminOrders />} />
         <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="orders/:id/invoice" element={<Invoice />} />
@@ -689,6 +695,8 @@ const AppRoutes = () => {
         />
         <Route path="products/add-product" element={<VendorAddProduct />} />
         <Route path="products/:id" element={<VendorProductForm />} />
+        <Route path="brand-requests" element={<VendorBrandRequests />} />
+        <Route path="category-requests" element={<VendorCategoryRequests />} />
         <Route path="orders" element={<VendorOrders />} />
         <Route path="orders/all-orders" element={<VendorAllOrders />} />
         <Route path="orders/order-tracking" element={<VendorOrderTracking />} />

@@ -114,6 +114,27 @@ export const updateBrand = (id, data) =>
 export const deleteBrand = (id) =>
     api.delete(`/admin/brands/${id}`);
 
+export const getAllBrandRequests = (params = {}) =>
+    api.get('/admin/brand-requests', { params });
+
+export const approveBrandRequest = (id) =>
+    api.post(`/admin/brand-requests/${id}/approve`);
+
+export const rejectBrandRequest = (id, rejectionReason) =>
+    api.post(`/admin/brand-requests/${id}/reject`, { rejectionReason });
+
+export const convertToGlobalBrandRequest = (id) =>
+    api.post(`/admin/brand-requests/${id}/convert-to-global`);
+
+export const getAllCategoryRequests = (params = {}) =>
+    api.get('/admin/category-requests', { params });
+
+export const approveCategoryRequest = (id, data = {}) =>
+    api.post(`/admin/category-requests/${id}/approve`, data);
+
+export const rejectCategoryRequest = (id, rejectionReason) =>
+    api.post(`/admin/category-requests/${id}/reject`, { rejectionReason });
+
 // ─── Vendors ──────────────────────────────────────────────────────────────────
 export const getAllVendors = (params = {}) =>
     api.get('/admin/vendors', { params });

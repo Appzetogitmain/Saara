@@ -5,7 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useBrandStore } from "../../../../shared/store/brandStore";
 import toast from "react-hot-toast";
 import Button from "../Button";
-import { uploadAdminImage } from "../../services/adminService";
+import { uploadAdminImage, getAllVendors } from "../../services/adminService";
+import AnimatedSelect from "../AnimatedSelect";
 
 const BrandForm = ({ brand, onClose, onSave }) => {
   const location = useLocation();
@@ -21,7 +22,13 @@ const BrandForm = ({ brand, onClose, onSave }) => {
     description: "",
     website: "",
     isActive: true,
+    visibility: "global",
+    ownerVendorId: "",
+    ownershipType: "",
+    country: "",
   });
+
+
 
   useEffect(() => {
     if (brand) {
@@ -31,6 +38,10 @@ const BrandForm = ({ brand, onClose, onSave }) => {
         description: brand.description || "",
         website: brand.website || "",
         isActive: brand.isActive !== undefined ? brand.isActive : true,
+        visibility: brand.visibility || "global",
+        ownerVendorId: brand.ownerVendorId?._id || brand.ownerVendorId || "",
+        ownershipType: brand.ownershipType || "",
+        country: brand.country || "",
       });
     }
   }, [brand]);
@@ -50,6 +61,8 @@ const BrandForm = ({ brand, onClose, onSave }) => {
       toast.error("Brand name is required");
       return;
     }
+
+
 
     if (isSubmitting) return;
     setIsSubmitting(true);
@@ -214,6 +227,43 @@ const BrandForm = ({ brand, onClose, onSave }) => {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                       placeholder="https://example.com"
                     />
+                  </div>
+
+
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Ownership Type
+                      </label>
+                      <AnimatedSelect
+                        name="ownershipType"
+                        value={formData.ownershipType}
+                        onChange={handleChange}
+                        placeholder="Select type..."
+                        options={[
+                          { value: "", label: "Select Type" },
+                          { value: "manufacturer", label: "Manufacturer" },
+                          { value: "reseller", label: "Reseller" },
+                          { value: "distributor", label: "Distributor" },
+                          { value: "private_label", label: "Private Label" },
+                        ]}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Country of Origin
+                      </label>
+                      <input
+                        type="text"
+                        name="country"
+                        value={formData.country}
+                        onChange={handleChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        placeholder="e.g., India, USA"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

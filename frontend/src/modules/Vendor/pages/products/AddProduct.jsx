@@ -9,6 +9,7 @@ import { useBrandStore } from "../../../../shared/store/brandStore";
 import { uploadVendorImage, uploadVendorImages } from "../../services/vendorService";
 import CategorySelector from "../../../Admin/components/CategorySelector";
 import AnimatedSelect from "../../../Admin/components/AnimatedSelect";
+import BrandSelector from "../../components/BrandSelector";
 import toast from "react-hot-toast";
 import {
   parseVariantAxis,
@@ -478,20 +479,10 @@ const AddProduct = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">
-                Brand
-              </label>
-              <AnimatedSelect
+              <BrandSelector
                 name="brandId"
                 value={formData.brandId || ""}
                 onChange={handleChange}
-                placeholder="Select Brand"
-                options={[
-                  { value: "", label: "Select Brand" },
-                  ...brands
-                    .filter((brand) => brand.isActive !== false)
-                    .map((brand) => ({ value: String(brand.id), label: brand.name })),
-                ]}
               />
             </div>
 

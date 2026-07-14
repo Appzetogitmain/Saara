@@ -522,3 +522,14 @@ export const createVendorSupportTicket = (data) => api.post('/vendor/support/tic
  */
 export const replyToVendorSupportTicket = (id, message) => 
     api.post(`/vendor/support/tickets/${id}/message`, { message });
+
+// ─── BRANDS & REQUESTS ──────────────────────────────────────────────────────────
+export const getVendorBrands = () => api.get('/vendor/brands');
+export const getVendorBrandRequests = (params = {}) => api.get('/vendor/brand-requests', { params });
+export const requestVendorBrand = (data) => api.post('/vendor/brand-requests', data);
+export const resubmitVendorBrandRequest = (id, data) => api.put(`/vendor/brand-requests/${id}/resubmit`, data);
+
+// ─── CATEGORY REQUESTS ──────────────────────────────────────────────────────────
+export const getVendorCategoryRequests = (params = {}) => api.get('/vendor/category-requests', { params });
+export const requestVendorCategory = (data) => api.post('/vendor/category-requests', data);
+export const resubmitVendorCategoryRequest = (id, data) => api.put(`/vendor/category-requests/${id}/resubmit`, data);

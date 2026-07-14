@@ -62,7 +62,12 @@ const getChildRoute = (parentRoute, childName) => {
     },
     "/admin/categories": {
       "Manage Categories": "/admin/categories/manage-categories",
+      "Category Requests": "/admin/categories/requests",
       "Category Order": "/admin/categories/category-order",
+    },
+    "/admin/brands": {
+      "Manage Brands": "/admin/brands",
+      "Brand Requests": "/admin/brands/requests",
     },
     "/admin/customers": {
       "View Customers": "/admin/customers/view-customers",
