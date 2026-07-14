@@ -2,6 +2,7 @@ import asyncHandler from '../../../utils/asyncHandler.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
 import ApiError from '../../../utils/ApiError.js';
 import Product from '../../../models/Product.model.js';
+import Brand from '../../../models/Brand.model.js';
 import { slugify } from '../../../utils/slugify.js';
 
 const deriveStockStatus = (stockQuantity = 0, lowStockThreshold = 10) => {
@@ -262,6 +263,15 @@ export const createProduct = asyncHandler(async (req, res) => {
         : stockQuantity;
     const stock = deriveStockStatus(finalStockQuantity, lowStockThreshold);
 
+    if (rest.brandId) {
+        const brand = await Brand.findById(rest.brandId);
+        if (!brand) throw new ApiError(404, 'Brand not found.');
+        if (!brand.isActive) throw new ApiError(400, 'Selected brand is inactive.');
+        if (brand.visibility === 'private' && String(brand.ownerVendorId) !== String(req.user.id)) {
+            throw new ApiError(403, 'You do not have permission to use this private brand.');
+        }
+    }
+
     const product = await Product.create({
         name,
         slug,
@@ -281,6 +291,16 @@ export const createProduct = asyncHandler(async (req, res) => {
 export const updateProduct = asyncHandler(async (req, res) => {
     const product = await Product.findOne({ _id: req.params.id, vendorId: req.user.id });
     if (!product) throw new ApiError(404, 'Product not found or access denied.');
+
+    if (req.body.brandId) {
+        const brand = await Brand.findById(req.body.brandId);
+        if (!brand) throw new ApiError(404, 'Brand not found.');
+        if (!brand.isActive) throw new ApiError(400, 'Selected brand is inactive.');
+        if (brand.visibility === 'private' && String(brand.ownerVendorId) !== String(req.user.id)) {
+            throw new ApiError(403, 'You do not have permission to use this private brand.');
+        }
+    }
+
     Object.assign(product, req.body);
     if (Object.prototype.hasOwnProperty.call(req.body, 'faqs')) {
         product.faqs = sanitizeFaqs(req.body.faqs);

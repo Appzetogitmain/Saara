@@ -121,6 +121,15 @@ router.post('/brands', ...adminAuth, validate(createBrandSchema), catalogControl
 router.put('/brands/:id', ...adminAuth, validate(brandIdParamSchema, 'params'), validate(updateBrandSchema), catalogController.updateBrand);
 router.delete('/brands/:id', ...adminAuth, validate(brandIdParamSchema, 'params'), catalogController.deleteBrand);
 
+router.get('/category-requests', ...adminAuth, catalogController.getAllCategoryRequests);
+router.post('/category-requests/:id/approve', ...adminAuth, validate(categoryIdParamSchema, 'params'), catalogController.approveCategoryRequest);
+router.post('/category-requests/:id/reject', ...adminAuth, validate(categoryIdParamSchema, 'params'), catalogController.rejectCategoryRequest);
+
+router.get('/brand-requests', ...adminAuth, catalogController.getAllBrandRequests);
+router.post('/brand-requests/:id/approve', ...adminAuth, validate(brandIdParamSchema, 'params'), catalogController.approveBrandRequest);
+router.post('/brand-requests/:id/reject', ...adminAuth, validate(brandIdParamSchema, 'params'), catalogController.rejectBrandRequest);
+router.post('/brand-requests/:id/convert-to-global', ...adminAuth, validate(brandIdParamSchema, 'params'), catalogController.convertToGlobalBrandRequest);
+
 // ─── Vendors ──────────────────────────────────────────────────────────────────
 router.get('/vendors', ...adminAuth, validate(vendorListQuerySchema, 'query'), vendorController.getAllVendors);
 router.get('/vendors/pending', ...adminAuth, (req, res, next) => { req.query.status = 'pending'; next(); }, validate(vendorListQuerySchema, 'query'), vendorController.getAllVendors);

@@ -459,7 +459,7 @@ router.get('/categories/all', catalogCache, asyncHandler(async (req, res) => {
 
 // GET /api/brands (public)
 router.get('/brands/all', catalogCache, asyncHandler(async (req, res) => {
-    const brands = await Brand.find({ isActive: true }).sort({ name: 1 }).lean();
+    const brands = await Brand.find({ isActive: true, visibility: 'global' }).sort({ name: 1 }).lean();
     res.status(200).json(new ApiResponse(200, brands, 'Brands fetched.'));
 }));
 

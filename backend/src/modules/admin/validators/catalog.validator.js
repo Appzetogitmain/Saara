@@ -133,16 +133,26 @@ export const brandIdParamSchema = Joi.object({
 
 export const createBrandSchema = Joi.object({
     name: Joi.string().trim().min(2).max(120).required(),
-    logo: Joi.string().trim().uri().allow('').optional(),
+    logo: Joi.string().trim().allow('').optional(), // Allow non-uri strings (like uploaded paths)
     description: Joi.string().trim().allow('').optional(),
-    website: Joi.string().trim().uri().allow('').optional(),
+    website: Joi.string().trim().allow('').optional(),
     isActive: Joi.boolean().optional(),
+    visibility: Joi.string().valid('global', 'private').optional(),
+    ownerVendorId: objectId.allow(null, '').optional(),
+    createdBy: Joi.string().valid('admin', 'vendor').optional(),
+    ownershipType: Joi.string().valid('manufacturer', 'reseller', 'distributor', 'private_label').allow(null, '').optional(),
+    country: Joi.string().trim().allow('').optional(),
 });
 
 export const updateBrandSchema = Joi.object({
     name: Joi.string().trim().min(2).max(120).optional(),
-    logo: Joi.string().trim().uri().allow('').optional(),
+    logo: Joi.string().trim().allow('').optional(),
     description: Joi.string().trim().allow('').optional(),
-    website: Joi.string().trim().uri().allow('').optional(),
+    website: Joi.string().trim().allow('').optional(),
     isActive: Joi.boolean().optional(),
+    visibility: Joi.string().valid('global', 'private').optional(),
+    ownerVendorId: objectId.allow(null, '').optional(),
+    createdBy: Joi.string().valid('admin', 'vendor').optional(),
+    ownershipType: Joi.string().valid('manufacturer', 'reseller', 'distributor', 'private_label').allow(null, '').optional(),
+    country: Joi.string().trim().allow('').optional(),
 }).min(1);

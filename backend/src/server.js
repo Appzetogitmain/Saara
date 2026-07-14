@@ -16,6 +16,21 @@ const startServer = async () => {
   try {
     validateEnv();
     await connectDB();
+    
+    // Idempotent migration for existing brands
+    try {
+      const Brand = (await import("./models/Brand.model.js")).default;
+      const updatedCount = await Brand.updateMany(
+        { visibility: { $exists: false } },
+        { $set: { visibility: "global", createdBy: "admin" } }
+      );
+      if (updatedCount.modifiedCount > 0) {
+        console.log(`📦 Migrated ${updatedCount.modifiedCount} existing brands to default global settings.`);
+      }
+    } catch (err) {
+      console.error("📦 Failed to run brand migration:", err);
+    }
+
     initAssignmentScheduler();
     
     // Auto-release escrow scanner (run on startup and every 24 hours)

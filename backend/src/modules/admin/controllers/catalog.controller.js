@@ -5,8 +5,13 @@ import Product from '../../../models/Product.model.js';
 import Vendor from '../../../models/Vendor.model.js';
 import Category from '../../../models/Category.model.js';
 import Brand from '../../../models/Brand.model.js';
+import BrandRequest from '../../../models/BrandRequest.model.js';
+import CategoryRequest from '../../../models/CategoryRequest.model.js';
 import Settings from '../../../models/Settings.model.js';
+import { emitToRoom } from '../../../services/socket.service.js';
 import { slugify } from '../../../utils/slugify.js';
+import { createNotification } from '../../../services/notification.service.js';
+import mongoose from 'mongoose';
 
 const sanitizeFaqs = (faqs) => {
     if (!Array.isArray(faqs)) return [];
@@ -233,14 +238,60 @@ const assertValidCategoryParent = async ({ categoryId = null, parentId }) => {
 };
 
 const sanitizeBrandPayload = (payload = {}) => {
-    const allowed = ['name', 'logo', 'description', 'website', 'isActive'];
+    const allowed = ['name', 'logo', 'description', 'website', 'isActive', 'visibility', 'ownerVendorId', 'createdBy', 'ownershipType', 'country'];
     const sanitized = {};
     for (const key of allowed) {
         if (Object.prototype.hasOwnProperty.call(payload, key)) {
             sanitized[key] = payload[key];
         }
     }
+    if (sanitized.ownerVendorId === '' || sanitized.ownerVendorId === 'null') {
+        sanitized.ownerVendorId = null;
+    }
     return sanitized;
+};
+
+// Check brand name uniqueness against approved brands and pending requests
+const checkBrandNameUnique = async ({ name, visibility, ownerVendorId, excludeBrandId = null, excludeRequestId = null }) => {
+    const nameRegex = new RegExp(`^${name.trim()}$`, 'i');
+
+    if (visibility === 'global') {
+        // 1. Check if any global brand has this name
+        const globalBrandQuery = { name: nameRegex, visibility: 'global' };
+        if (excludeBrandId) globalBrandQuery._id = { $ne: excludeBrandId };
+        const existingGlobalBrand = await Brand.findOne(globalBrandQuery);
+        if (existingGlobalBrand) {
+            throw new ApiError(400, 'A global brand with this name already exists.');
+        }
+
+        // 2. Check if any pending global brand request has this name
+        const globalRequestQuery = { brandName: nameRegex, requestedVisibility: 'global', status: 'pending' };
+        if (excludeRequestId) globalRequestQuery._id = { $ne: excludeRequestId };
+        const existingGlobalRequest = await BrandRequest.findOne(globalRequestQuery);
+        if (existingGlobalRequest) {
+            throw new ApiError(400, 'A global brand request with this name is already pending approval.');
+        }
+    } else if (visibility === 'private') {
+        if (!ownerVendorId) {
+            throw new ApiError(400, 'Owner vendor ID is required for private brands.');
+        }
+
+        // 1. Check if this vendor already has an approved private brand with this name
+        const privateBrandQuery = { name: nameRegex, visibility: 'private', ownerVendorId };
+        if (excludeBrandId) privateBrandQuery._id = { $ne: excludeBrandId };
+        const existingPrivateBrand = await Brand.findOne(privateBrandQuery);
+        if (existingPrivateBrand) {
+            throw new ApiError(400, 'You already have a private brand with this name.');
+        }
+
+        // 2. Check if this vendor already has a pending private request with this name
+        const privateRequestQuery = { brandName: nameRegex, requestedVisibility: 'private', vendorId: ownerVendorId, status: 'pending' };
+        if (excludeRequestId) privateRequestQuery._id = { $ne: excludeRequestId };
+        const existingPrivateRequest = await BrandRequest.findOne(privateRequestQuery);
+        if (existingPrivateRequest) {
+            throw new ApiError(400, 'A private brand request with this name is already pending approval.');
+        }
+    }
 };
 
 // GET /api/admin/products
@@ -322,6 +373,15 @@ export const createProduct = asyncHandler(async (req, res) => {
             ? 'low_stock'
             : 'in_stock');
 
+    if (rest.brandId) {
+        const brand = await Brand.findById(rest.brandId);
+        if (!brand) throw new ApiError(404, 'Brand not found.');
+        if (!brand.isActive) throw new ApiError(400, 'Selected brand is inactive.');
+        if (brand.visibility === 'private' && String(brand.ownerVendorId) !== String(targetVendorId)) {
+            throw new ApiError(400, 'Selected brand is private and belongs to another vendor.');
+        }
+    }
+
     const product = await Product.create({
         name,
         slug,
@@ -340,6 +400,19 @@ export const createProduct = asyncHandler(async (req, res) => {
 // PUT /api/admin/products/:id
 export const updateProduct = asyncHandler(async (req, res) => {
     const payload = { ...req.body };
+    if (payload.brandId) {
+        const product = await Product.findById(req.params.id).select('vendorId');
+        if (!product) throw new ApiError(404, 'Product not found.');
+        const targetVendorId = payload.vendorId || product.vendorId;
+
+        const brand = await Brand.findById(payload.brandId);
+        if (!brand) throw new ApiError(404, 'Brand not found.');
+        if (!brand.isActive) throw new ApiError(400, 'Selected brand is inactive.');
+        if (brand.visibility === 'private' && String(brand.ownerVendorId) !== String(targetVendorId)) {
+            throw new ApiError(400, 'Selected brand is private and belongs to another vendor.');
+        }
+    }
+
     if (payload.name) {
         payload.slug = slugify(payload.name) + '-' + Date.now();
     }
@@ -522,21 +595,48 @@ export const getAllBrands = asyncHandler(async (req, res) => {
 // POST /api/admin/brands
 export const createBrand = asyncHandler(async (req, res) => {
     const payload = sanitizeBrandPayload(req.body);
-    const { name, ...rest } = payload;
-    const slug = slugify(name);
-    const brand = await Brand.create({ name, slug, ...rest });
+    const { name } = payload;
+    
+    // Ignore client-supplied values for visibility, ownerVendorId, createdBy
+    payload.visibility = 'global';
+    payload.createdBy = 'admin';
+    payload.ownerVendorId = null;
+    
+    // Check uniqueness (Global brand uniqueness check)
+    await checkBrandNameUnique({ name, visibility: 'global', ownerVendorId: null });
+    
+    const slug = slugify(name) + '-' + Date.now();
+    const brand = await Brand.create({ ...payload, slug });
     res.status(201).json(new ApiResponse(201, brand, 'Brand created.'));
 });
 
 // PUT /api/admin/brands/:id
 export const updateBrand = asyncHandler(async (req, res) => {
     const payload = sanitizeBrandPayload(req.body);
+    
+    // Never allow updating visibility, ownerVendorId, createdBy
+    delete payload.visibility;
+    delete payload.createdBy;
+    delete payload.ownerVendorId;
+
+    const existing = await Brand.findById(req.params.id);
+    if (!existing) throw new ApiError(404, 'Brand not found.');
+
     if (payload.name) {
-        payload.slug = slugify(payload.name);
+        // Enforce uniqueness rules based on existing brand visibility
+        await checkBrandNameUnique({
+            name: payload.name,
+            visibility: existing.visibility,
+            ownerVendorId: existing.ownerVendorId,
+            excludeBrandId: existing._id
+        });
+    }
+
+    if (payload.name) {
+        payload.slug = slugify(payload.name) + '-' + Date.now();
     }
 
     const brand = await Brand.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
-    if (!brand) throw new ApiError(404, 'Brand not found.');
     res.status(200).json(new ApiResponse(200, brand, 'Brand updated.'));
 });
 
@@ -547,9 +647,404 @@ export const deleteBrand = asyncHandler(async (req, res) => {
 
     const linkedProductsCount = await Product.countDocuments({ brandId: req.params.id });
     if (linkedProductsCount > 0) {
-        throw new ApiError(409, 'Cannot delete brand with existing products.');
+        throw new ApiError(400, 'Cannot delete brand used in products. Please set it as Inactive instead.');
     }
 
     await Brand.findByIdAndDelete(req.params.id);
     res.status(200).json(new ApiResponse(200, null, 'Brand deleted.'));
+});
+
+// GET /api/admin/brand-requests
+export const getAllBrandRequests = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 20, status, search } = req.query;
+    const numericPage = Math.max(1, Number(page) || 1);
+    const numericLimit = Math.max(1, Number(limit) || 20);
+    const skip = (numericPage - 1) * numericLimit;
+
+    const filter = {};
+    if (status) filter.status = status;
+    if (search) {
+        filter.brandName = { $regex: String(search).trim(), $options: 'i' };
+    }
+
+    const [requests, total] = await Promise.all([
+        BrandRequest.find(filter)
+            .populate('vendorId', 'name storeName email')
+            .populate('reviewedBy', 'name email')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(numericLimit)
+            .lean(),
+        BrandRequest.countDocuments(filter),
+    ]);
+
+    res.status(200).json(
+        new ApiResponse(
+            200,
+            { requests, total, page: numericPage, pages: Math.ceil(total / numericLimit) },
+            'Brand requests fetched.'
+        )
+    );
+});
+
+// POST /api/admin/brand-requests/:id/approve
+export const approveBrandRequest = asyncHandler(async (req, res) => {
+    const request = await BrandRequest.findById(req.params.id);
+    if (!request) throw new ApiError(404, 'Brand request not found.');
+    if (request.status !== 'pending') {
+        throw new ApiError(400, 'This request has already been reviewed.');
+    }
+
+    // Verify name uniqueness first
+    await checkBrandNameUnique({
+        name: request.brandName,
+        visibility: request.requestedVisibility,
+        ownerVendorId: request.vendorId,
+        excludeRequestId: request._id
+    });
+
+    const session = await mongoose.startSession();
+    try {
+        session.startTransaction();
+
+        // Create Brand
+        const slug = slugify(request.brandName) + '-' + Date.now();
+        const brand = await Brand.create(
+            [
+                {
+                    name: request.brandName,
+                    slug,
+                    logo: request.logo,
+                    description: request.description,
+                    website: request.website,
+                    visibility: request.requestedVisibility,
+                    ownerVendorId: request.requestedVisibility === 'private' ? request.vendorId : null,
+                    createdBy: 'vendor',
+                    ownershipType: request.ownershipType,
+                    country: request.country,
+                    isActive: true,
+                },
+            ],
+            { session }
+        );
+
+        // Update Request
+        request.status = 'approved';
+        request.reviewedBy = req.user.id;
+        request.approvedBrandId = brand[0]._id;
+        await request.save({ session });
+
+        await session.commitTransaction();
+
+        // Send Notification
+        await createNotification({
+            recipientId: request.vendorId,
+            recipientType: 'vendor',
+            title: 'Brand Approved',
+            message: `Your brand "${request.brandName}" has been approved. Use it in products now.`,
+            type: 'system',
+            data: { brandId: String(brand[0]._id) },
+        });
+
+        res.status(200).json(new ApiResponse(200, request, 'Brand request approved.'));
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
+});
+
+// POST /api/admin/brand-requests/:id/reject
+export const rejectBrandRequest = asyncHandler(async (req, res) => {
+    const { rejectionReason } = req.body;
+    if (!rejectionReason || !rejectionReason.trim()) {
+        throw new ApiError(400, 'Rejection reason is required.');
+    }
+
+    const request = await BrandRequest.findById(req.params.id);
+    if (!request) throw new ApiError(404, 'Brand request not found.');
+    if (request.status !== 'pending') {
+        throw new ApiError(400, 'This request has already been reviewed.');
+    }
+
+    request.status = 'rejected';
+    request.reviewedBy = req.user.id;
+    request.rejectionReason = rejectionReason.trim();
+    request.rejectedAt = new Date();
+    await request.save();
+
+    // Send Notification
+    await createNotification({
+        recipientId: request.vendorId,
+        recipientType: 'vendor',
+        title: 'Brand Rejected',
+        message: `Your brand request "${request.brandName}" has been rejected. Reason: ${rejectionReason}`,
+        type: 'system',
+        data: { requestId: String(request._id) },
+    });
+
+    res.status(200).json(new ApiResponse(200, request, 'Brand request rejected.'));
+});
+
+// POST /api/admin/brand-requests/:id/convert-to-global
+export const convertToGlobalBrandRequest = asyncHandler(async (req, res) => {
+    const request = await BrandRequest.findById(req.params.id);
+    if (!request) throw new ApiError(404, 'Brand request not found.');
+    if (request.status !== 'pending') {
+        throw new ApiError(400, 'This request has already been reviewed.');
+    }
+
+    // Verify name uniqueness as global brand
+    await checkBrandNameUnique({
+        name: request.brandName,
+        visibility: 'global',
+        excludeRequestId: request._id
+    });
+
+    const session = await mongoose.startSession();
+    try {
+        session.startTransaction();
+
+        // Create a Global Brand
+        const slug = slugify(request.brandName) + '-' + Date.now();
+        const brand = await Brand.create(
+            [
+                {
+                    name: request.brandName,
+                    slug,
+                    logo: request.logo,
+                    description: request.description,
+                    website: request.website,
+                    visibility: 'global',
+                    ownerVendorId: null,
+                    createdBy: 'admin',
+                    ownershipType: request.ownershipType,
+                    country: request.country,
+                    isActive: true,
+                },
+            ],
+            { session }
+        );
+
+        // Update Request
+        request.status = 'approved';
+        request.requestedVisibility = 'global';
+        request.reviewedBy = req.user.id;
+        request.approvedBrandId = brand[0]._id;
+        await request.save({ session });
+
+        await session.commitTransaction();
+
+        // Send Notification
+        await createNotification({
+            recipientId: request.vendorId,
+            recipientType: 'vendor',
+            title: 'Brand Approved as Global',
+            message: `Your brand "${request.brandName}" has been approved as a Global Brand. All sellers can select it.`,
+            type: 'system',
+            data: { brandId: String(brand[0]._id) },
+        });
+
+        res.status(200).json(new ApiResponse(200, request, 'Brand request converted to global and approved.'));
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
+});
+
+// Helper to generate a unique category slug
+const generateUniqueCategorySlug = async (name, session = null) => {
+    let baseSlug = slugify(name);
+    let uniqueSlug = baseSlug;
+    let counter = 1;
+    while (true) {
+        const query = { slug: uniqueSlug };
+        const existing = session 
+            ? await Category.findOne(query).session(session)
+            : await Category.findOne(query);
+        if (!existing) {
+            return uniqueSlug;
+        }
+        uniqueSlug = `${baseSlug}-${counter}`;
+        counter++;
+    }
+};
+
+// GET /api/admin/category-requests
+export const getAllCategoryRequests = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 20, status, search } = req.query;
+    const numericPage = Math.max(1, Number(page) || 1);
+    const numericLimit = Math.max(1, Number(limit) || 20);
+    const skip = (numericPage - 1) * numericLimit;
+
+    const filter = {};
+    if (status) filter.status = status;
+    if (search) {
+        filter.categoryName = { $regex: String(search).trim(), $options: 'i' };
+    }
+
+    const [requests, total] = await Promise.all([
+        CategoryRequest.find(filter)
+            .populate('vendorId', 'name storeName email')
+            .populate('approvedBy', 'name email')
+            .populate('rejectedBy', 'name email')
+            .populate('requestedParentCategoryId', 'name')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(numericLimit)
+            .lean(),
+        CategoryRequest.countDocuments(filter),
+    ]);
+
+    res.status(200).json(
+        new ApiResponse(
+            200,
+            { requests, total, page: numericPage, pages: Math.ceil(total / numericLimit) },
+            'Category requests fetched.'
+        )
+    );
+});
+
+// POST /api/admin/category-requests/:id/approve
+export const approveCategoryRequest = asyncHandler(async (req, res) => {
+    const { parentCategoryId, mergeWithCategoryId } = req.body;
+
+    const request = await CategoryRequest.findById(req.params.id);
+    if (!request) throw new ApiError(404, 'Category request not found.');
+    if (request.status !== 'pending') {
+        throw new ApiError(400, 'This request has already been reviewed.');
+    }
+
+    // 1. If merging with an existing category
+    if (mergeWithCategoryId) {
+        const existingCategory = await Category.findById(mergeWithCategoryId);
+        if (!existingCategory) throw new ApiError(404, 'Merge target category not found.');
+
+        request.status = 'approved';
+        request.approvedCategoryId = existingCategory._id;
+        request.approvedBy = req.user.id;
+        request.approvedAt = new Date();
+        await request.save();
+
+        // Send Notification
+        await createNotification({
+            recipientId: request.vendorId,
+            recipientType: 'vendor',
+            title: 'Category Approved',
+            message: `Your category request "${request.categoryName}" has been approved. Use it in products now.`,
+            type: 'system',
+            data: { categoryId: String(existingCategory._id) },
+        });
+
+        // Emit Socket Event
+        emitToRoom(`vendor_${request.vendorId}`, 'category_request_approved', request);
+        emitToRoom('admin_room', 'category_request_approved', request);
+
+        return res.status(200).json(new ApiResponse(200, request, 'Category request approved and merged.'));
+    }
+
+    // 2. Otherwise, create a new category
+    // Verify name uniqueness (case-insensitive)
+    const nameRegex = new RegExp(`^${request.categoryName.trim()}$`, 'i');
+    const duplicateCategory = await Category.findOne({ name: nameRegex });
+    if (duplicateCategory) {
+        throw new ApiError(400, 'A category with this name already exists.');
+    }
+
+    const session = await mongoose.startSession();
+    try {
+        session.startTransaction();
+
+        // Resolve parent category ID (Admin override or vendor requested)
+        const finalParentId = typeof parentCategoryId !== 'undefined'
+            ? (parentCategoryId === '' || parentCategoryId === 'null' ? null : parentCategoryId)
+            : request.requestedParentCategoryId;
+
+        // Generate unique slug
+        const uniqueSlug = await generateUniqueCategorySlug(request.categoryName, session);
+
+        // Create Category
+        const category = await Category.create(
+            [
+                {
+                    name: request.categoryName.trim(),
+                    slug: uniqueSlug,
+                    description: request.description || '',
+                    image: request.image || '',
+                    parentId: finalParentId || null,
+                    isActive: true,
+                },
+            ],
+            { session }
+        );
+
+        // Update Request
+        request.status = 'approved';
+        request.approvedCategoryId = category[0]._id;
+        request.approvedBy = req.user.id;
+        request.approvedAt = new Date();
+        await request.save({ session });
+
+        await session.commitTransaction();
+
+        // Send Notification
+        await createNotification({
+            recipientId: request.vendorId,
+            recipientType: 'vendor',
+            title: 'Category Approved',
+            message: `Your category request "${request.categoryName}" has been approved. Use it in products now.`,
+            type: 'system',
+            data: { categoryId: String(category[0]._id) },
+        });
+
+        // Emit Socket Event
+        emitToRoom(`vendor_${request.vendorId}`, 'category_request_approved', request);
+        emitToRoom('admin_room', 'category_request_approved', request);
+
+        res.status(200).json(new ApiResponse(200, request, 'Category request approved.'));
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
+});
+
+// POST /api/admin/category-requests/:id/reject
+export const rejectCategoryRequest = asyncHandler(async (req, res) => {
+    const { rejectionReason } = req.body;
+    if (!rejectionReason || !rejectionReason.trim()) {
+        throw new ApiError(400, 'Rejection reason is required.');
+    }
+
+    const request = await CategoryRequest.findById(req.params.id);
+    if (!request) throw new ApiError(404, 'Category request not found.');
+    if (request.status !== 'pending') {
+        throw new ApiError(400, 'This request has already been reviewed.');
+    }
+
+    request.status = 'rejected';
+    request.rejectionReason = rejectionReason.trim();
+    request.rejectedBy = req.user.id;
+    request.rejectedAt = new Date();
+    await request.save();
+
+    // Send Notification
+    await createNotification({
+        recipientId: request.vendorId,
+        recipientType: 'vendor',
+        title: 'Category Rejected',
+        message: `Your category request "${request.categoryName}" has been rejected. Reason: ${rejectionReason}`,
+        type: 'system',
+        data: { requestId: String(request._id) },
+    });
+
+    // Emit Socket Event
+    emitToRoom(`vendor_${request.vendorId}`, 'category_request_rejected', request);
+    emitToRoom('admin_room', 'category_request_rejected', request);
+
+    res.status(200).json(new ApiResponse(200, request, 'Category request rejected.'));
 });

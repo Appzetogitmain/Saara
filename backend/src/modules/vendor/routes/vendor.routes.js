@@ -14,6 +14,8 @@ import * as shippingController from '../controllers/shipping.controller.js';
 import * as uploadController from '../controllers/upload.controller.js';
 import * as walletController from '../controllers/wallet.controller.js';
 import * as supportController from '../controllers/support.controller.js';
+import * as brandController from '../controllers/brand.controller.js';
+import * as categoryController from '../controllers/category.controller.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
 import { authLimiter, otpLimiter, otpVerifyLimiter } from '../../../middlewares/rateLimiter.js';
@@ -60,6 +62,17 @@ router.post('/products', ...vendorAuth, validate(createProductSchema), productCo
 router.put('/products/:id', ...vendorAuth, validate(productIdParamSchema, 'params'), validate(updateProductSchema), productController.updateProduct);
 router.delete('/products/:id', ...vendorAuth, validate(productIdParamSchema, 'params'), productController.deleteProduct);
 router.patch('/stock/:productId', ...vendorAuth, productController.updateStock);
+
+// Brands
+router.get('/brands', ...vendorAuth, brandController.getVendorBrands);
+router.get('/brand-requests', ...vendorAuth, brandController.getVendorBrandRequests);
+router.post('/brand-requests', ...vendorAuth, brandController.requestVendorBrand);
+router.put('/brand-requests/:id/resubmit', ...vendorAuth, brandController.resubmitVendorBrandRequest);
+
+// Categories
+router.get('/category-requests', ...vendorAuth, categoryController.getVendorCategoryRequests);
+router.post('/category-requests', ...vendorAuth, categoryController.requestVendorCategory);
+router.put('/category-requests/:id/resubmit', ...vendorAuth, categoryController.resubmitVendorCategoryRequest);
 
 // Orders
 router.get('/orders', ...vendorAuth, orderController.getVendorOrders);
