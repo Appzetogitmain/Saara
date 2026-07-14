@@ -3,6 +3,9 @@
 
 ### Node ###
 # Logs
+scratch/
+./scripts
+./scratch
 logs
 *.log
 npm-debug.log*

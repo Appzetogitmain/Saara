@@ -14,6 +14,11 @@ import { createRazorpayOrder, verifyPaymentSignature } from '../../../services/p
 import { getWallet, debitWallet } from '../../../services/wallet.service.js';
 import { processCapturedPayment } from '../../../services/paymentProcessor.js';
 import { getDefaultCommissionRate, isPaymentMethodEnabled } from '../../../services/settingsService.js';
+import Admin from '../../../models/Admin.model.js';
+import { createNotification } from '../../../services/notification.service.js';
+import { sendOrderConfirmationEmail } from '../../../services/email.service.js';
+import { notifyOrderUpdate } from '../../../services/socket.service.js';
+import { buildOrderItemsSummary, buildVendorItemsSummary } from '../../../utils/notificationProductFormatter.js';
 
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
 import { calculateVendorShippingForGroups } from '../../../services/vendorShipping.service.js';
@@ -344,6 +349,66 @@ export const initializePayment = asyncHandler(async (req, res) => {
             await session.endSession();
         }
 
+        // Trigger notifications and email asynchronously (non-blocking)
+        if (order && order.orderId) {
+            const notificationTasks = [];
+            
+            // 1. User Notification
+            if (userId) {
+                const itemsText = buildOrderItemsSummary(order.items);
+                notificationTasks.push(
+                    createNotification({
+                        recipientId: userId,
+                        recipientType: 'user',
+                        title: 'Order Placed!',
+                        message: `Your order ${order.orderId} has been placed successfully.${itemsText}`,
+                        type: 'order',
+                        data: { link: `/orders/${order.orderId}` },
+                    }).catch(err => console.error('[COD User Notification] Failed:', err.message))
+                );
+            }
+
+            // 2. Admin Notifications
+            Admin.find({ isActive: true }).select('_id').lean()
+                .then(admins => {
+                    admins.forEach(adm => {
+                        createNotification({
+                            recipientId: adm._id,
+                            recipientType: 'admin',
+                            title: 'New Order Placed',
+                            message: `A new COD order #${order.orderId} of total ₹${order.total} has been placed.`,
+                            type: 'order',
+                            data: { orderId: String(order._id) },
+                        }).catch(err => console.error('[COD Admin Notification] Failed:', err.message));
+                    });
+                })
+                .catch(err => console.error('[COD Admin Fetch] Failed:', err.message));
+
+            // 3. Vendor Notifications
+            (order.vendorItems || []).forEach(vGroup => {
+                const vItemsText = buildVendorItemsSummary(vGroup.items);
+                notificationTasks.push(
+                    createNotification({
+                        recipientId: vGroup.vendorId,
+                        recipientType: 'vendor',
+                        title: 'New Order Received!',
+                        message: `You have received a new order ${order.orderId} totalling ₹${vGroup.subtotal}.${vItemsText}`,
+                        type: 'order',
+                        data: { orderId: String(order._id) },
+                    }).catch(err => console.error('[COD Vendor Notification] Failed:', err.message))
+                );
+            });
+
+            // 4. Send Confirmation Email & Socket updates
+            const emailAddress = order?.shippingAddress?.email || (req.user?.email);
+            if (emailAddress) {
+                sendOrderConfirmationEmail(order, emailAddress).catch((err) =>
+                    console.error(`[COD Order Email] Failed to send for ${order.orderId}:`, err.message)
+                );
+            }
+            notifyOrderUpdate(order);
+        }
+
         return res.status(201).json(new ApiResponse(201, {
             orderId: order.orderId,
             total,
@@ -534,17 +599,48 @@ export const initializePayment = asyncHandler(async (req, res) => {
             recipientType: 'user',
             title: 'Order Confirmed',
             message: `Your order #${order.orderId} has been confirmed successfully!`,
-            type: 'order_status',
+            type: 'order',
             data: { orderId: String(order._id) },
         }).catch(console.error);
 
+        // Notify each admin individually
+        Admin.find({ isActive: true }).select('_id').lean()
+            .then(admins => {
+                admins.forEach(adm => {
+                    createNotification({
+                        recipientId: adm._id,
+                        recipientType: 'admin',
+                        title: 'New Order Placed',
+                        message: `A new order #${order.orderId} of total ₹${order.total} has been placed.`,
+                        type: 'order',
+                        data: { orderId: String(order._id) },
+                    }).catch(err => console.error('[Wallet Admin Notification] Failed:', err.message));
+                });
+            })
+            .catch(err => console.error('[Wallet Admin Fetch] Failed:', err.message));
+
+        // Notify vendors
+        (order.vendorItems || []).forEach(vGroup => {
+            const vItemsText = buildVendorItemsSummary(vGroup.items);
+            createNotification({
+                recipientId: vGroup.vendorId,
+                recipientType: 'vendor',
+                title: 'New Order Received!',
+                message: `You have received a new order ${order.orderId} totalling ₹${vGroup.subtotal}.${vItemsText}`,
+                type: 'order',
+                data: { orderId: String(order._id) },
+            }).catch(err => console.error('[Wallet Vendor Notification] Failed:', err.message));
+        });
+
         try {
-            await sendOrderConfirmationEmail(order._id);
+            await sendOrderConfirmationEmail(order, order.shippingAddress?.email || req.user?.email);
         } catch (e) {
             console.error('[Email Error]', e.message);
         }
 
-        notifyOrderUpdate(order._id, { status: 'processing', paymentStatus: 'paid' }).catch(console.error);
+        order.status = 'processing';
+        order.paymentStatus = 'paid';
+        notifyOrderUpdate(order).catch(console.error);
 
         return res.status(201).json(new ApiResponse(201, {
             orderId: order.orderId,

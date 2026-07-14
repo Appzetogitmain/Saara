@@ -212,17 +212,17 @@ export const payWithWallet = asyncHandler(async (req, res) => {
         recipientType: 'user',
         title: 'Order Confirmed',
         message: `Your order #${order.orderId} has been confirmed successfully!`,
-        type: 'order_status',
+        type: 'order',
         data: { orderId: String(order._id) },
     }).catch(console.error);
 
     try {
-        await sendOrderConfirmationEmail(order._id);
+        await sendOrderConfirmationEmail(order, order.shippingAddress?.email || req.user?.email);
     } catch (e) {
         console.error('[payWithWallet Email Error]', e.message);
     }
 
-    notifyOrderUpdate(order._id, { status: 'processing', paymentStatus: 'paid' }).catch(console.error);
+    notifyOrderUpdate(order).catch(console.error);
 
     res.status(200).json(new ApiResponse(200, { orderId: order.orderId }, 'Order paid successfully with wallet balance'));
 });
