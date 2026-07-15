@@ -58,7 +58,7 @@ const ImageGallery = ({
       <div className="w-full flex flex-col">
         {/* Main Image */}
         <div
-          className="relative w-full aspect-[4/3] bg-white lg:rounded-3xl p-0 lg:p-4 overflow-hidden"
+          className="relative w-full aspect-[3/4] lg:aspect-[3/4] bg-white lg:rounded-3xl p-0 lg:p-4 overflow-hidden"
           data-gallery>
           <motion.div
             key={selectedIndex}
@@ -72,7 +72,7 @@ const ImageGallery = ({
             <LazyImage
               src={imageArray[selectedIndex]}
               alt={`${productName} - Image ${selectedIndex + 1}`}
-              className="w-full h-full object-cover lg:object-contain mix-blend-multiply"
+              className="w-full h-full object-cover mix-blend-multiply"
               onError={(e) => {
                 e.target.src =
                   "https://via.placeholder.com/500x500?text=Product+Image";

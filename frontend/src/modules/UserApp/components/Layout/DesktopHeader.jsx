@@ -448,15 +448,6 @@ const DesktopHeader = () => {
             })}
           </nav>
 
-          {/* Secondary links / micro promotion details */}
-          <div className="hidden lg:flex items-center gap-4 text-xs font-semibold text-gray-500">
-            <span className="flex items-center gap-1">
-              <FiPercent /> Smart Offers
-            </span>
-            <span className="flex items-center gap-1">
-              <FiZap /> Trending Now
-            </span>
-          </div>
         </div>
       </div>
     </header>

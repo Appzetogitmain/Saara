@@ -74,6 +74,35 @@ const VariantSelector = ({ variants, onVariantChange, currentPrice, selectedVari
       const parsed = Number(normalized[1]);
       if (Number.isFinite(parsed)) return parsed;
     }
+
+    // Candidate keys support (e.g. size|color)
+    const size = String(selection.size || "").trim().toLowerCase();
+    const color = String(selection.color || "").trim().toLowerCase();
+
+    const candidates = [
+      `${size}|${color}`,
+      `${size}-${color}`,
+      `${size}_${color}`,
+      `${size}:${color}`,
+      size && !color ? size : null,
+      color && !size ? color : null,
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+      const exactCandidate = entries.find(([rawKey]) => String(rawKey).trim() === candidate);
+      if (exactCandidate) {
+        const parsed = Number(exactCandidate[1]);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+      const normalizedCandidate = entries.find(
+        ([rawKey]) => String(rawKey).trim().toLowerCase() === candidate
+      );
+      if (normalizedCandidate) {
+        const parsed = Number(normalizedCandidate[1]);
+        if (Number.isFinite(parsed)) return parsed;
+      }
+    }
+
     return null;
   };
 
@@ -154,6 +183,35 @@ const VariantSelector = ({ variants, onVariantChange, currentPrice, selectedVari
       const parsed = Number(normalized[1]);
       if (Number.isFinite(parsed) && parsed >= 0) return parsed;
     }
+
+    // Candidate keys support (e.g. size|color)
+    const size = String(selectedVariant.size || "").trim().toLowerCase();
+    const color = String(selectedVariant.color || "").trim().toLowerCase();
+
+    const candidates = [
+      `${size}|${color}`,
+      `${size}-${color}`,
+      `${size}_${color}`,
+      `${size}:${color}`,
+      size && !color ? size : null,
+      color && !size ? color : null,
+    ].filter(Boolean);
+
+    for (const candidate of candidates) {
+      const exactCandidate = entries.find(([rawKey]) => String(rawKey).trim() === candidate);
+      if (exactCandidate) {
+        const parsed = Number(exactCandidate[1]);
+        if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+      }
+      const normalizedCandidate = entries.find(
+        ([rawKey]) => String(rawKey).trim().toLowerCase() === candidate
+      );
+      if (normalizedCandidate) {
+        const parsed = Number(normalizedCandidate[1]);
+        if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+      }
+    }
+
     return base;
   };
 
