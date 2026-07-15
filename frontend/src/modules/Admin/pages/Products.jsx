@@ -31,16 +31,7 @@ const Products = () => {
       hoverShadow: "hover:shadow-green-500/30",
       description: "Create a new product",
     },
-    {
-      path: "/admin/products/tax-pricing",
-      label: "Tax & Pricing",
-      icon: FiDollarSign,
-      gradient: "from-orange-500 via-orange-600 to-orange-700",
-      lightGradient: "from-orange-50 via-orange-100/80 to-orange-50",
-      shadowColor: "shadow-orange-500/20",
-      hoverShadow: "hover:shadow-orange-500/30",
-      description: "Manage tax and pricing rules",
-    },
+
     {
       path: "/admin/products/product-ratings",
       label: "Product Ratings",

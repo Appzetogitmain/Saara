@@ -74,30 +74,7 @@ export const createProductSchema = Joi.object({
 
 export const updateProductSchema = Joi.object(productBaseSchema).min(1);
 
-const ruleStatus = Joi.string().valid('active', 'inactive').required();
-const taxRuleSchema = Joi.object({
-    id: Joi.alternatives().try(Joi.number().integer(), Joi.string()).optional(),
-    name: Joi.string().trim().min(1).required(),
-    rate: Joi.number().min(0).required(),
-    type: Joi.string().valid('percentage', 'fixed').required(),
-    applicableTo: Joi.string().trim().min(1).required(),
-    status: ruleStatus,
-});
 
-const pricingRuleSchema = Joi.object({
-    id: Joi.alternatives().try(Joi.number().integer(), Joi.string()).optional(),
-    name: Joi.string().trim().min(1).required(),
-    type: Joi.string().valid('discount', 'markup').required(),
-    value: Joi.number().min(0).required(),
-    minQuantity: Joi.number().integer().min(1).allow(null).optional(),
-    applicableTo: Joi.string().allow('').optional(),
-    status: ruleStatus,
-});
-
-export const taxPricingRulesSchema = Joi.object({
-    taxRules: Joi.array().items(taxRuleSchema).required(),
-    pricingRules: Joi.array().items(pricingRuleSchema).required(),
-});
 
 export const categoryIdParamSchema = Joi.object({
     id: objectId.required(),

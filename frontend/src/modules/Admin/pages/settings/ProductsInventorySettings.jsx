@@ -71,39 +71,6 @@ const ProductsInventorySettings = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Default Tax Rate (%)
-                </label>
-                <input
-                  type="number"
-                  name="defaultTaxRate"
-                  value={taxData.defaultTaxRate || 18}
-                  onChange={handleTaxChange}
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">Default tax rate applied to all products</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Tax Calculation Method
-                </label>
-                <AnimatedSelect
-                  name="taxCalculationMethod"
-                  value={taxData.taxCalculationMethod || 'exclusive'}
-                  onChange={handleTaxChange}
-                  options={[
-                    { value: 'exclusive', label: 'Exclusive (Tax added on top)' },
-                    { value: 'inclusive', label: 'Inclusive (Tax included in price)' },
-                  ]}
-                />
-                <p className="text-xs text-gray-500 mt-1">How tax is calculated and displayed</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
                   Price Display Format
                 </label>
                 <AnimatedSelect

@@ -81,8 +81,6 @@ const defaultSettings = {
     stockAlertsEnabled: true,
   },
   tax: {
-    defaultTaxRate: 18,
-    taxCalculationMethod: "exclusive", // 'inclusive' or 'exclusive'
     priceDisplayFormat: "INR", // Currency format
   },
   content: {

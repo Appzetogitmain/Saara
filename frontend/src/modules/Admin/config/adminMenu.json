@@ -23,7 +23,6 @@
     "children": [
       "Manage Products",
       "Add Product",
-      "Tax & Pricing",
       "Product Ratings"
     ]
   },

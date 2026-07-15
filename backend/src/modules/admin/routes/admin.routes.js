@@ -30,7 +30,6 @@ import { refreshTokenSchema, logoutSchema } from '../validators/auth.validator.j
 import {
     createProductSchema,
     updateProductSchema,
-    taxPricingRulesSchema,
     categoryIdParamSchema,
     createCategorySchema,
     updateCategorySchema,
@@ -100,10 +99,8 @@ router.delete('/orders/:id', ...adminAuth, audit('DELETE_ORDER', 'Order'), order
 
 // ─── Products ─────────────────────────────────────────────────────────────────
 router.get('/products', ...adminAuth, catalogController.getAllProducts);
-router.get('/products/tax-pricing-rules', ...adminAuth, catalogController.getTaxPricingRules);
 router.get('/products/:id', ...adminAuth, catalogController.getProductById);
 router.post('/products', ...adminAuth, validate(createProductSchema), catalogController.createProduct);
-router.put('/products/tax-pricing-rules', ...adminAuth, validate(taxPricingRulesSchema), catalogController.updateTaxPricingRules);
 
 router.put('/products/:id', ...adminAuth, validate(updateProductSchema), catalogController.updateProduct);
 router.delete('/products/:id', ...adminAuth, catalogController.deleteProduct);

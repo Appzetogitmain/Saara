@@ -73,11 +73,7 @@ export const updateProduct = (id, data) =>
 export const deleteProduct = (id) =>
     api.delete(`/admin/products/${id}`);
 
-export const getTaxPricingRules = () =>
-    api.get('/admin/products/tax-pricing-rules');
 
-export const updateTaxPricingRules = (data) =>
-    api.put('/admin/products/tax-pricing-rules', data);
 
 // ─── Categories ───────────────────────────────────────────────────────────────
 export const getAllCategories = () =>

@@ -7,7 +7,6 @@ import Category from '../../../models/Category.model.js';
 import Brand from '../../../models/Brand.model.js';
 import BrandRequest from '../../../models/BrandRequest.model.js';
 import CategoryRequest from '../../../models/CategoryRequest.model.js';
-import Settings from '../../../models/Settings.model.js';
 import { emitToRoom } from '../../../services/socket.service.js';
 import { slugify } from '../../../utils/slugify.js';
 import { createNotification } from '../../../services/notification.service.js';
@@ -467,33 +466,6 @@ export const deleteProduct = asyncHandler(async (req, res) => {
     );
     if (!product) throw new ApiError(404, 'Product not found.');
     res.status(200).json(new ApiResponse(200, null, 'Product disabled.'));
-});
-
-// GET /api/admin/products/tax-pricing-rules
-export const getTaxPricingRules = asyncHandler(async (req, res) => {
-    const settings = await Settings.findOne({ key: 'product_tax_pricing_rules' }).lean();
-    const value = settings?.value || {};
-    const taxRules = Array.isArray(value.taxRules) ? value.taxRules : [];
-    const pricingRules = Array.isArray(value.pricingRules) ? value.pricingRules : [];
-
-    res.status(200).json(
-        new ApiResponse(200, { taxRules, pricingRules }, 'Tax and pricing rules fetched.')
-    );
-});
-
-// PUT /api/admin/products/tax-pricing-rules
-export const updateTaxPricingRules = asyncHandler(async (req, res) => {
-    const { taxRules = [], pricingRules = [] } = req.body;
-
-    await Settings.findOneAndUpdate(
-        { key: 'product_tax_pricing_rules' },
-        { key: 'product_tax_pricing_rules', value: { taxRules, pricingRules } },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-
-    res.status(200).json(
-        new ApiResponse(200, { taxRules, pricingRules }, 'Tax and pricing rules updated.')
-    );
 });
 
 // GET /api/admin/categories
