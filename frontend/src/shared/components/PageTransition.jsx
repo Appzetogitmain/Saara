@@ -26,13 +26,14 @@ const pageTransition = {
  * Note: Exit animations removed as they require AnimatePresence at Routes level
  * RouteWrapper handles component remounting via key prop
  */
-const PageTransition = ({ children }) => {
+const PageTransition = ({ children, disabled = false }) => {
   const location = useLocation();
   const [direction, setDirection] = useState('none');
   const [prevPath, setPrevPath] = useState(location.pathname);
 
   // Determine direction based on path changes
   useEffect(() => {
+    if (disabled) return;
     const pathDepth = (path) => path.split('/').filter(Boolean).length;
     const currentDepth = pathDepth(location.pathname);
     const previousDepth = pathDepth(prevPath);
@@ -46,7 +47,7 @@ const PageTransition = ({ children }) => {
     }
 
     setPrevPath(location.pathname);
-  }, [location.pathname, prevPath]);
+  }, [location.pathname, prevPath, disabled]);
 
   // Scroll to top on route change
   useEffect(() => {
@@ -55,6 +56,10 @@ const PageTransition = ({ children }) => {
 
   // Memoize the unique key to ensure it updates when location changes
   const uniqueKey = useMemo(() => location.pathname + location.search, [location.pathname, location.search]);
+
+  if (disabled) {
+    return <div className="w-full">{children}</div>;
+  }
 
   // Use a regular div with key to ensure proper remounting, then wrap with motion
   // This prevents motion.div from interfering with React Router's remounting mechanism

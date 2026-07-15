@@ -703,7 +703,7 @@ const MobileProductDetail = () => {
 
   return (
     <>
-      <PageTransition>
+      <PageTransition disabled={true}>
         <MobileLayout showBottomNav={false} showCartBar={false} showHeader={false}>
           <div className="w-full min-h-screen bg-gray-50 flex flex-col pb-24">
             {/* Mobile Overlay Header */}

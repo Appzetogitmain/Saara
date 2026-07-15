@@ -56,7 +56,7 @@ const MobileLayout = ({ children, showBottomNav = true, showCartBar = true, show
       {isDesktopHeaderVisible && <DesktopHeader />}
       {shouldShowHeader && <MobileHeader />}
       <main
-        className={`flex-grow w-full overflow-x-hidden max-w-[1440px] mx-auto px-0 md:px-8 lg:px-12 ${
+        className={`flex-grow w-full max-w-[1440px] mx-auto px-0 md:px-8 lg:px-12 ${
           showCartBar 
             ? 'pb-24' 
             : (shouldShowBottomNav ? 'pb-14' : '')
