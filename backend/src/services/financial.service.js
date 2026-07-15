@@ -140,7 +140,7 @@ export const calculateOrderFinancials = ({
 
             // E. Final Line Total Paid by Customer
             const totalTaxAmount = parseFloat((itemTax + itemShippingTax).toFixed(2));
-            const finalLineTotal = parseFloat((discountedItemSubtotal + itemShipping + itemShippingTax).toFixed(2));
+            const finalLineTotal = parseFloat((discountedItemSubtotal + (item.taxIncluded ? 0 : itemTax) + itemShipping + itemShippingTax).toFixed(2));
 
             itemsWithDiscount.push({
                 productId: item.productId,
@@ -213,7 +213,7 @@ export const calculateOrderFinancials = ({
     });
 
     const tax = totalTax;
-    const finalTotal = parseFloat((discountedSubtotal + rawShipping + tax).toFixed(2));
+    const finalTotal = parseFloat(itemsWithDiscount.reduce((sum, item) => sum + item.finalLineTotal, 0).toFixed(2));
 
     return {
         originalSubtotal,
