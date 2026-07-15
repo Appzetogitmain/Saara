@@ -184,6 +184,61 @@ const resolveVariantPrice = (product, selectedVariant) => {
   return basePrice;
 };
 
+const resolveVariantStock = (product, selectedVariant) => {
+  const baseStock = Number(product?.stockQuantity) || 0;
+  if (!selectedVariant || !product?.variants?.stockMap) return baseStock;
+
+  const entries =
+    product.variants.stockMap instanceof Map
+      ? Array.from(product.variants.stockMap.entries())
+      : Object.entries(product.variants.stockMap || {});
+
+  const dynamicKey = getVariantSignature(selectedVariant || {});
+  if (dynamicKey) {
+    const direct = entries.find(([key]) => String(key).trim() === dynamicKey);
+    if (direct) {
+      const parsed = Number(direct[1]);
+      if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+    }
+    const normalized = entries.find(
+      ([key]) => String(key).trim().toLowerCase() === dynamicKey.toLowerCase()
+    );
+    if (normalized) {
+      const parsed = Number(normalized[1]);
+      if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+    }
+  }
+
+  const size = String(selectedVariant.size || "").trim().toLowerCase();
+  const color = String(selectedVariant.color || "").trim().toLowerCase();
+
+  const candidates = [
+    `${size}|${color}`,
+    `${size}-${color}`,
+    `${size}_${color}`,
+    `${size}:${color}`,
+    size && !color ? size : null,
+    color && !size ? color : null,
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const exact = entries.find(([key]) => String(key).trim() === candidate);
+    if (exact) {
+      const parsed = Number(exact[1]);
+      if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+    }
+    const normalized = entries.find(
+      ([key]) => String(key).trim().toLowerCase() === candidate
+    );
+    if (normalized) {
+      const parsed = Number(normalized[1]);
+      if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+    }
+  }
+
+  return baseStock;
+};
+
 const isMongoId = (value) => /^[a-fA-F0-9]{24}$/.test(String(value || ""));
 const normalizeProduct = (raw) => {
   if (!raw) return null;
@@ -522,14 +577,7 @@ const MobileProductDetail = () => {
     }
 
     const finalPrice = resolveVariantPrice(product, selectedVariant);
-    const variantKey = getVariantSignature(selectedVariant || {});
-    const variantStockValue = Number(
-      product?.variants?.stockMap?.[variantKey] ??
-      product?.variants?.stockMap?.get?.(variantKey)
-    );
-    const effectiveStock = Number.isFinite(variantStockValue)
-      ? variantStockValue
-      : Number(product.stockQuantity || 0);
+    const effectiveStock = resolveVariantStock(product, selectedVariant);
     if (effectiveStock <= 0) {
       toast.error("Selected variant is out of stock");
       return;
@@ -599,15 +647,12 @@ const MobileProductDetail = () => {
 
   const handleQuantityChange = (change) => {
     const newQuantity = quantity + change;
-    const variantKey = getVariantSignature(selectedVariant || {});
-    const variantStockValue = Number(
-      product?.variants?.stockMap?.[variantKey] ??
-      product?.variants?.stockMap?.get?.(variantKey)
-    );
-    const maxStock = Number.isFinite(variantStockValue)
-      ? Math.max(0, variantStockValue)
-      : Number(product?.stockQuantity || 0);
-    if (newQuantity >= 1 && newQuantity <= (maxStock || 10)) {
+    const maxStock = resolveVariantStock(product, selectedVariant);
+    if (change > 0 && newQuantity > (maxStock || 10)) {
+      toast.error(`Only ${maxStock || 10} item(s) available in stock`);
+      return;
+    }
+    if (newQuantity >= 1) {
       setQuantity(newQuantity);
     }
   };
@@ -637,15 +682,7 @@ const MobileProductDetail = () => {
   }, [product, selectedVariant]);
 
   const selectedAvailableStock = useMemo(() => {
-    const variantKey = getVariantSignature(selectedVariant || {});
-    const variantStockValue = Number(
-      product?.variants?.stockMap?.[variantKey] ??
-      product?.variants?.stockMap?.get?.(variantKey)
-    );
-    if (Number.isFinite(variantStockValue)) {
-      return Math.max(0, variantStockValue);
-    }
-    return Number(product?.stockQuantity || 0);
+    return resolveVariantStock(product, selectedVariant);
   }, [product, selectedVariant]);
 
   const productFaqs = useMemo(() => {
@@ -744,7 +781,7 @@ const MobileProductDetail = () => {
             <div className="flex flex-col lg:flex-row lg:max-w-[1440px] lg:mx-auto lg:gap-12 lg:p-8 lg:items-start">
               {/* Left Column: Sticky Image Gallery on Desktop, Swipeable on Mobile */}
               <div className="w-full lg:w-[50%] relative bg-white lg:sticky lg:top-[120px] lg:rounded-3xl lg:p-6 lg:border lg:border-gray-100 lg:shadow-sm flex flex-col gap-4">
-                <div className="relative w-full aspect-[4/3] lg:aspect-square lg:rounded-2xl overflow-hidden">
+                <div className="relative w-full aspect-[3/4] lg:aspect-[3/4] lg:rounded-2xl overflow-hidden">
                   <ImageGallery 
                     images={productImages} 
                     productName={product.name} 
@@ -923,10 +960,9 @@ const MobileProductDetail = () => {
                   <div className="px-4 py-4">
                     <h3 className="text-lg font-bold text-slate-800">Product Details</h3>
                   </div>
-                  
-                  {/* Tabs */}
+                                  {/* Tabs */}
                   <div className="flex items-center border-b border-gray-100 px-4">
-                    {["Description", "Ingredients", "How to use"].map((tab) => (
+                    {["Description"].map((tab) => (
                       <button
                         key={tab}
                         onClick={() => setActiveTab(tab)}
@@ -974,64 +1010,6 @@ const MobileProductDetail = () => {
                                   </div>
                                 </div>
                               ))}
-                            </div>
-                          </div>
-                        </motion.div>
-                      </div>
-                    )}
-
-                    {activeTab === "Ingredients" && (
-                      <div className="space-y-4">
-                        <p className="text-xs text-teal-900 font-medium leading-relaxed">
-                          {product.ingredients || "High-quality raw materials, Premium finishes, Reinforced stitching, and sustainable components tailored for longevity."}
-                        </p>
-                        <motion.div
-                          initial={false}
-                          animate={{ height: isExpanded ? "auto" : 0, opacity: isExpanded ? 1 : 0 }}
-                          className="overflow-hidden space-y-4"
-                        >
-                          <div className="pt-4 border-t border-gray-50">
-                            <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest mb-3">Core Components</h4>
-                            <div className="grid grid-cols-2 gap-3">
-                              {["Pure Organic Cotton", "Recycled Fibers", "Hypoallergenic Dye", "Sustainable Wood"].map((ing, idx) => (
-                                <div key={idx} className="flex items-center gap-2">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                                  <span className="text-[10px] text-slate-600 font-medium">{ing}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </motion.div>
-                      </div>
-                    )}
-
-                    {activeTab === "How to use" && (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          {(Array.isArray(product.howToUse) ? product.howToUse : (product.howToUse?.split?.("\n") || [
-                            "1. Carefully unbox the product from its protective cover.",
-                            "2. Inspect the item for any specific care instructions.",
-                            "3. Follow the recommended maintenance routine."
-                          ])).map((step, idx) => (
-                            <p key={idx} className="text-xs text-teal-900 font-medium leading-relaxed">
-                              {step}
-                            </p>
-                          ))}
-                        </div>
-                        <motion.div
-                          initial={false}
-                          animate={{ height: isExpanded ? "auto" : 0, opacity: isExpanded ? 1 : 0 }}
-                          className="overflow-hidden space-y-4"
-                        >
-                          <div className="pt-4 border-t border-gray-50">
-                            <h4 className="text-[11px] font-bold text-slate-800 uppercase tracking-widest mb-3">Pro Tips & Care</h4>
-                            <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                              <p className="text-[10px] text-slate-600 font-medium leading-relaxed italic">
-                                "To maintain peak condition, avoid direct exposure to extreme heat and clean regularly with a soft, damp cloth."
-                              </p>
-                              <div className="flex items-center gap-2 text-pink-500 font-bold text-[9px]">
-                                <FiCheckCircle /> VERIFIED QUALITY
-                              </div>
                             </div>
                           </div>
                         </motion.div>
