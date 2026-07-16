@@ -339,7 +339,6 @@ const MobileHome = () => {
   const combinedSections = useMemo(() => {
     const all = [...homepageSections, ...userSections];
     const sorted = all.sort((a, b) => a.order - b.order || b.priority - a.priority);
-    console.log("🔌 [Home.jsx] combinedSections:", sorted);
     return sorted;
   }, [homepageSections, userSections]);
 
@@ -520,11 +519,8 @@ const MobileHome = () => {
         setDealItems([]);
       }
 
-      console.log("🔌 [Home.jsx] homepageRes status:", homepageRes.status);
       if (homepageRes.status === "fulfilled") {
-        console.log("🔌 [Home.jsx] homepageRes value:", homepageRes.value);
         const payload = extractResponseData(homepageRes.value) || {};
-        console.log("🔌 [Home.jsx] homepageRes payload:", payload);
         const parsedSections = (payload.sections || []).map(sec => {
           if (Array.isArray(sec.data)) {
             return {
@@ -965,31 +961,20 @@ const MobileHome = () => {
               </div>
             }>
               {combinedSections.map((section) => {
-                console.log(`🔍 [Home.jsx] Map checking section: ${section.type}`, {
-                  dataLength: Array.isArray(section.data) ? section.data.length : !!section.data,
-                  minProducts: section.minimumProducts,
-                  layout: section.layout
-                });
-
                 const Component = SECTION_COMPONENTS[section.type];
                 if (!Component) {
-                  console.log(`❌ [Home.jsx] Component registry missing for type: ${section.type}`);
                   return null;
                 }
 
                 const hasData = Array.isArray(section.data) ? section.data.length > 0 : !!section.data;
                 if (!hasData) {
-                  console.log(`⚠️ [Home.jsx] Skipping section ${section.type} due to no data.`);
                   return null;
                 }
 
                 // Honor minimumProducts display condition
                 if (Array.isArray(section.data) && section.data.length < (section.minimumProducts || 0)) {
-                  console.log(`⚠️ [Home.jsx] Skipping section ${section.type} because data length (${section.data.length}) < minProducts (${section.minimumProducts}).`);
                   return null;
                 }
-
-                console.log(`🚀 [Home.jsx] Rendering Component for section: ${section.type}`);
 
                 // Render best_sellers, recently_viewed, top_rated by passing products
                 if (['best_sellers', 'recently_viewed', 'top_rated'].includes(section.type)) {

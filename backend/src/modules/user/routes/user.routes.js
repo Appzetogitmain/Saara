@@ -62,6 +62,8 @@ router.patch('/addresses/:id/default', ...customerAuth, addressController.setDef
 router.get('/wishlist', ...customerAuth, wishlistController.getWishlist);
 router.post('/wishlist', ...customerAuth, wishlistController.addToWishlist);
 router.delete('/wishlist/:productId', ...customerAuth, wishlistController.removeFromWishlist);
+router.post('/wishlist/move-selected', ...customerAuth, wishlistController.moveSelectedToCart);
+router.post('/wishlist/remove-selected', ...customerAuth, wishlistController.removeSelectedFromWishlist);
 
 // Review routes
 router.get('/reviews/product/:productId', reviewController.getProductReviews);

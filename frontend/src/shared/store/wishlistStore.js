@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import api from '../utils/api';
 import { useAuthStore } from './authStore';
 import { setPostLoginAction, setPostLoginRedirect } from '../utils/postLoginAction';
+import toast from 'react-hot-toast';
 
 const isMongoId = (value) => /^[a-fA-F0-9]{24}$/.test(String(value || ''));
 const normalizeId = (value) => String(value ?? '').trim();
@@ -26,8 +27,8 @@ const redirectToLogin = () => {
 };
 
 const normalizeWishlistItem = (item) => {
-  const product = item?.productId || item;
-  const id = normalizeId(product?.id || product?._id || item?.id);
+  const product = item?.product || item?.productId || item;
+  const id = normalizeId(product?.id || product?._id || item?.id || item?.productId);
   return {
     id,
     name: product?.name || item?.name || 'Product',
@@ -36,6 +37,7 @@ const normalizeWishlistItem = (item) => {
     stock: product?.stock || item?.stock,
     unit: product?.unit || item?.unit,
     rating: Number(product?.rating ?? item?.rating ?? 0),
+    reviewCount: Number(product?.reviewCount ?? item?.reviewCount ?? 0),
     originalPrice:
       product?.originalPrice !== undefined
         ? Number(product.originalPrice)
@@ -43,6 +45,15 @@ const normalizeWishlistItem = (item) => {
           ? Number(item.originalPrice)
           : undefined,
     productId: normalizeId(product?._id || item?.productId || item?.id),
+    variantId: item?.variantId || '',
+    priceAtWishlist: Number(item?.priceAtWishlist ?? product?.price ?? item?.price ?? 0),
+    notes: item?.notes || '',
+    priority: Number(item?.priority ?? 0),
+    addedAt: item?.addedAt,
+    brandName: product?.brandId?.name || '',
+    vendorName: product?.vendorId?.storeName || product?.vendorId?.name || '',
+    stockQuantity: product?.stockQuantity !== undefined ? Number(product.stockQuantity) : undefined,
+    deliveryLabel: product?.deliveryLabel || 'Standard Delivery'
   };
 };
 
@@ -50,30 +61,44 @@ export const useWishlistStore = create(
   persist(
     (set, get) => ({
       items: [],
+      filters: [],
+      sections: [],
+      summary: { totalItems: 0, selectedItems: 0, inStock: 0, outOfStock: 0 },
+      pagination: { page: 1, limit: 20, hasNext: false },
       isLoading: false,
       hasFetched: false,
       ownerUserId: null,
 
-      fetchWishlist: async () => {
+      fetchWishlist: async (page = 1, limit = 20, append = false) => {
         const authState = useAuthStore.getState();
         if (!authState?.isAuthenticated) {
-          set({ items: [], hasFetched: false, ownerUserId: null, isLoading: false });
+          set({ items: [], filters: [], sections: [], summary: { totalItems: 0, selectedItems: 0, inStock: 0, outOfStock: 0 }, hasFetched: false, ownerUserId: null, isLoading: false });
           return get().items;
         }
 
         const currentUserId = getCurrentAuthUserId();
         if (currentUserId && get().ownerUserId && normalizeId(get().ownerUserId) !== currentUserId) {
-          set({ items: [], hasFetched: false });
+          set({ items: [], filters: [], sections: [], summary: { totalItems: 0, selectedItems: 0, inStock: 0, outOfStock: 0 }, hasFetched: false });
         }
 
         set({ isLoading: true });
         try {
-          const response = await api.get('/user/wishlist');
-          const payload = response?.data ?? response;
-          const list = Array.isArray(payload)
-            ? payload.map(normalizeWishlistItem).filter((item) => item.id)
-            : [];
-          set({ items: list, isLoading: false, hasFetched: true, ownerUserId: currentUserId || null });
+          const response = await api.get('/user/wishlist', { params: { page, limit } });
+          const payload = response?.data ?? response ?? {};
+          
+          const itemsRaw = Array.isArray(payload) ? payload : (Array.isArray(payload?.items) ? payload.items : []);
+          const list = itemsRaw.map(normalizeWishlistItem).filter((item) => item.id);
+
+          set((state) => ({
+            items: append ? [...state.items, ...list] : list,
+            filters: payload.filters || [],
+            sections: payload.sections || [],
+            summary: payload.summary || { totalItems: list.length, selectedItems: 0, inStock: list.length, outOfStock: 0 },
+            pagination: payload.pagination || { page, limit, hasNext: false },
+            isLoading: false,
+            hasFetched: true,
+            ownerUserId: currentUserId || null
+          }));
           return list;
         } catch {
           set({ isLoading: false });
@@ -88,7 +113,7 @@ export const useWishlistStore = create(
 
         if (!authState?.isAuthenticated) {
           if (state.items.length || state.hasFetched || state.ownerUserId) {
-            set({ items: [], hasFetched: false, ownerUserId: null });
+            set({ items: [], filters: [], sections: [], summary: { totalItems: 0, selectedItems: 0, inStock: 0, outOfStock: 0 }, hasFetched: false, ownerUserId: null });
           }
           return;
         }
@@ -98,7 +123,7 @@ export const useWishlistStore = create(
           state.ownerUserId &&
           normalizeId(state.ownerUserId) !== currentUserId
         ) {
-          set({ items: [], hasFetched: false, ownerUserId: currentUserId });
+          set({ items: [], filters: [], sections: [], summary: { totalItems: 0, selectedItems: 0, inStock: 0, outOfStock: 0 }, hasFetched: false, ownerUserId: currentUserId });
           return;
         }
 
@@ -108,12 +133,12 @@ export const useWishlistStore = create(
       },
 
       // Add item to wishlist
-      addItem: (item) => {
+      addItem: (item, variantId = '') => {
         const authState = useAuthStore.getState();
         if (!authState?.isAuthenticated) {
           setPostLoginAction({
             type: 'wishlist:add',
-            payload: item,
+            payload: { ...item, variantId },
           });
           redirectToLogin();
           return false;
@@ -132,37 +157,61 @@ export const useWishlistStore = create(
             normalizeId(state.ownerUserId) !== currentUserId;
           const safeItems = ownerMismatch ? [] : state.items;
           const existingItem = safeItems.find(
-            (i) => normalizeId(i.id) === normalizeId(normalizedItem.id)
+            (i) => normalizeId(i.id) === normalizeId(normalizedItem.id) && (i.variantId || '') === (variantId || '')
           );
           if (existingItem) {
             return state; // Item already in wishlist
           }
           added = true;
           return {
-            items: [...safeItems, normalizedItem],
+            items: [...safeItems, { ...normalizedItem, variantId }],
             ownerUserId: currentUserId || state.ownerUserId || null,
           };
         });
 
         if (authState?.isAuthenticated && isMongoId(normalizedItem.id)) {
-          api.post('/user/wishlist', { productId: String(normalizedItem.id) }).catch(() => null);
+          api.post('/user/wishlist', { productId: String(normalizedItem.id), variantId }).then(res => {
+            const payload = res?.data ?? res ?? {};
+            const itemsRaw = Array.isArray(payload) ? payload : (Array.isArray(payload?.items) ? payload.items : []);
+            const list = itemsRaw.map(normalizeWishlistItem).filter((i) => i.id);
+            set({
+              items: list,
+              filters: payload.filters || [],
+              sections: payload.sections || [],
+              summary: payload.summary || { totalItems: list.length, selectedItems: 0, inStock: list.length, outOfStock: 0 },
+              pagination: payload.pagination || { page: 1, limit: 20, hasNext: false }
+            });
+          }).catch(() => null);
         }
 
         return added;
       },
 
       // Remove item from wishlist
-      removeItem: (id) => {
-        const normalizedId = normalizeId(id);
+      removeItem: (productId, variantId = '') => {
+        const normalizedId = normalizeId(productId);
         const currentUserId = getCurrentAuthUserId();
         set((state) => ({
-          items: state.items.filter((item) => normalizeId(item.id) !== normalizedId),
+          items: state.items.filter((item) => !(normalizeId(item.productId) === normalizedId && (item.variantId || '') === variantId)),
           ownerUserId: currentUserId || state.ownerUserId || null,
         }));
 
         const authState = useAuthStore.getState();
         if (authState?.isAuthenticated && isMongoId(normalizedId)) {
-          api.delete(`/user/wishlist/${normalizedId}`).catch(() => null);
+          api.delete(`/user/wishlist/${normalizedId}`, { params: { variantId } }).then(res => {
+            const payload = res?.data ?? res ?? {};
+            const itemsRaw = Array.isArray(payload) ? payload : (Array.isArray(payload?.items) ? payload.items : []);
+            const list = itemsRaw.map(normalizeWishlistItem).filter((i) => i.id);
+            set({
+              items: list,
+              filters: payload.filters || [],
+              sections: payload.sections || [],
+              summary: payload.summary || { totalItems: list.length, selectedItems: 0, inStock: list.length, outOfStock: 0 },
+              pagination: payload.pagination || { page: 1, limit: 20, hasNext: false }
+            });
+          }).catch(() => {
+            get().fetchWishlist().catch(() => null);
+          });
         }
       },
 
@@ -175,7 +224,7 @@ export const useWishlistStore = create(
           return false;
         }
         const normalizedId = normalizeId(id);
-        return state.items.some((item) => normalizeId(item.id) === normalizedId);
+        return state.items.some((item) => normalizeId(item.productId) === normalizedId);
       },
 
       // Clear wishlist
@@ -187,9 +236,9 @@ export const useWishlistStore = create(
         const authState = useAuthStore.getState();
         if (authState?.isAuthenticated) {
           items
-            .filter((item) => isMongoId(item.id))
+            .filter((item) => isMongoId(item.productId))
             .forEach((item) => {
-              api.delete(`/user/wishlist/${item.id}`).catch(() => null);
+              api.delete(`/user/wishlist/${item.productId}`, { params: { variantId: item.variantId } }).catch(() => null);
             });
         }
       },
@@ -206,20 +255,20 @@ export const useWishlistStore = create(
       },
 
       // Move item from wishlist to cart (returns item for cart)
-      moveToCart: (id) => {
-        const normalizedId = normalizeId(id);
+      moveToCart: (productId, variantId = '') => {
+        const normalizedId = normalizeId(productId);
         const state = get();
         const currentUserId = getCurrentAuthUserId();
-        const item = state.items.find((i) => normalizeId(i.id) === normalizedId);
+        const item = state.items.find((i) => normalizeId(i.productId) === normalizedId && (i.variantId || '') === variantId);
         if (item) {
           set({
-            items: state.items.filter((i) => normalizeId(i.id) !== normalizedId),
+            items: state.items.filter((i) => !(normalizeId(i.productId) === normalizedId && (i.variantId || '') === variantId)),
             ownerUserId: currentUserId || state.ownerUserId || null,
           });
 
           const authState = useAuthStore.getState();
           if (authState?.isAuthenticated && isMongoId(normalizedId)) {
-            api.delete(`/user/wishlist/${normalizedId}`).catch(() => null);
+            api.delete(`/user/wishlist/${normalizedId}`, { params: { variantId } }).catch(() => null);
           }
 
           return item;
@@ -227,8 +276,58 @@ export const useWishlistStore = create(
         return null;
       },
 
+      moveSelectedToCart: async (selectedItems) => {
+        set({ isLoading: true });
+        try {
+          const res = await api.post('/user/wishlist/move-selected', { items: selectedItems });
+          const payload = res?.data ?? res ?? {};
+          
+          if (payload.wishlist) {
+            const itemsRaw = Array.isArray(payload.wishlist.items) ? payload.wishlist.items : [];
+            const list = itemsRaw.map(normalizeWishlistItem).filter((i) => i.id);
+            set({
+              items: list,
+              filters: payload.wishlist.filters || [],
+              sections: payload.wishlist.sections || [],
+              summary: payload.wishlist.summary || { totalItems: list.length, selectedItems: 0, inStock: list.length, outOfStock: 0 },
+              pagination: payload.wishlist.pagination || { page: 1, limit: 20, hasNext: false }
+            });
+          }
+          return payload;
+        } catch (err) {
+          toast.error('Failed to move selected items.');
+          return null;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
+      removeSelectedFromWishlist: async (selectedItems) => {
+        set({ isLoading: true });
+        try {
+          const res = await api.post('/user/wishlist/remove-selected', { items: selectedItems });
+          const payload = res?.data ?? res ?? {};
+          
+          const itemsRaw = Array.isArray(payload.items) ? payload.items : [];
+          const list = itemsRaw.map(normalizeWishlistItem).filter((i) => i.id);
+          set({
+            items: list,
+            filters: payload.filters || [],
+            sections: payload.sections || [],
+            summary: payload.summary || { totalItems: list.length, selectedItems: 0, inStock: list.length, outOfStock: 0 },
+            pagination: payload.pagination || { page: 1, limit: 20, hasNext: false }
+          });
+          return true;
+        } catch (err) {
+          toast.error('Failed to remove selected items.');
+          return false;
+        } finally {
+          set({ isLoading: false });
+        }
+      },
+
       resetWishlist: () => {
-        set({ items: [], hasFetched: false, ownerUserId: null, isLoading: false });
+        set({ items: [], filters: [], sections: [], summary: { totalItems: 0, selectedItems: 0, inStock: 0, outOfStock: 0 }, hasFetched: false, ownerUserId: null, isLoading: false });
       },
     }),
     {
@@ -241,4 +340,3 @@ export const useWishlistStore = create(
     }
   )
 );
-
