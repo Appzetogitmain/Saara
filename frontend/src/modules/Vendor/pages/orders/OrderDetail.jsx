@@ -310,6 +310,12 @@ const OrderDetail = () => {
                                         </span>
                                     </div>
                                     <div className="flex justify-between gap-4 text-sm text-gray-500">
+                                        <span>Tax:</span>
+                                        <span className="font-medium text-gray-700">
+                                            {formatPrice(order.vendorFinancials?.tax ?? vendorItem?.tax ?? 0)}
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between gap-4 text-sm text-gray-500">
                                         <span>Commission:</span>
                                         <span className="font-medium text-red-600">
                                             -{formatPrice(

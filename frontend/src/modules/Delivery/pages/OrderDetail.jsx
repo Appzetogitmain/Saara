@@ -24,17 +24,21 @@ const DeliveryOrderDetail = () => {
   const { fetchOrderById, acceptOrder, rejectOrder, completeOrder, resendDeliveryOtp, isLoadingOrder, isUpdatingOrderStatus } = useDeliveryAuthStore();
   const [order, setOrder] = useState(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const [deliveryOtp, setDeliveryOtp] = useState('');
   const [isResendingOtp, setIsResendingOtp] = useState(false);
 
   const loadOrder = useCallback(async (isBackground = false) => {
     try {
       setLoadFailed(false);
+      setErrorMsg('');
       const response = await fetchOrderById(id, isBackground);
       setOrder(response);
-    } catch {
+    } catch (err) {
       setLoadFailed(true);
       setOrder(null);
+      const apiMessage = err?.response?.data?.message || err?.message || 'Unable to load order details';
+      setErrorMsg(apiMessage);
     }
   }, [id, fetchOrderById]);
 
@@ -206,7 +210,7 @@ const DeliveryOrderDetail = () => {
     return (
       <PageTransition>
         <div className="px-4 py-6 text-center space-y-3">
-          <p className="text-gray-600">{loadFailed ? 'Unable to load order details' : 'Order not found'}</p>
+          <p className="text-gray-600">{loadFailed ? (errorMsg || 'Unable to load order details') : 'Order not found'}</p>
           {loadFailed && (
             <button
               onClick={loadOrder}

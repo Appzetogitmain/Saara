@@ -41,6 +41,8 @@ const mapBackendItemToStore = (item) => ({
   cartLineKey: getCartLineKey(item.productId?._id || item.productId, item.variant),
   vendorId: item.productId?.vendorId || 1,
   vendorName: item.productId?.vendorName || "Vendor",
+  taxRate: item.productId?.taxRate !== undefined ? item.productId.taxRate : 18,
+  taxIncluded: !!item.productId?.taxIncluded,
 });
 
 // Cart Store

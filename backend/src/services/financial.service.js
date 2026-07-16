@@ -131,12 +131,12 @@ export const calculateOrderFinancials = ({
                     itemShipping = parseFloat(((vendorShipping * item.sub) / v.subtotal).toFixed(2));
                     itemShippingSum = parseFloat((itemShippingSum + itemShipping).toFixed(2));
                 }
-                itemShippingTax = parseFloat((itemShipping * 0.18).toFixed(2));
+                itemShippingTax = 0;
             }
 
             // D. Item Commission & Vendor Earnings
             const itemCommission = parseFloat(((commissionBase * commissionRate) / 100).toFixed(2));
-            const itemVendorEarnings = parseFloat((commissionBase - itemCommission).toFixed(2));
+            const itemVendorEarnings = parseFloat((commissionBase - itemCommission + itemTax).toFixed(2));
 
             // E. Final Line Total Paid by Customer
             const totalTaxAmount = parseFloat((itemTax + itemShippingTax).toFixed(2));

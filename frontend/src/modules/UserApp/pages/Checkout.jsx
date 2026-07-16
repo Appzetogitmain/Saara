@@ -223,9 +223,20 @@ const MobileCheckout = () => {
       ? estimatedShipping
       : calculateShippingFallback();
   const discount = appliedCoupon ? appliedDiscount : 0;
-  const taxableAmount = Math.max(0, total - discount);
-  const tax = taxableAmount * 0.18;
+  
+  // Calculate dynamic tax based on product taxRate and taxIncluded values
+  const calculatedTax = items.reduce((sum, item) => {
+    const itemSubtotal = (item.price ?? 0) * (item.quantity ?? 1);
+    const itemDiscountShare = total > 0 ? (discount * itemSubtotal) / total : 0;
+    const discountedItemSubtotal = itemSubtotal - itemDiscountShare;
+    const rate = item.taxRate !== undefined ? item.taxRate : 18;
+    const itemTax = item.taxIncluded ? 0 : discountedItemSubtotal * (rate / 100);
+    return sum + itemTax;
+  }, 0);
+
+  const tax = Number(calculatedTax.toFixed(2));
   const finalTotal = Math.max(0, total + shipping + tax - discount);
+  const taxableAmount = Math.max(0, total - discount);
   const walletAmountUsed = useWallet ? Math.min(walletBalance, finalTotal) : 0;
   const remainingPayable = Number((finalTotal - walletAmountUsed).toFixed(2));
 

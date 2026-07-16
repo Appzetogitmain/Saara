@@ -29,6 +29,35 @@ const generateDeliveryOtp = () => {
     return String(randomInt(100000, 1000000)); // T5.1: cryptographically secure
 };
 
+const findOrderForAgentOrThrow = async (orderId, deliveryBoyId, selectFields = '', populateFields = []) => {
+    const existsQuery = {
+        isDeleted: { $ne: true },
+        $or: [{ orderId }],
+    };
+    if (mongoose.isValidObjectId(orderId)) {
+        existsQuery.$or.push({ _id: orderId });
+    }
+
+    const orderExists = await Order.findOne(existsQuery);
+    if (!orderExists) {
+        throw new ApiError(404, 'Order not found.');
+    }
+
+    if (String(orderExists.deliveryBoyId) !== String(deliveryBoyId)) {
+        throw new ApiError(403, 'Order offer has expired or is not assigned to you.');
+    }
+
+    let queryBuilder = Order.findOne({ ...existsQuery, deliveryBoyId });
+    if (selectFields) {
+        queryBuilder = queryBuilder.select(selectFields);
+    }
+    for (const pop of populateFields) {
+        queryBuilder = queryBuilder.populate(pop.path, pop.select);
+    }
+
+    return await queryBuilder;
+};
+
 const getCustomerEmail = (order) => {
     return (
         String(order?.shippingAddress?.email || '').trim().toLowerCase() ||
@@ -210,19 +239,12 @@ export const getProfileSummary = asyncHandler(async (req, res) => {
 
 // GET /api/delivery/orders/:id
 export const getOrderDetail = asyncHandler(async (req, res) => {
-    const query = {
-        deliveryBoyId: req.user.id,
-        isDeleted: { $ne: true },
-        $or: [{ orderId: req.params.id }],
-    };
-    if (mongoose.isValidObjectId(req.params.id)) {
-        query.$or.push({ _id: req.params.id });
-    }
-
-    const order = await Order.findOne(query)
-        .select('+deliveryOtpHash +deliveryOtpExpiry +deliveryOtpSentAt +deliveryOtpAttempts +deliveryOtpDebug +pickupOtpHash +pickupOtpExpiry +pickupOtpDebug')
-        .populate('vendorItems.vendorId', 'storeName phone address');
-    if (!order) throw new ApiError(404, 'Order not found.');
+    const order = await findOrderForAgentOrThrow(
+        req.params.id,
+        req.user.id,
+        '+deliveryOtpHash +deliveryOtpExpiry +deliveryOtpSentAt +deliveryOtpAttempts +deliveryOtpDebug +pickupOtpHash +pickupOtpExpiry +pickupOtpDebug',
+        [{ path: 'vendorItems.vendorId', select: 'storeName phone address' }]
+    );
     res.status(200).json(new ApiResponse(200, order, 'Order detail fetched.'));
 });
 
@@ -232,17 +254,11 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
     const allowed = ['shipped', 'delivered'];
     if (!allowed.includes(status)) throw new ApiError(400, `Status must be one of: ${allowed.join(', ')}`);
 
-    const query = {
-        deliveryBoyId: req.user.id,
-        isDeleted: { $ne: true },
-        $or: [{ orderId: req.params.id }],
-    };
-    if (mongoose.isValidObjectId(req.params.id)) {
-        query.$or.push({ _id: req.params.id });
-    }
-
-    const order = await Order.findOne(query).select('+deliveryOtpHash +deliveryOtpExpiry +deliveryOtpSentAt +deliveryOtpAttempts +deliveryOtpDebug');
-    if (!order) throw new ApiError(404, 'Order not found.');
+    const order = await findOrderForAgentOrThrow(
+        req.params.id,
+        req.user.id,
+        '+deliveryOtpHash +deliveryOtpExpiry +deliveryOtpSentAt +deliveryOtpAttempts +deliveryOtpDebug'
+    );
 
     // Server-side transition guard (frontend guard already exists).
     const transitionAllowed =
@@ -420,18 +436,7 @@ export const updateDeliveryStatus = asyncHandler(async (req, res) => {
 
 // POST /api/delivery/orders/:id/resend-delivery-otp
 export const resendDeliveryOtp = asyncHandler(async (req, res) => {
-    const query = {
-        deliveryBoyId: req.user.id,
-        isDeleted: { $ne: true },
-        $or: [{ orderId: req.params.id }],
-    };
-
-    if (mongoose.isValidObjectId(req.params.id)) {
-        query.$or.push({ _id: req.params.id });
-    }
-
-    const order = await Order.findOne(query);
-    if (!order) throw new ApiError(404, 'Order not found.');
+    const order = await findOrderForAgentOrThrow(req.params.id, req.user.id);
 
     if (order.status !== 'shipped') {
         throw new ApiError(409, 'OTP can only be resent when order is in shipped state.');
@@ -499,17 +504,11 @@ export const getDeliveryOtpForDebug = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Route not found.');
     }
 
-    const query = {
-        deliveryBoyId: req.user.id,
-        isDeleted: { $ne: true },
-        $or: [{ orderId: req.params.id }],
-    };
-    if (mongoose.isValidObjectId(req.params.id)) {
-        query.$or.push({ _id: req.params.id });
-    }
-
-    const order = await Order.findOne(query).select('+deliveryOtpDebug +deliveryOtpExpiry status orderId');
-    if (!order) throw new ApiError(404, 'Order not found.');
+    const order = await findOrderForAgentOrThrow(
+        req.params.id,
+        req.user.id,
+        '+deliveryOtpDebug +deliveryOtpExpiry status orderId'
+    );
     if (order.status !== 'shipped') {
         throw new ApiError(409, 'Debug OTP is only available while order is in shipped state.');
     }
@@ -528,17 +527,7 @@ export const getDeliveryOtpForDebug = asyncHandler(async (req, res) => {
 
 // POST /api/delivery/orders/:id/accept
 export const acceptOrder = asyncHandler(async (req, res) => {
-    const query = {
-        deliveryBoyId: req.user.id,
-        isDeleted: { $ne: true },
-        $or: [{ orderId: req.params.id }],
-    };
-    if (mongoose.isValidObjectId(req.params.id)) {
-        query.$or.push({ _id: req.params.id });
-    }
-
-    const order = await Order.findOne(query);
-    if (!order) throw new ApiError(404, 'Order not found.');
+    const order = await findOrderForAgentOrThrow(req.params.id, req.user.id);
 
     if (order.deliveryAssignmentStatus !== 'assigned') {
         throw new ApiError(409, `Cannot accept order. Assignment status is ${order.deliveryAssignmentStatus}.`);
@@ -573,17 +562,7 @@ export const acceptOrder = asyncHandler(async (req, res) => {
 
 // POST /api/delivery/orders/:id/reject
 export const rejectOrder = asyncHandler(async (req, res) => {
-    const query = {
-        deliveryBoyId: req.user.id,
-        isDeleted: { $ne: true },
-        $or: [{ orderId: req.params.id }],
-    };
-    if (mongoose.isValidObjectId(req.params.id)) {
-        query.$or.push({ _id: req.params.id });
-    }
-
-    const order = await Order.findOne(query);
-    if (!order) throw new ApiError(404, 'Order not found.');
+    const order = await findOrderForAgentOrThrow(req.params.id, req.user.id);
 
     if (order.deliveryAssignmentStatus !== 'assigned') {
         throw new ApiError(409, 'No active assignment offer found to reject.');
