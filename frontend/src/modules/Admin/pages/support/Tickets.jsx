@@ -348,7 +348,7 @@ const Tickets = () => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm lg:hidden">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Support Desk</h1>
           <p className="text-sm text-gray-500 mt-1">Review, resolve, and manage incoming support tickets</p>

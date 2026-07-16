@@ -214,7 +214,7 @@ const OrderDetail = () => {
                     >
                         <FiArrowLeft className="text-gray-600" />
                     </Link>
-                    <div>
+                    <div className="lg:hidden">
                         <h1 className="text-2xl font-bold text-gray-800">
                             Order #{order.orderId ?? order._id}
                         </h1>
@@ -227,7 +227,7 @@ const OrderDetail = () => {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 lg:ml-auto">
                     <AnimatedSelect
                         options={visibleStatusOptions}
                         value={currentStatus}

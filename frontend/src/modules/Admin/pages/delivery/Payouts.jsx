@@ -306,13 +306,13 @@ const AdminPayouts = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
+        <div className="lg:hidden">
           <h1 className="text-2xl font-bold text-gray-800">Rider Payout & Adjustment Management</h1>
           <p className="text-sm text-gray-600">Review logistics withdrawals, complete payouts, and adjustments</p>
         </div>
         <button 
           onClick={fetchRequests} 
-          className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors"
+          className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors lg:ml-auto"
         >
           <FiRefreshCw className={isLoading ? 'animate-spin' : ''} />
         </button>

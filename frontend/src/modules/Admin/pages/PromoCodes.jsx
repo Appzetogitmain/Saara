@@ -224,7 +224,7 @@ const PromoCodes = () => {
         </div>
         <button
           onClick={() => setEditingCode({ code: '', type: 'percentage', value: '', minPurchase: 0, maxDiscount: '', usageLimit: '', startDate: '', endDate: '', status: 'active', isActive: true })}
-          className="flex items-center gap-2 px-4 py-2 gradient-green text-white rounded-lg hover:shadow-glow-green transition-all font-semibold text-sm"
+          className="flex items-center gap-2 px-4 py-2 gradient-green text-white rounded-lg hover:shadow-glow-green transition-all font-semibold text-sm lg:ml-auto"
         >
           <FiPlus />
           <span>Add Promo Code</span>

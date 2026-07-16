@@ -12,7 +12,7 @@ const AffiliatePayouts = () => {
     return (
         <div className="space-y-8 p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
-                <div>
+                <div className="lg:hidden">
                     <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3 uppercase">
                         <FiDollarSign className="text-primary-600" />
                         Affiliate Payouts
@@ -20,7 +20,7 @@ const AffiliatePayouts = () => {
                     <p className="text-gray-500 font-medium tracking-wide">Financial oversight and commission approvals for marketplace creators.</p>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 lg:ml-auto">
                     <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex items-center gap-4 pr-12">
                         <div className="p-3 bg-blue-50 text-blue-600 rounded-2xl">
                             <FiPieChart size={20} />

@@ -96,7 +96,7 @@ const WalletHistory = () => {
       className="space-y-6 max-w-5xl mx-auto pb-24 px-4"
     >
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
+        <div className="lg:hidden">
           <h1 className="text-2xl font-black text-slate-800 uppercase tracking-wider">
             Vendor Wallet & Payouts
           </h1>
@@ -115,7 +115,7 @@ const WalletHistory = () => {
             setShowWithdrawModal(true);
           }}
           disabled={!stats?.walletBalance || stats.walletBalance <= 0}
-          className="px-5 py-2.5 bg-[#024d3e] hover:bg-[#01352a] text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-5 py-2.5 bg-[#024d3e] hover:bg-[#01352a] text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed lg:ml-auto"
         >
           Withdraw Funds
         </button>

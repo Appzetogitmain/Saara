@@ -221,7 +221,7 @@ const CategoryRequests = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 lg:hidden">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
             Category Requests

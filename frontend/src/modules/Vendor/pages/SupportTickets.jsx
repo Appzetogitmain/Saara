@@ -293,8 +293,8 @@ const SupportTickets = () => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-        <div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm lg:bg-transparent lg:p-0 lg:border-0 lg:shadow-none">
+        <div className="lg:hidden">
           <h1 className="text-2xl font-bold text-gray-800 mb-1 flex items-center gap-2">
             <FiMessageSquare className="text-primary-600" />
             Support Desk
@@ -305,7 +305,7 @@ const SupportTickets = () => {
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-bold text-sm shadow-md shadow-primary-100">
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-bold text-sm shadow-md shadow-primary-100 lg:ml-auto">
           <FiPlus className="text-lg" />
           <span>Create Ticket</span>
         </button>
@@ -571,7 +571,7 @@ const TicketDetail = ({
           className="p-2 hover:bg-gray-150 rounded-xl transition-colors">
           <FiArrowLeft className="text-xl text-gray-650" />
         </button>
-        <div>
+        <div className="lg:hidden">
           <h1 className="text-xl font-bold text-gray-800">
             Ticket Details
           </h1>

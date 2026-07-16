@@ -275,7 +275,7 @@ const HomepageBanners = () => {
       
       {/* Title & Action */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
+        <div className="lg:hidden">
           <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
             <FiImage className="text-primary-600" />
             Banner Library
@@ -287,7 +287,7 @@ const HomepageBanners = () => {
 
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-5 py-3 rounded-xl bg-primary-600 hover:bg-primary-750 font-bold text-sm text-white transition-all shadow-md active:scale-95 duration-200 self-start md:self-auto"
+          className="flex items-center gap-2 px-5 py-3 rounded-xl bg-primary-600 hover:bg-primary-750 font-bold text-sm text-white transition-all shadow-md active:scale-95 duration-200 self-start md:self-auto lg:ml-auto"
         >
           <FiPlus className="text-lg" />
           Add Banner Asset

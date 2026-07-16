@@ -9,7 +9,7 @@ const AuditLogs = () => {
     return (
         <div className="space-y-8 p-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
-                <div>
+                <div className="lg:hidden">
                     <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3 uppercase">
                         <FiActivity className="text-primary-600" />
                         Audit Trail
@@ -17,7 +17,7 @@ const AuditLogs = () => {
                     <p className="text-gray-500 font-medium tracking-wide">Historical log of all administrative actions performed across the social ecosystem.</p>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 lg:ml-auto">
                     <button className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-100 rounded-2xl text-xs font-black text-gray-600 uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm">
                         <FiDownload /> Export CSV
                     </button>

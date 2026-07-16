@@ -9,7 +9,7 @@ const ReelModeration = () => {
 
     return (
         <div className="space-y-8 p-4">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 lg:hidden">
                 <div>
                     <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3 uppercase">
                         <FiMonitor className="text-primary-600" />

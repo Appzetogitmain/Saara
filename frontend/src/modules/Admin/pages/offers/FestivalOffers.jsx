@@ -207,7 +207,7 @@ const Offers = () => {
         </div>
         <button
           onClick={() => setEditingOffer({ type: "festival" })}
-          className="flex items-center gap-2 px-4 py-2 gradient-green text-white rounded-lg hover:shadow-glow-green transition-all font-semibold text-sm">
+          className="flex items-center gap-2 px-4 py-2 gradient-green text-white rounded-lg hover:shadow-glow-green transition-all font-semibold text-sm lg:ml-auto">
           <FiPlus />
           <span>Add Offer</span>
         </button>

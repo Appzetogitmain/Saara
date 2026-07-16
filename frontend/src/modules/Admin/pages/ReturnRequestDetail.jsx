@@ -139,7 +139,7 @@ const ReturnRequestDetail = () => {
           >
             <FiArrowLeft className="text-lg text-gray-600" />
           </button>
-          <div>
+          <div className="lg:hidden">
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800">{returnRequest.id}</h1>
               <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wider ${
@@ -153,7 +153,7 @@ const ReturnRequestDetail = () => {
             <p className="text-xs text-gray-500">Requested on {formatDateTime(returnRequest.requestDate)}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 lg:ml-auto">
           {isEditing ? (
             <>
               <AnimatedSelect

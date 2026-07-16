@@ -296,8 +296,8 @@ const TicketTypes = () => {
       className="space-y-6"
     >
       {/* Header section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm lg:bg-transparent lg:p-0 lg:border-0 lg:shadow-none">
+        <div className="lg:hidden">
           <h1 className="text-2xl font-bold text-gray-800">Support Categories</h1>
           <p className="text-sm text-gray-500 mt-1">Manage portal-specific categories and sort orders dynamically</p>
         </div>
@@ -306,7 +306,7 @@ const TicketTypes = () => {
             setEditingType({ name: '', description: '', portals: ['customer'], icon: '❓', status: 'active', isSystem: false });
             setFormErrors({});
           }}
-          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-all font-semibold text-sm shadow-md shadow-primary-200"
+          className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-all font-semibold text-sm shadow-md shadow-primary-200 lg:ml-auto"
         >
           <FiPlus className="text-lg" />
           <span>Add Category</span>

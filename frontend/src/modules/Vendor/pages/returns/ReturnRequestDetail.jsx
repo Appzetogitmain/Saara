@@ -205,7 +205,7 @@ const ReturnRequestDetail = () => {
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
             <FiArrowLeft className="text-lg text-gray-600" />
           </button>
-          <div>
+          <div className="lg:hidden">
             <div className="flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-800">
                 {returnRequest.id}
@@ -224,7 +224,7 @@ const ReturnRequestDetail = () => {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 lg:ml-auto">
           {isEditing ? (
             <>
               <AnimatedSelect

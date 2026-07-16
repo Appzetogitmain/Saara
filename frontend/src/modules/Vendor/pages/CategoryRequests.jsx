@@ -214,7 +214,7 @@ const CategoryRequests = () => {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
+        <div className="lg:hidden">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-1">
             Category Requests
           </h1>
@@ -224,7 +224,7 @@ const CategoryRequests = () => {
         </div>
         <button
           onClick={() => handleOpenRequestModal(null)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-all font-semibold text-sm shadow-md">
+          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-all font-semibold text-sm shadow-md lg:ml-auto">
           <FiPlus />
           <span>Request New Category</span>
         </button>

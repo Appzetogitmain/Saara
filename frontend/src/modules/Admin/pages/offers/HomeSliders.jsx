@@ -263,7 +263,7 @@ const HomeSliders = () => {
             Manage homepage slider and right-side banners
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 lg:ml-auto">
           <AnimatedSelect
             value={selectedBannerType}
             onChange={(e) => setSelectedBannerType(e.target.value)}
