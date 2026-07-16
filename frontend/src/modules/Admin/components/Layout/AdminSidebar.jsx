@@ -83,7 +83,6 @@ const getChildRoute = (parentRoute, childName) => {
       "Home Content": "/admin/marketing/home-content",
       "Homepage Sections": "/admin/marketing/homepage-sections",
       "Banner Library": "/admin/marketing/banner-library",
-      "Shop Configuration": "/admin/marketing/shop-config",
       Offers: "/admin/marketing/offers",
       "Promo Codes": "/admin/marketing/promocodes",
     },

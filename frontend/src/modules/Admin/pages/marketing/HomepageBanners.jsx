@@ -59,7 +59,7 @@ const HomepageBanners = () => {
   const fetchBanners = async () => {
     setLoading(true);
     try {
-      const response = await api.get('/api/admin/marketing/homepage-banners');
+      const response = await api.get('/admin/marketing/homepage-banners');
       setBanners(response?.data || response?.data?.data || []);
     } catch (err) {
       toast.error('Failed to load banner library');
@@ -173,7 +173,6 @@ const HomepageBanners = () => {
       const ratio = width / height;
 
       if (mode === 'desktop') {
-        // Expected ~1920x700 (2.74 ratio)
         if (width < 1200) {
           toast.error('Warning: Desktop image width should be at least 1200px (Preferred: 1920x700)');
           setDesktopImageRatioWarning(true);
@@ -181,7 +180,6 @@ const HomepageBanners = () => {
           setDesktopImageRatioWarning(false);
         }
       } else {
-        // Expected ~800x900 (0.88 ratio)
         if (ratio > 1.2) {
           toast.error('Warning: Mobile image should be portrait (Preferred: 800x900)');
           setMobileImageRatioWarning(true);
@@ -248,10 +246,10 @@ const HomepageBanners = () => {
 
     try {
       if (editingBanner) {
-        await api.put(`/api/admin/marketing/homepage-banners/${editingBanner._id}`, payload);
+        await api.put(`/admin/marketing/homepage-banners/${editingBanner._id}`, payload);
         toast.success('Banner updated successfully');
       } else {
-        await api.post('/api/admin/marketing/homepage-banners', payload);
+        await api.post('/admin/marketing/homepage-banners', payload);
         toast.success('Banner created successfully');
       }
       setShowModal(false);
@@ -264,7 +262,7 @@ const HomepageBanners = () => {
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this banner?')) return;
     try {
-      await api.delete(`/api/admin/marketing/homepage-banners/${id}`);
+      await api.delete(`/admin/marketing/homepage-banners/${id}`);
       toast.success('Banner deleted successfully');
       fetchBanners();
     } catch (err) {
@@ -273,22 +271,23 @@ const HomepageBanners = () => {
   };
 
   return (
-    <div className="p-6 bg-slate-900 min-h-screen text-slate-100">
+    <div className="p-6 bg-[#f8fafc] min-h-screen text-slate-800">
+      
       {/* Title & Action */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
-            <FiImage className="text-primary-500" />
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+            <FiImage className="text-primary-600" />
             Banner Library
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-1">
             Manage reusable marketing banner assets with size constraints and crop optimization.
           </p>
         </div>
 
         <button
           onClick={openAddModal}
-          className="flex items-center gap-2 px-5 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 font-bold text-sm text-white transition-all shadow-lg active:scale-95 duration-200 self-start md:self-auto"
+          className="flex items-center gap-2 px-5 py-3 rounded-xl bg-primary-600 hover:bg-primary-750 font-bold text-sm text-white transition-all shadow-md active:scale-95 duration-200 self-start md:self-auto"
         >
           <FiPlus className="text-lg" />
           Add Banner Asset
@@ -296,7 +295,7 @@ const HomepageBanners = () => {
       </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-4 mb-6 flex flex-col gap-4">
+      <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-6 shadow-sm flex flex-col gap-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search Box */}
           <div className="relative">
@@ -306,17 +305,17 @@ const HomepageBanners = () => {
               placeholder="Search by banner name or title..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500 transition-colors"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500 transition-colors"
             />
           </div>
 
           {/* Section Type Filter */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 border border-gray-200 bg-gray-50 rounded-xl px-3 py-1">
             <FiSliders className="text-slate-400 text-sm shrink-0" />
             <select
               value={selectedSectionType}
               onChange={(e) => setSelectedSectionType(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-primary-500"
+              className="w-full bg-transparent text-sm text-slate-600 focus:outline-none border-none py-1.5"
             >
               <option value="All">All Section Types</option>
               <option value="flash_sale">Flash Sale</option>
@@ -326,12 +325,12 @@ const HomepageBanners = () => {
           </div>
 
           {/* Tags Dropdown filter */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 border border-gray-200 bg-gray-50 rounded-xl px-3 py-1">
             <FiTag className="text-slate-400 text-sm shrink-0" />
             <select
               value={selectedTag}
               onChange={(e) => setSelectedTag(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-primary-500"
+              className="w-full bg-transparent text-sm text-slate-600 focus:outline-none border-none py-1.5"
             >
               {allTags.map((tag) => (
                 <option key={tag} value={tag}>
@@ -345,9 +344,9 @@ const HomepageBanners = () => {
 
       {/* Banner Library Grid */}
       {loading ? (
-        <div className="py-20 text-center text-slate-400">Loading banner library...</div>
+        <div className="py-20 text-center text-slate-500">Loading banner library...</div>
       ) : filteredBanners.length === 0 ? (
-        <div className="py-20 text-center text-slate-400 bg-slate-800/30 rounded-2xl border border-dashed border-slate-700">
+        <div className="py-20 text-center text-slate-500 bg-white rounded-2xl border border-dashed border-gray-200">
           No banner assets found matching the filters.
         </div>
       ) : (
@@ -355,10 +354,10 @@ const HomepageBanners = () => {
           {filteredBanners.map((banner) => (
             <div
               key={banner._id}
-              className="bg-slate-800/80 border border-slate-700/80 rounded-2xl overflow-hidden shadow-md flex flex-col group hover:border-slate-600 transition-all duration-300"
+              className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm flex flex-col group hover:border-gray-300 hover:shadow-md transition-all duration-300"
             >
               {/* Preview Wrapper */}
-              <div className="h-44 bg-slate-950 relative overflow-hidden flex items-center justify-center border-b border-slate-700/50">
+              <div className="h-44 bg-slate-900 relative overflow-hidden flex items-center justify-center border-b border-gray-150">
                 <img
                   src={banner.desktopImage}
                   alt={banner.name}
@@ -368,21 +367,21 @@ const HomepageBanners = () => {
                 {/* Badges */}
                 <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-15">
                   {banner.isDefault && (
-                    <span className="bg-primary-500 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide shadow-sm">
+                    <span className="bg-primary-600 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full tracking-wide shadow-sm">
                       Default
                     </span>
                   )}
-                  <span className="bg-slate-900/90 text-slate-200 border border-slate-700 text-[10px] font-semibold px-2.5 py-0.5 rounded-full capitalize">
+                  <span className="bg-slate-100 text-slate-700 border border-gray-200 text-[10px] font-semibold px-2.5 py-0.5 rounded-full capitalize">
                     {banner.sectionType?.replace('_', ' ')}
                   </span>
                 </div>
 
                 {/* Active Toggle overlay */}
                 <div className="absolute top-3 right-3 z-15">
-                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    banner.isActive ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                    banner.isActive ? 'bg-green-50 text-green-600 border border-green-200' : 'bg-red-50 text-red-600 border border-red-200'
                   }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${banner.isActive ? 'bg-green-400' : 'bg-red-400'}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full ${banner.isActive ? 'bg-green-500' : 'bg-red-500'}`} />
                     {banner.isActive ? 'Active' : 'Inactive'}
                   </span>
                 </div>
@@ -403,7 +402,7 @@ const HomepageBanners = () => {
                   {banner.tags && banner.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1">
                       {banner.tags.map((t, idx) => (
-                        <span key={idx} className="bg-slate-700/50 text-slate-300 text-[9px] font-semibold px-2 py-0.5 rounded">
+                        <span key={idx} className="bg-gray-100 text-gray-600 text-[9px] font-semibold px-2 py-0.5 rounded">
                           #{t}
                         </span>
                       ))}
@@ -412,8 +411,8 @@ const HomepageBanners = () => {
 
                   {/* Date limits */}
                   {(banner.startDate || banner.endDate) && (
-                    <div className="text-[10px] text-slate-400 flex items-center gap-1 bg-slate-900/40 p-1.5 rounded">
-                      <FiCalendar className="shrink-0 text-primary-400" />
+                    <div className="text-[10px] text-slate-500 flex items-center gap-1 bg-gray-50 p-1.5 rounded border border-gray-150">
+                      <FiCalendar className="shrink-0 text-primary-600" />
                       <span className="truncate">
                         {banner.startDate ? new Date(banner.startDate).toLocaleDateString() : 'Always'} -{' '}
                         {banner.endDate ? new Date(banner.endDate).toLocaleDateString() : 'Always'}
@@ -423,10 +422,10 @@ const HomepageBanners = () => {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-700/40">
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
                   <button
                     onClick={() => openEditModal(banner)}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 font-bold text-xs text-slate-200 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 font-bold text-xs text-gray-700 border border-gray-200 transition-colors"
                   >
                     <FiEdit className="text-sm" />
                     Edit Asset
@@ -434,8 +433,8 @@ const HomepageBanners = () => {
                   <button
                     onClick={() => handleDelete(banner._id)}
                     disabled={banner.isDefault}
-                    className={`p-2 rounded-xl border border-red-500/30 text-red-400 transition-all ${
-                      banner.isDefault ? 'opacity-40 cursor-not-allowed' : 'hover:bg-red-500/10'
+                    className={`p-2 rounded-xl border border-red-200 text-red-500 transition-all ${
+                      banner.isDefault ? 'opacity-40 cursor-not-allowed' : 'hover:bg-red-50'
                     }`}
                     title={banner.isDefault ? 'Cannot delete default banner' : 'Delete banner'}
                   >
@@ -451,20 +450,20 @@ const HomepageBanners = () => {
       {/* Save Modal */}
       <AnimatePresence>
         {showModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-slate-800 rounded-3xl border border-slate-700 w-full max-w-3xl overflow-hidden shadow-2xl my-8 flex flex-col max-h-[85vh]"
+              className="bg-white rounded-3xl border border-gray-200 w-full max-w-3xl overflow-hidden shadow-2xl my-8 flex flex-col max-h-[85vh]"
             >
               {/* Header */}
-              <div className="px-6 py-4 bg-slate-950 flex items-center justify-between border-b border-slate-700">
-                <h3 className="text-lg font-black text-white flex items-center gap-2">
-                  <FiImage className="text-primary-500" />
+              <div className="px-6 py-4 bg-gray-50 flex items-center justify-between border-b border-gray-200">
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                  <FiImage className="text-primary-600" />
                   {editingBanner ? 'Edit Banner Library Asset' : 'Add Banner Asset to Library'}
                 </h3>
-                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white p-1">
+                <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-700 p-1">
                   <FiX className="text-xl" />
                 </button>
               </div>
@@ -474,28 +473,28 @@ const HomepageBanners = () => {
                 
                 {/* section: General Info */}
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700/60 pb-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-gray-150 pb-1.5">
                     1. General Info & Curation
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Banner Asset Name (Internal)*</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Banner Asset Name (Internal)*</label>
                       <input
                         type="text"
                         placeholder="e.g. Army Summer Campaign Hero"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Section Type Association*</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Section Type Association*</label>
                       <select
                         value={sectionType}
                         onChange={(e) => setSectionType(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-slate-600 focus:outline-none focus:border-primary-500"
                       >
                         <option value="flash_sale">Flash Sale</option>
                         <option value="seasonal_collection">Seasonal Collection</option>
@@ -506,13 +505,13 @@ const HomepageBanners = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Search Tags (Comma Separated)</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Search Tags (Comma Separated)</label>
                       <input
                         type="text"
                         placeholder="e.g. Army, Summer, Fashion"
                         value={tagsInput}
                         onChange={(e) => setTagsInput(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                       />
                     </div>
 
@@ -522,9 +521,9 @@ const HomepageBanners = () => {
                           type="checkbox"
                           checked={isActive}
                           onChange={(e) => setIsActive(e.target.checked)}
-                          className="w-4 h-4 text-primary-600 bg-slate-900 border-slate-700 rounded focus:ring-primary-500"
+                          className="w-4 h-4 text-primary-600 bg-gray-50 border-gray-200 rounded focus:ring-primary-500"
                         />
-                        <span className="text-sm font-semibold text-slate-300">Is Active</span>
+                        <span className="text-sm font-semibold text-slate-600">Is Active</span>
                       </label>
 
                       <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -532,9 +531,9 @@ const HomepageBanners = () => {
                           type="checkbox"
                           checked={isDefault}
                           onChange={(e) => setIsDefault(e.target.checked)}
-                          className="w-4 h-4 text-primary-600 bg-slate-900 border-slate-700 rounded focus:ring-primary-500"
+                          className="w-4 h-4 text-primary-600 bg-gray-50 border-gray-200 rounded focus:ring-primary-500"
                         />
-                        <span className="text-sm font-semibold text-slate-300 flex items-center gap-1">
+                        <span className="text-sm font-semibold text-slate-600 flex items-center gap-1">
                           Set as Default Banner
                           <FiAlertCircle className="text-slate-400" title="Only one default banner can exist per section type. Enabling this will set others to false." />
                         </span>
@@ -545,13 +544,13 @@ const HomepageBanners = () => {
 
                 {/* section: Image Assets */}
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700/60 pb-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-gray-150 pb-1.5">
                     2. Image Media Assets (Max 500KB, WebP preferred)
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Desktop Image */}
                     <div className="space-y-2">
-                      <label className="block text-xs font-bold text-slate-300">
+                      <label className="block text-xs font-bold text-slate-600">
                         Desktop Banner (1920 × 700 px)*
                       </label>
                       <div className="flex items-center gap-3">
@@ -560,22 +559,22 @@ const HomepageBanners = () => {
                           placeholder="Paste image URL or upload..."
                           value={desktopImage}
                           onChange={(e) => setDesktopImage(e.target.value)}
-                          className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                          className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                         />
-                        <label className={`cursor-pointer px-4 py-2.5 rounded-xl border border-slate-600 font-bold text-xs shrink-0 flex items-center justify-center transition-colors ${
-                          uploadingDesktop ? 'bg-slate-700 text-slate-400' : 'bg-slate-700 hover:bg-slate-600 text-white'
+                        <label className={`cursor-pointer px-4 py-2.5 rounded-xl border border-gray-200 font-bold text-xs shrink-0 flex items-center justify-center transition-colors ${
+                          uploadingDesktop ? 'bg-gray-100 text-slate-400' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                         }`}>
                           <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'desktop')} className="hidden" disabled={uploadingDesktop} />
                           {uploadingDesktop ? 'Uploading...' : 'Upload File'}
                         </label>
                       </div>
                       {desktopImageRatioWarning && (
-                        <p className="text-[10px] text-amber-400 flex items-center gap-1">
+                        <p className="text-[10px] text-amber-600 flex items-center gap-1">
                           <FiAlertCircle /> Dimension warning: Width should be at least 1200px (ideal: 1920px)
                         </p>
                       )}
                       {desktopImage && (
-                        <div className="h-28 bg-slate-950 rounded-xl overflow-hidden border border-slate-700 flex items-center justify-center">
+                        <div className="h-28 bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
                           <img src={desktopImage} alt="Desktop Preview" className="w-full h-full object-cover" />
                         </div>
                       )}
@@ -583,7 +582,7 @@ const HomepageBanners = () => {
 
                     {/* Mobile Image */}
                     <div className="space-y-2">
-                      <label className="block text-xs font-bold text-slate-300">
+                      <label className="block text-xs font-bold text-slate-600">
                         Mobile Banner (800 × 900 px - Portrait)
                       </label>
                       <div className="flex items-center gap-3">
@@ -592,22 +591,22 @@ const HomepageBanners = () => {
                           placeholder="Paste image URL or upload..."
                           value={mobileImage}
                           onChange={(e) => setMobileImage(e.target.value)}
-                          className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                          className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                         />
-                        <label className={`cursor-pointer px-4 py-2.5 rounded-xl border border-slate-600 font-bold text-xs shrink-0 flex items-center justify-center transition-colors ${
-                          uploadingMobile ? 'bg-slate-700 text-slate-400' : 'bg-slate-700 hover:bg-slate-600 text-white'
+                        <label className={`cursor-pointer px-4 py-2.5 rounded-xl border border-gray-200 font-bold text-xs shrink-0 flex items-center justify-center transition-colors ${
+                          uploadingMobile ? 'bg-gray-100 text-slate-400' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                         }`}>
                           <input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, 'mobile')} className="hidden" disabled={uploadingMobile} />
                           {uploadingMobile ? 'Uploading...' : 'Upload File'}
                         </label>
                       </div>
                       {mobileImageRatioWarning && (
-                        <p className="text-[10px] text-amber-400 flex items-center gap-1">
+                        <p className="text-[10px] text-amber-600 flex items-center gap-1">
                           <FiAlertCircle /> Dimension warning: Portrait orientation is highly recommended for mobile
                         </p>
                       )}
                       {mobileImage && (
-                        <div className="h-28 bg-slate-950 rounded-xl overflow-hidden border border-slate-700 flex items-center justify-center">
+                        <div className="h-28 bg-gray-100 rounded-xl overflow-hidden border border-gray-200 flex items-center justify-center">
                           <img src={mobileImage} alt="Mobile Preview" className="h-full object-contain" />
                         </div>
                       )}
@@ -617,114 +616,114 @@ const HomepageBanners = () => {
 
                 {/* section: Appearance Overlays */}
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700/60 pb-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-gray-150 pb-1.5">
                     3. Text & Layout Overlays
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Overlay Banner Title</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Overlay Banner Title</label>
                       <input
                         type="text"
                         placeholder="e.g. Grab 40% Off Allen Solly!"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Overlay Banner Subtitle</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Overlay Banner Subtitle</label>
                       <input
                         type="text"
                         placeholder="e.g. Valid on footwear and jackets only"
                         value={subtitle}
                         onChange={(e) => setSubtitle(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">CTA Button Text</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">CTA Button Text</label>
                       <input
                         type="text"
                         placeholder="e.g. Shop Now"
                         value={ctaText}
                         onChange={(e) => setCtaText(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">CTA Link Target</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">CTA Link Target</label>
                       <input
                         type="text"
                         placeholder="e.g. /search?category=shoes"
                         value={ctaLink}
                         onChange={(e) => setCtaLink(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Text Color</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Text Color</label>
                       <div className="flex gap-2">
                         <input
                           type="color"
                           value={textColor}
                           onChange={(e) => setTextColor(e.target.value)}
-                          className="w-10 h-10 border border-slate-700 rounded bg-slate-950 p-1 cursor-pointer"
+                          className="w-10 h-10 border border-gray-200 rounded bg-gray-50 p-1 cursor-pointer"
                         />
                         <input
                           type="text"
                           value={textColor}
                           onChange={(e) => setTextColor(e.target.value)}
-                          className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 text-xs text-slate-200 focus:outline-none"
+                          className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 text-xs text-slate-700 focus:outline-none"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Button Color</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Button Color</label>
                       <div className="flex gap-2">
                         <input
                           type="color"
                           value={buttonColor}
                           onChange={(e) => setButtonColor(e.target.value)}
-                          className="w-10 h-10 border border-slate-700 rounded bg-slate-950 p-1 cursor-pointer"
+                          className="w-10 h-10 border border-gray-200 rounded bg-gray-50 p-1 cursor-pointer"
                         />
                         <input
                           type="text"
                           value={buttonColor}
                           onChange={(e) => setButtonColor(e.target.value)}
-                          className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 text-xs text-slate-200 focus:outline-none"
+                          className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 text-xs text-slate-700 focus:outline-none"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Solid Fallback Color</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Solid Fallback Color</label>
                       <div className="flex gap-2">
                         <input
                           type="color"
                           value={backgroundColor}
                           onChange={(e) => setBackgroundColor(e.target.value)}
-                          className="w-10 h-10 border border-slate-700 rounded bg-slate-950 p-1 cursor-pointer"
+                          className="w-10 h-10 border border-gray-200 rounded bg-gray-50 p-1 cursor-pointer"
                         />
                         <input
                           type="text"
                           value={backgroundColor}
                           onChange={(e) => setBackgroundColor(e.target.value)}
-                          className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 text-xs text-slate-200 focus:outline-none"
+                          className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 text-xs text-slate-700 focus:outline-none"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Overlay Dark Opacity</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Overlay Dark Opacity</label>
                       <div className="flex items-center gap-3 pt-2">
                         <input
                           type="range"
@@ -733,9 +732,9 @@ const HomepageBanners = () => {
                           step="0.05"
                           value={overlayOpacity}
                           onChange={(e) => setOverlayOpacity(e.target.value)}
-                          className="w-full accent-primary-500 bg-slate-900 h-2 rounded-lg cursor-pointer"
+                          className="w-full accent-primary-500 bg-gray-250 h-2 rounded-lg cursor-pointer"
                         />
-                        <span className="text-xs font-black text-slate-300 w-10 text-right">
+                        <span className="text-xs font-black text-slate-600 w-10 text-right">
                           {Math.round(overlayOpacity * 100)}%
                         </span>
                       </div>
@@ -743,40 +742,40 @@ const HomepageBanners = () => {
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-300 mb-1.5">CSS Background Gradient Override</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1.5">CSS Background Gradient Override</label>
                     <input
                       type="text"
                       placeholder="e.g. linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)"
                       value={gradient}
                       onChange={(e) => setGradient(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                     />
                   </div>
                 </div>
 
                 {/* section: Schedule limits */}
                 <div className="space-y-4">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 border-b border-slate-700/60 pb-1.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-gray-150 pb-1.5">
                     4. Active Schedule Period (Optional)
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Schedule Start Date & Time</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Schedule Start Date & Time</label>
                       <input
                         type="datetime-local"
                         value={startDate}
                         onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-300 mb-1.5">Schedule End Date & Time</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Schedule End Date & Time</label>
                       <input
                         type="datetime-local"
                         value={endDate}
                         onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-primary-500"
+                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:border-primary-500"
                       />
                     </div>
                   </div>
@@ -785,17 +784,17 @@ const HomepageBanners = () => {
               </form>
 
               {/* Footer Actions */}
-              <div className="px-6 py-4 bg-slate-950 border-t border-slate-700 flex items-center justify-end gap-3">
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-5 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-bold"
+                  className="px-5 py-2.5 rounded-xl border border-gray-200 text-slate-600 hover:bg-gray-100 text-xs font-bold"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-6 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white text-xs font-bold shadow-lg"
+                  className="px-6 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-750 text-white text-xs font-bold shadow-md"
                 >
                   Save Banner Asset
                 </button>

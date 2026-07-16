@@ -82,7 +82,7 @@ const HomepageSections = () => {
         api.get('/products', { params: { page: 1, limit: 200 } }),
         api.get('/categories/all'),
         api.get('/brands/all'),
-        api.get('/api/admin/marketing/homepage-banners')
+        api.get('/admin/marketing/homepage-banners')
       ]);
 
       const prodPayload = prodRes.data?.data?.products || prodRes.data?.products || [];

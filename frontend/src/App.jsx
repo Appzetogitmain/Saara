@@ -29,7 +29,6 @@ import Campaigns from "./modules/Admin/pages/Campaigns";
 import HomeContent from "./modules/Admin/pages/HomeContent";
 import HomepageSections from "./modules/Admin/pages/marketing/HomepageSections";
 import HomepageBanners from "./modules/Admin/pages/marketing/HomepageBanners";
-import ShopConfiguration from "./modules/Admin/pages/marketing/ShopConfiguration";
 import Reviews from "./modules/Admin/pages/Reviews";
 import Analytics from "./modules/Admin/pages/Analytics";
 import Content from "./modules/Admin/pages/Content";
@@ -605,7 +604,6 @@ const AppRoutes = () => {
         <Route path="marketing/home-content" element={<HomeContent />} />
         <Route path="marketing/homepage-sections" element={<HomepageSections />} />
         <Route path="marketing/banner-library" element={<HomepageBanners />} />
-        <Route path="marketing/shop-config" element={<ShopConfiguration />} />
         <Route path="marketing/offers" element={<Offers />} />
         <Route path="marketing/promocodes" element={<PromoCodes />} />
         <Route path="notifications" element={<AllNotifications />} />

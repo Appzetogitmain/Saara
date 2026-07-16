@@ -85,16 +85,22 @@ const PromotionalBannerSection = ({
                   {subtitle}
                 </p>
               )}
-              {ctaText && (
-                <span 
-                  className="inline-block mt-4 font-black py-2.5 px-5 rounded-xl text-[10px] md:text-xs tracking-wide self-start active:scale-95 shadow transition-all pointer-events-auto"
-                  style={{ 
-                    backgroundColor: buttonColor || '#ffffff',
-                    color: '#111827'
-                  }}
-                >
-                  {ctaText}
-                </span>
+              {(ctaText || 'View All Deals') && (
+                <>
+                  <style>{`
+                    .custom-banner-btn {
+                      color: #000000 !important;
+                    }
+                  `}</style>
+                  <span 
+                    className="inline-block mt-4 font-black py-2.5 px-5 rounded-xl text-[10px] md:text-xs tracking-wide self-start active:scale-95 shadow transition-all pointer-events-auto custom-banner-btn"
+                    style={{ 
+                      backgroundColor: buttonColor || '#ffffff'
+                    }}
+                  >
+                    {ctaText || 'View All Deals'}
+                  </span>
+                </>
               )}
             </div>
           )}
