@@ -451,6 +451,10 @@ const MobileProductDetail = () => {
         if (!active) return;
 
         setProduct(resolvedProduct);
+        if (resolvedProduct?.id && isAuthenticated) {
+          api.post("/user/recently-viewed", { productId: resolvedProduct.id }).catch((err) => console.error("Error logging product view:", err));
+        }
+
         if (resolvedSimilar.length > 0) {
           setSimilarProducts(resolvedSimilar);
         } else if (resolvedProduct?.id) {

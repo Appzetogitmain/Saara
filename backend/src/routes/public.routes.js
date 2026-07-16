@@ -13,8 +13,72 @@ import { calculateVendorShippingForGroups } from '../services/vendorShipping.ser
 import { cacheResponse } from '../middlewares/responseCache.js';
 import Settings from '../models/Settings.model.js';
 import PlatformPolicy from '../models/PlatformPolicy.model.js';
+import { getHomepage } from '../modules/admin/controllers/homepage.controller.js';
+import Order from '../models/Order.model.js';
+import AppConfig from '../models/AppConfig.model.js';
+import HomeBanner from '../models/HomeBanner.model.js';
 
 const router = Router();
+
+// GET /api/homepage (Public dynamic homepage data resolver)
+router.get('/homepage', getHomepage);
+
+// GET /api/search/trending
+router.get('/search/trending', asyncHandler(async (req, res) => {
+    const { default: SearchQuery } = await import('../models/SearchQuery.model.js');
+    const trending = await SearchQuery.find()
+        .sort({ count: -1 })
+        .limit(10)
+        .select('query count')
+        .lean();
+    res.status(200).json(new ApiResponse(200, trending.map(t => t.query), 'Trending searches.'));
+}));
+
+// GET /api/products/best-sellers
+router.get('/products/best-sellers', asyncHandler(async (req, res) => {
+    const bestSellersAgg = await Order.aggregate([
+        { $match: { paymentStatus: 'paid', status: { $nin: ['cancelled', 'returned'] } } },
+        { $unwind: '$items' },
+        { $group: { _id: '$items.productId', totalQty: { $sum: '$items.quantity' } } },
+        { $sort: { totalQty: -1 } },
+        { $limit: 20 }
+    ]);
+    const bestSellerIds = bestSellersAgg.map((item) => item._id);
+    let bestSellersRaw = await Product.find({
+        _id: { $in: bestSellerIds },
+        isActive: true,
+        stock: { $ne: 'out_of_stock' }
+    })
+    .populate('categoryId', 'name')
+    .populate('brandId', 'name')
+    .populate('vendorId', 'storeName')
+    .lean();
+
+    if (bestSellersRaw.length < 4) {
+        bestSellersRaw = await Product.find({ isActive: true, stock: { $ne: 'out_of_stock' } })
+            .sort({ reviewCount: -1 })
+            .limit(10)
+            .populate('categoryId', 'name')
+            .populate('brandId', 'name')
+            .populate('vendorId', 'storeName')
+            .lean();
+    }
+    const products = bestSellersRaw.map(p => ({ ...p, id: String(p._id), _id: String(p._id) })).filter(p => p.isActive !== false);
+    res.status(200).json(new ApiResponse(200, products, 'Best sellers fetched.'));
+}));
+
+// GET /api/products/top-rated
+router.get('/products/top-rated', asyncHandler(async (req, res) => {
+    const topRatedRaw = await Product.find({ isActive: true })
+        .sort({ rating: -1, reviewCount: -1 })
+        .limit(15)
+        .populate('categoryId', 'name')
+        .populate('brandId', 'name')
+        .populate('vendorId', 'storeName')
+        .lean();
+    const products = topRatedRaw.map(p => ({ ...p, id: String(p._id), _id: String(p._id) })).filter(p => p.isActive !== false);
+    res.status(200).json(new ApiResponse(200, products, 'Top rated fetched.'));
+}));
 const listCache = cacheResponse({ ttlSeconds: 30, maxEntries: 1000 });
 const detailCache = cacheResponse({ ttlSeconds: 60, maxEntries: 1000 });
 const catalogCache = cacheResponse({ ttlSeconds: 300, maxEntries: 200 });
@@ -192,6 +256,15 @@ const listProducts = asyncHandler(async (req, res) => {
 
     const searchQuery = String(search || q || '').trim();
     if (searchQuery) {
+        // Track the search query asynchronously
+        import('../models/SearchQuery.model.js').then(({ default: SearchQuery }) => {
+            SearchQuery.findOneAndUpdate(
+                { query: searchQuery.toLowerCase() },
+                { $inc: { count: 1 } },
+                { upsert: true, new: true }
+            ).catch((err) => console.error('Error tracking search query:', err));
+        });
+
         // Use $text search for multi-word queries for relevance.
         // For single words, use regex to support partial matches (which $text doesn't handle well).
         // Mixing $text and $regex in an $or block often causes "No query solutions" errors in MongoDB.
@@ -235,8 +308,267 @@ const listProducts = asyncHandler(async (req, res) => {
     res.status(200).json(new ApiResponse(200, { products, total, page: numericPage, pages: Math.ceil(total / numericLimit) }, 'Products fetched.'));
 });
 
+const getShopMetadata = asyncHandler(async (req, res) => {
+    let shopConfig = await AppConfig.findOne({ key: 'shop' }).lean();
+    if (!shopConfig) {
+        shopConfig = {
+            value: {
+                defaultSort: 'newest',
+                productsPerPage: 20,
+                defaultViewMode: 'grid',
+                quickFilters: [],
+                featuredCategories: [],
+                featuredBrands: [],
+                bannerAsset: null,
+                enabledFilters: {}
+            }
+        };
+    }
+    const configVal = shopConfig.value || {};
+
+    // 1. Categories
+    let categories;
+    if (configVal.featuredCategories && configVal.featuredCategories.length > 0) {
+        categories = await Category.find({ _id: { $in: configVal.featuredCategories }, isActive: true }).lean();
+    } else {
+        categories = await Category.find({ isActive: true, parentId: null }).lean();
+    }
+
+    // 2. Brands
+    let brands;
+    if (configVal.featuredBrands && configVal.featuredBrands.length > 0) {
+        brands = await Brand.find({ _id: { $in: configVal.featuredBrands }, isActive: true }).lean();
+    } else {
+        brands = await Brand.find({ isActive: true }).lean();
+    }
+
+    // 3. Vendors
+    const vendors = await Vendor.find({ status: 'approved' })
+        .select('_id id storeName name isVerified logo')
+        .lean();
+
+    // 4. Dynamic Price Range
+    const priceStats = await Product.aggregate([
+        { $match: { isActive: true } },
+        { $group: { _id: null, min: { $min: "$price" }, max: { $max: "$price" } } }
+    ]);
+    const priceRange = {
+        min: priceStats[0]?.min ?? 0,
+        max: priceStats[0]?.max ?? 50000
+    };
+
+    // 5. Shop Banner
+    let resolvedBanner = null;
+    if (configVal.bannerAsset) {
+        resolvedBanner = await HomeBanner.findOne({ _id: configVal.bannerAsset, isActive: true }).lean();
+    }
+    if (!resolvedBanner) {
+        resolvedBanner = await HomeBanner.findOne({ sectionType: 'promotional_banner', isDefault: true, isActive: true }).lean();
+    }
+
+    // 6. Dynamic Filters configuration schema
+    const enabled = configVal.enabledFilters || {};
+    const allFilters = [
+        { key: 'category', label: 'Categories', enabled: enabled.category !== false, type: 'multi-select' },
+        { key: 'brand', label: 'Brands', enabled: enabled.brand !== false, type: 'multi-select' },
+        { key: 'price', label: 'Price Range', enabled: enabled.price !== false, type: 'range' },
+        { key: 'rating', label: 'Customer Rating', enabled: enabled.rating !== false, type: 'stars' },
+        { key: 'discount', label: 'Discount %', enabled: enabled.discount !== false, type: 'discount' },
+        { key: 'stock', label: 'Availability', enabled: enabled.stock !== false, type: 'toggle' },
+        { key: 'vendor', label: 'Store Vendors', enabled: enabled.vendor !== false, type: 'multi-select' },
+        { key: 'deliveryType', label: 'Delivery Option', enabled: enabled.deliveryType !== false, type: 'toggle' },
+        { key: 'color', label: 'Colors', enabled: enabled.color !== false, type: 'multi-select' },
+        { key: 'size', label: 'Sizes', enabled: enabled.size !== false, type: 'multi-select' }
+    ];
+
+    res.status(200).json(new ApiResponse(200, {
+        categories,
+        brands,
+        vendors,
+        quickFilters: configVal.quickFilters || [],
+        priceRange,
+        banner: resolvedBanner ? {
+            desktopImage: resolvedBanner.desktopImage,
+            mobileImage: resolvedBanner.mobileImage || resolvedBanner.desktopImage,
+            title: resolvedBanner.title || '',
+            subtitle: resolvedBanner.subtitle || '',
+            ctaText: resolvedBanner.ctaText || '',
+            ctaLink: resolvedBanner.ctaLink || '',
+            textColor: resolvedBanner.textColor || '#ffffff',
+            buttonColor: resolvedBanner.buttonColor || '#ffffff',
+            overlayOpacity: resolvedBanner.overlayOpacity ?? 0.3
+        } : null,
+        filters: allFilters.filter(f => f.enabled)
+    }, 'Shop metadata loaded.'));
+});
+
+const getShopProducts = asyncHandler(async (req, res) => {
+    const {
+        page = 1,
+        limit = 20,
+        sort = 'newest',
+        q,
+        search,
+        category,
+        brand,
+        vendor,
+        minPrice,
+        maxPrice,
+        minRating,
+        discount,
+        stock,
+        deliveryType,
+        color,
+        size
+    } = req.query;
+
+    const numericPage = Math.max(Number(page) || 1, 1);
+    const numericLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const skip = (numericPage - 1) * numericLimit;
+
+    const filter = { isActive: true };
+
+    // Search Query
+    const searchQuery = String(search || q || '').trim();
+    if (searchQuery) {
+        if (searchQuery.includes(' ')) {
+            filter.$text = { $search: searchQuery };
+        } else {
+            filter.$or = [
+                { name: { $regex: searchQuery, $options: 'i' } },
+                { tags: { $regex: searchQuery, $options: 'i' } }
+            ];
+        }
+    }
+
+    // Categories (Including Child Categories)
+    if (category) {
+        const categoryIds = Array.isArray(category) ? category.map(String) : String(category).split(',');
+        
+        const fetchAllChildCategoryIds = async (id) => {
+            const subs = await Category.find({ parentId: id, isActive: true }).select('_id').lean();
+            let ids = subs.map(s => String(s._id));
+            for (const subId of ids) {
+                const deeperIds = await fetchAllChildCategoryIds(subId);
+                ids = [...ids, ...deeperIds];
+            }
+            return ids;
+        };
+
+        let expandedIds = [...categoryIds];
+        for (const catId of categoryIds) {
+            const children = await fetchAllChildCategoryIds(catId);
+            expandedIds = [...expandedIds, ...children];
+        }
+
+        filter.categoryId = { $in: expandedIds };
+    }
+
+    // Brand Filter
+    if (brand) {
+        const brandIds = Array.isArray(brand) ? brand.map(String) : String(brand).split(',');
+        filter.brandId = { $in: brandIds };
+    }
+
+    // Vendor Filter
+    if (vendor) {
+        const vendorIds = Array.isArray(vendor) ? vendor.map(String) : String(vendor).split(',');
+        filter.vendorId = { $in: vendorIds };
+    }
+
+    // Price Filter
+    if (minPrice || maxPrice) {
+        filter.price = {
+            ...(minPrice && { $gte: Number(minPrice) }),
+            ...(maxPrice && { $lte: Number(maxPrice) })
+        };
+    }
+
+    // Rating Filter
+    if (minRating) {
+        filter.rating = { $gte: Number(minRating) };
+    }
+
+    // Discount Filter (mathematical comparison)
+    if (discount) {
+        const discountNum = Number(discount);
+        filter.originalPrice = { $exists: true, $gt: 0 };
+        filter.$expr = {
+            $gte: [
+                { $multiply: [ { $divide: [ { $subtract: ["$originalPrice", "$price"] }, "$originalPrice" ] }, 100 ] },
+                discountNum
+            ]
+        };
+    }
+
+    // Availability Filter (Stock)
+    if (stock) {
+        if (stock === 'in_stock') {
+            filter.stock = { $in: ['in_stock', 'low_stock'] };
+        } else if (stock === 'out_of_stock') {
+            filter.stock = 'out_of_stock';
+        }
+    }
+
+    // Delivery Type (Standard vs Express simulated check)
+    if (deliveryType === 'express') {
+        filter.codAllowed = true;
+    }
+
+    // Colors Filter
+    if (color) {
+        const colors = Array.isArray(color) ? color : String(color).split(',');
+        filter['variants.colors'] = { $in: colors };
+    }
+
+    // Sizes Filter
+    if (size) {
+        const sizes = Array.isArray(size) ? size : String(size).split(',');
+        filter['variants.sizes'] = { $in: sizes };
+    }
+
+    // Sorting
+    const sortMap = {
+        newest: { createdAt: -1 },
+        oldest: { createdAt: 1 },
+        'price-asc': { price: 1 },
+        'price-desc': { price: -1 },
+        popular: { reviewCount: -1 },
+        rating: { rating: -1 },
+        discount: { originalPrice: -1, price: 1 } // sorting by biggest potential discounts
+    };
+
+    const activeSaleProductIds = await getActiveSaleProductIds();
+    if (activeSaleProductIds.length) {
+        filter._id = { $nin: activeSaleProductIds };
+    }
+
+    const [products, total] = await Promise.all([
+        Product.find(filter)
+            .select('name slug price originalPrice images image categoryId brandId vendorId stock stockQuantity rating reviewCount isNewArrival isFeatured flashSale variants')
+            .populate('categoryId', 'name')
+            .populate('brandId', 'name')
+            .populate('vendorId', 'storeName')
+            .sort(sortMap[sort] || { createdAt: -1 })
+            .skip(skip)
+            .limit(numericLimit)
+            .lean(),
+        Product.countDocuments(filter)
+    ]);
+
+    res.status(200).json(new ApiResponse(200, {
+        products,
+        page: numericPage,
+        pages: Math.ceil(total / numericLimit),
+        totalProducts: total,
+        hasMore: numericPage < Math.ceil(total / numericLimit)
+    }, 'Shop products fetched.'));
+});
+
 router.get('/', listCache, listProducts);
 router.get('/products', listCache, listProducts);
+router.get('/shop/meta', getShopMetadata);
+router.get('/shop/products', getShopProducts);
 
 // GET /api/search/autocomplete
 router.get('/search/autocomplete', cacheResponse({ ttlSeconds: 300, maxEntries: 1000 }), asyncHandler(async (req, res) => {

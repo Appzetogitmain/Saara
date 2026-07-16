@@ -106,10 +106,7 @@ const DesktopHeader = () => {
 
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
-    let searchRoute = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
-    if (selectedCategoryId) {
-      searchRoute += `&category=${selectedCategoryId}`;
-    }
+    let searchRoute = `/shop?q=${encodeURIComponent(searchQuery.trim())}`;
     navigate(searchRoute);
   };
 
@@ -141,65 +138,12 @@ const DesktopHeader = () => {
             )}
           </Link>
 
-          {/* Premium Search Bar with Category Dropdown */}
+          {/* Premium Search Bar */}
           <div className="flex-1 max-w-xl">
             <form
               onSubmit={handleSearchSubmit}
               className="relative flex items-center bg-gray-50 rounded-full pl-5 pr-1 py-1 border border-gray-200 focus-within:border-primary-500 focus-within:bg-white focus-within:shadow-md transition-all duration-300"
             >
-              {/* Category selector */}
-              <div
-                ref={categoryDropdownRef}
-                className="relative pr-3 mr-3 border-r border-gray-200 shrink-0"
-              >
-                <button
-                  type="button"
-                  onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                  className="flex items-center gap-1 text-gray-600 text-xs lg:text-sm font-bold hover:text-primary-600 select-none cursor-pointer focus:outline-none"
-                >
-                  <span className="max-w-[100px] truncate">
-                    {selectedCategoryName}
-                  </span>
-                  <FiChevronDown className="text-gray-400" />
-                </button>
-                <AnimatePresence>
-                  {showCategoryDropdown && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="absolute left-0 mt-3 bg-white rounded-xl shadow-xl border border-gray-100 p-2 z-[1000] min-w-[200px]"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCategoryName("All Categories");
-                          setSelectedCategoryId("");
-                          setShowCategoryDropdown(false);
-                        }}
-                        className="w-full text-left px-3 py-2 rounded-lg text-xs lg:text-sm text-gray-700 hover:bg-gray-50 hover:text-primary-600 font-semibold"
-                      >
-                        All Categories
-                      </button>
-                      {rootCategories.map((cat) => (
-                        <button
-                          key={cat.id || cat._id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedCategoryName(cat.name);
-                            setSelectedCategoryId(cat.id || cat._id);
-                            setShowCategoryDropdown(false);
-                          }}
-                          className="w-full text-left px-3 py-2 rounded-lg text-xs lg:text-sm text-gray-700 hover:bg-gray-50 hover:text-primary-600 font-semibold truncate"
-                        >
-                          {cat.name}
-                        </button>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
               {/* Text Input */}
               <input
                 type="text"
@@ -423,7 +367,7 @@ const DesktopHeader = () => {
               { path: "/offers", label: "Offers", badge: "New" },
               { path: "/explore", label: "Explore" },
               { path: "/reels", label: "Reels" },
-              { path: "/search", label: "Brands" },
+              { path: "/shop", label: "Shop" },
               { path: "/new-arrivals", label: "New Arrivals" },
             ].map((link, idx) => {
               const isActive = window.location.pathname === link.path;

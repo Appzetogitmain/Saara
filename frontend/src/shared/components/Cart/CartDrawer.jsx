@@ -100,7 +100,7 @@ const CartDrawer = () => {
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
             drag="x"
             dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.2}
+            dragElastic={{ left: 0, right: 0.2 }}
             onDragEnd={(event, info) => {
               if (info.offset.x > 200) {
                 toggleCart();

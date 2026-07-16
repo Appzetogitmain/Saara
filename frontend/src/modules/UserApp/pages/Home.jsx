@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link, matchPath, useNavigate } from "react-router-dom";
 import { FiHeart } from "react-icons/fi";
+import { useAuthStore } from "../../../shared/store/authStore";
+import React from 'react';
 import MobileLayout from "../components/Layout/MobileLayout";
 import ProductCard from "../../../shared/components/ProductCard";
 import AnimatedBanner from "../components/Mobile/AnimatedBanner";
@@ -236,8 +238,21 @@ const getButtonStyleClasses = (style = "primary", isDarkBg = false) => {
   }
 };
 
+const SECTION_COMPONENTS = {
+  flash_sale: React.lazy(() => import('../components/HomeSections/FlashSaleSection')),
+  seasonal_collection: React.lazy(() => import('../components/HomeSections/SeasonalCollectionSection')),
+  promotional_banner: React.lazy(() => import('../components/HomeSections/PromotionalBannerSection')),
+  best_sellers: React.lazy(() => import('../components/HomeSections/BestSellersSection')),
+  recently_viewed: React.lazy(() => import('../components/HomeSections/RecentlyViewedSection')),
+  top_rated: React.lazy(() => import('../components/HomeSections/TopRatedSection'))
+};
+
 const MobileHome = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
+  const [homepageSections, setHomepageSections] = useState([]);
+  const [userSections, setUserSections] = useState([]);
+  const [homepageLoading, setHomepageLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
@@ -321,9 +336,16 @@ const MobileHome = () => {
     return homeBrands.slice(0, 10);
   }, [homeBrands, fallbackBrands]);
 
+  const combinedSections = useMemo(() => {
+    const all = [...homepageSections, ...userSections];
+    const sorted = all.sort((a, b) => a.order - b.order || b.priority - a.priority);
+    console.log("🔌 [Home.jsx] combinedSections:", sorted);
+    return sorted;
+  }, [homepageSections, userSections]);
+
   const fetchHomeData = useCallback(async () => {
     try {
-      const [productsRes, vendorsRes, brandsRes, bannersRes] =
+      const [productsRes, vendorsRes, brandsRes, bannersRes, homepageRes] =
         await Promise.allSettled([
           api.get("/products", { params: { page: 1, limit: 120 } }),
           api.get("/vendors/all", {
@@ -331,6 +353,7 @@ const MobileHome = () => {
           }),
           api.get("/brands/all"),
           api.get("/banners"),
+          api.get("/homepage"),
         ]);
 
       if (productsRes.status === "fulfilled") {
@@ -496,11 +519,52 @@ const MobileHome = () => {
         setCategoryFocusItems([]);
         setDealItems([]);
       }
+
+      console.log("🔌 [Home.jsx] homepageRes status:", homepageRes.status);
+      if (homepageRes.status === "fulfilled") {
+        console.log("🔌 [Home.jsx] homepageRes value:", homepageRes.value);
+        const payload = extractResponseData(homepageRes.value) || {};
+        console.log("🔌 [Home.jsx] homepageRes payload:", payload);
+        const parsedSections = (payload.sections || []).map(sec => {
+          if (Array.isArray(sec.data)) {
+            return {
+              ...sec,
+              data: sec.data.map(normalizeProduct).filter(Boolean)
+            };
+          }
+          return sec;
+        });
+        setHomepageSections(parsedSections);
+      }
+
+      if (isAuthenticated) {
+        try {
+          const userHomeRes = await api.get("/user/homepage");
+          const payload = extractResponseData(userHomeRes) || {};
+          const parsedUserSections = (payload.sections || []).map(sec => {
+            if (Array.isArray(sec.data)) {
+              return {
+                ...sec,
+                data: sec.data.map(normalizeProduct).filter(Boolean)
+              };
+            }
+            return sec;
+          });
+          setUserSections(parsedUserSections);
+        } catch (err) {
+          console.error("Failed to load user-specific homepage sections:", err);
+        }
+      } else {
+        setUserSections([]);
+      }
+      setHomepageLoading(false);
+
       return true;
     } catch {
+      setHomepageLoading(false);
       return false;
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     fetchHomeData();
@@ -892,6 +956,74 @@ const MobileHome = () => {
 
           {/* Deals Section */}
           <DealsSection items={dealItems} />
+
+          {/* Dynamic sections registry map */}
+          <div className="space-y-4 px-4 md:px-0">
+            <Suspense fallback={
+              <div className="py-12 flex justify-center items-center">
+                <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            }>
+              {combinedSections.map((section) => {
+                console.log(`🔍 [Home.jsx] Map checking section: ${section.type}`, {
+                  dataLength: Array.isArray(section.data) ? section.data.length : !!section.data,
+                  minProducts: section.minimumProducts,
+                  layout: section.layout
+                });
+
+                const Component = SECTION_COMPONENTS[section.type];
+                if (!Component) {
+                  console.log(`❌ [Home.jsx] Component registry missing for type: ${section.type}`);
+                  return null;
+                }
+
+                const hasData = Array.isArray(section.data) ? section.data.length > 0 : !!section.data;
+                if (!hasData) {
+                  console.log(`⚠️ [Home.jsx] Skipping section ${section.type} due to no data.`);
+                  return null;
+                }
+
+                // Honor minimumProducts display condition
+                if (Array.isArray(section.data) && section.data.length < (section.minimumProducts || 0)) {
+                  console.log(`⚠️ [Home.jsx] Skipping section ${section.type} because data length (${section.data.length}) < minProducts (${section.minimumProducts}).`);
+                  return null;
+                }
+
+                console.log(`🚀 [Home.jsx] Rendering Component for section: ${section.type}`);
+
+                // Render best_sellers, recently_viewed, top_rated by passing products
+                if (['best_sellers', 'recently_viewed', 'top_rated'].includes(section.type)) {
+                  return <Component key={section.type} products={section.data} title={section.title} subtitle={section.subtitle} />;
+                }
+
+                return (
+                  <Component
+                    key={section.type}
+                    data={section.data}
+                    layout={section.layout}
+                    title={section.title}
+                    subtitle={section.subtitle}
+                    banner={section.banner}
+                    mobileBanner={section.mobileBanner}
+                    bannerTitle={section.bannerTitle}
+                    bannerSubtitle={section.bannerSubtitle}
+                    ctaText={section.ctaText}
+                    ctaLink={section.ctaLink}
+                    backgroundColor={section.backgroundColor}
+                    gradient={section.gradient}
+                    bannerBgColor={section.bannerBgColor}
+                    bannerBgGradient={section.bannerBgGradient}
+                    textColor={section.textColor}
+                    buttonColor={section.buttonColor}
+                    overlayOpacity={section.overlayOpacity}
+                    countdownDate={section.countdownDate}
+                    categories={section.categories}
+                    vendors={section.vendors}
+                  />
+                );
+              })}
+            </Suspense>
+          </div>
 
           {/* Trust Bar */}
           <TrustBar />

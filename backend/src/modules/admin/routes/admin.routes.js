@@ -19,6 +19,11 @@ import * as policyController from '../controllers/policy.controller.js';
 import * as reelController from '../controllers/reel.controller.js';
 import * as affiliateController from '../controllers/affiliate.controller.js';
 import * as escrowController from '../controllers/escrow.controller.js';
+import AppConfig from '../../../models/AppConfig.model.js';
+import ApiResponse from '../../../utils/ApiResponse.js';
+import asyncHandler from '../../../utils/asyncHandler.js';
+import * as homepageSectionController from '../controllers/homepageSection.controller.js';
+import * as homeBannerController from '../controllers/homeBanner.controller.js';
 import * as customerWalletController from '../controllers/customerWallet.controller.js';
 import { audit } from '../../../middlewares/audit.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
@@ -206,11 +211,72 @@ router.patch('/marketing/banners/reorder', ...adminAuth, marketingController.reo
 router.put('/marketing/banners/:id', ...adminAuth, validate(marketingIdParamSchema, 'params'), marketingController.updateBanner);
 router.delete('/marketing/banners/:id', ...adminAuth, validate(marketingIdParamSchema, 'params'), marketingController.deleteBanner);
 
+// Homepage Sections
+router.get('/marketing/homepage-sections', ...adminAuth, homepageSectionController.getAllSections);
+router.post('/marketing/homepage-sections', ...adminAuth, homepageSectionController.createSection);
+router.patch('/marketing/homepage-sections/reorder', ...adminAuth, homepageSectionController.reorderSections);
+router.put('/marketing/homepage-sections/:id', ...adminAuth, homepageSectionController.updateSection);
+router.delete('/marketing/homepage-sections/:id', ...adminAuth, homepageSectionController.deleteSection);
+
+// Homepage Banners (Library)
+router.get('/marketing/homepage-banners', ...adminAuth, homeBannerController.getAllBanners);
+router.post('/marketing/homepage-banners', ...adminAuth, homeBannerController.createBanner);
+router.put('/marketing/homepage-banners/:id', ...adminAuth, homeBannerController.updateBanner);
+router.delete('/marketing/homepage-banners/:id', ...adminAuth, homeBannerController.deleteBanner);
+
 // Campaigns
 router.get('/marketing/campaigns', ...adminAuth, validate(campaignListQuerySchema, 'query'), marketingController.getAllCampaigns);
 router.post('/marketing/campaigns', ...adminAuth, marketingController.createCampaign);
 router.put('/marketing/campaigns/:id', ...adminAuth, validate(marketingIdParamSchema, 'params'), marketingController.updateCampaign);
 router.delete('/marketing/campaigns/:id', ...adminAuth, validate(marketingIdParamSchema, 'params'), marketingController.deleteCampaign);
+
+// Shop configuration
+router.get('/marketing/shop-config', ...adminAuth, asyncHandler(async (req, res) => {
+    let config = await AppConfig.findOne({ key: 'shop' }).lean();
+    if (!config) {
+        config = await AppConfig.create({
+            key: 'shop',
+            value: {
+                defaultSort: 'newest',
+                productsPerPage: 20,
+                defaultViewMode: 'grid',
+                quickFilters: [
+                    { label: 'All', queryParams: '{}', isActive: true, order: 1 },
+                    { label: 'New Arrivals', queryParams: '{"isNewArrival":"true"}', isActive: true, order: 2 },
+                    { label: 'Best Sellers', queryParams: '{"sort":"popular"}', isActive: true, order: 3 },
+                    { label: 'Top Rated', queryParams: '{"minRating":"4"}', isActive: true, order: 4 },
+                    { label: 'Discounts', queryParams: '{"discount":"10"}', isActive: true, order: 5 },
+                    { label: 'In Stock', queryParams: '{"stock":"in_stock"}', isActive: true, order: 6 }
+                ],
+                featuredCategories: [],
+                featuredBrands: [],
+                bannerAsset: null,
+                enabledFilters: {
+                    category: true,
+                    brand: true,
+                    price: true,
+                    rating: true,
+                    discount: true,
+                    stock: true,
+                    vendor: true,
+                    deliveryType: true,
+                    color: true,
+                    size: true
+                }
+            }
+        });
+    }
+    res.status(200).json(new ApiResponse(200, config.value, 'Shop config fetched.'));
+}));
+
+router.put('/marketing/shop-config', ...adminAuth, asyncHandler(async (req, res) => {
+    const updated = await AppConfig.findOneAndUpdate(
+        { key: 'shop' },
+        { $set: { value: req.body } },
+        { new: true, upsert: true }
+    );
+    res.status(200).json(new ApiResponse(200, updated.value, 'Shop config updated successfully.'));
+}));
 
 // ─── Reports ──────────────────────────────────────────────────────────────────
 router.get('/reports/sales', ...adminAuth, reportController.getSalesReport);

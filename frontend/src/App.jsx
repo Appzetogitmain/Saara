@@ -27,6 +27,9 @@ import Customers from "./modules/Admin/pages/Customers";
 
 import Campaigns from "./modules/Admin/pages/Campaigns";
 import HomeContent from "./modules/Admin/pages/HomeContent";
+import HomepageSections from "./modules/Admin/pages/marketing/HomepageSections";
+import HomepageBanners from "./modules/Admin/pages/marketing/HomepageBanners";
+import ShopConfiguration from "./modules/Admin/pages/marketing/ShopConfiguration";
 import Reviews from "./modules/Admin/pages/Reviews";
 import Analytics from "./modules/Admin/pages/Analytics";
 import Content from "./modules/Admin/pages/Content";
@@ -108,6 +111,7 @@ import MobileBrand from "./modules/UserApp/pages/Brand";
 import MobileCategories from "./modules/UserApp/pages/categories";
 import MobileCheckout from "./modules/UserApp/pages/Checkout";
 import MobileSearch from "./modules/UserApp/pages/Search";
+import MobileShop from "./modules/UserApp/pages/Shop";
 import MobileLogin from "./modules/UserApp/pages/Login";
 import MobileRegister from "./modules/UserApp/pages/Register";
 import MobileVerification from "./modules/UserApp/pages/Verification";
@@ -261,7 +265,15 @@ const AppRoutes = () => {
         path="/search"
         element={
           <RouteWrapper>
-            <MobileSearch />
+            <MobileShop />
+          </RouteWrapper>
+        }
+      />
+      <Route
+        path="/shop"
+        element={
+          <RouteWrapper>
+            <MobileShop />
           </RouteWrapper>
         }
       />
@@ -591,6 +603,9 @@ const AppRoutes = () => {
         <Route path="marketing" element={<Navigate to="/admin/marketing/home-sliders" replace />} />
         <Route path="marketing/home-sliders" element={<HomeSliders />} />
         <Route path="marketing/home-content" element={<HomeContent />} />
+        <Route path="marketing/homepage-sections" element={<HomepageSections />} />
+        <Route path="marketing/banner-library" element={<HomepageBanners />} />
+        <Route path="marketing/shop-config" element={<ShopConfiguration />} />
         <Route path="marketing/offers" element={<Offers />} />
         <Route path="marketing/promocodes" element={<PromoCodes />} />
         <Route path="notifications" element={<AllNotifications />} />

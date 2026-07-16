@@ -8,6 +8,7 @@ import * as walletController from '../controllers/wallet.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
 import * as cartController from '../controllers/cart.controller.js';
 import * as supportController from '../controllers/support.controller.js';
+import * as recentlyViewedController from '../controllers/recentlyViewed.controller.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
 import { authLimiter, otpLimiter, otpVerifyLimiter } from '../../../middlewares/rateLimiter.js';
@@ -105,5 +106,17 @@ router.get('/support/ticket-types', ...customerAuth, supportController.getActive
 router.get('/wallet', ...customerAuth, walletController.getCustomerWallet);
 router.get('/wallet/transactions', ...customerAuth, walletController.getCustomerWalletTransactions);
 router.post('/wallet/pay', ...customerAuth, walletController.payWithWallet);
+
+// Recently Viewed routes (protected)
+router.get('/recently-viewed', ...customerAuth, recentlyViewedController.getRecentlyViewed);
+router.post('/recently-viewed', ...customerAuth, recentlyViewedController.recordRecentlyViewed);
+
+// User Homepage Personalized Route
+router.get('/homepage', ...customerAuth, (req, res, next) => {
+    // Dynamically resolve user homepage data
+    import('../../../modules/admin/controllers/homepage.controller.js')
+        .then((m) => m.getUserHomepage(req, res, next))
+        .catch(next);
+});
 
 export default router;

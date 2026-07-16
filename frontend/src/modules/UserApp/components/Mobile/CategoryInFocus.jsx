@@ -33,7 +33,7 @@ const CategoryInFocus = ({ banner, items }) => {
     { name: 'Conditioner', image: 'https://images.pexels.com/photos/4465124/pexels-photo-4465124.jpeg?auto=compress&cs=tinysrgb&w=200' },
     { name: 'Foundation', image: 'https://images.pexels.com/photos/3373736/pexels-photo-3373736.jpeg?auto=compress&cs=tinysrgb&w=200' },
     { name: 'Blush', image: 'https://images.pexels.com/photos/2533266/pexels-photo-2533266.jpeg?auto=compress&cs=tinysrgb&w=200' },
-    { name: 'Lipsticks', image: 'https://images.pexels.com/photos/2533261/pexels-photo-2533261.jpeg?auto=compress&cs=tinysrgb&w=200' },
+    { name: 'Lipsticks', image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=200&q=80' },
     { name: 'Mascara', image: 'https://images.pexels.com/photos/3373746/pexels-photo-3373746.jpeg?auto=compress&cs=tinysrgb&w=200' },
   ];
 
