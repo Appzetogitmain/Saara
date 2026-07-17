@@ -186,9 +186,9 @@ const DeliveryWallet = () => {
 
   return (
     <PageTransition>
-      <div className="px-4 py-6 space-y-6 max-w-3xl mx-auto pb-24">
+      <div className="px-4 py-6 space-y-6 max-w-5xl mx-auto pb-24">
         {/* Header section */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-xl font-black text-slate-800 uppercase tracking-wide">
               My Wallet
@@ -199,418 +199,428 @@ const DeliveryWallet = () => {
           </div>
           <button
             onClick={() => setSettingsOpen(true)}
-            className="p-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-2xl transition-all text-xs font-bold flex items-center gap-1.5"
+            className="w-full sm:w-auto p-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-2xl transition-all text-xs font-bold flex items-center justify-center gap-1.5 flex-shrink-0"
           >
             <FiCreditCard className="text-sm" />
             Payout Setup
           </button>
         </div>
 
-        {/* Dynamic balances card grid */}
-        <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden space-y-6">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-12 -mt-12" />
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full -ml-12 -mb-12" />
+        {/* Responsive Grid Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* Left Column: Balances & Settlement Info */}
+          <div className="lg:col-span-5 space-y-6">
+            {/* Dynamic balances card grid */}
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-5 sm:p-6 shadow-xl relative overflow-hidden space-y-6">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-12 -mt-12" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full -ml-12 -mb-12" />
 
-          <div className="relative z-10 space-y-1">
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              Available for Withdrawal
-            </p>
-            <h2 className="text-4xl font-black font-mono tracking-tight">
-              {isLoading ? (
-                <span className="inline-block h-9 w-32 rounded bg-slate-700 animate-pulse" />
-              ) : (
-                formatPrice(netBalance)
-              )}
-            </h2>
-          </div>
-
-          <div className="relative z-10 grid grid-cols-2 gap-4 border-t border-white/10 pt-4">
-            <div className="space-y-1">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                Logistics Earnings
-              </p>
-              <p className="text-lg font-black font-mono text-emerald-400">
-                {isLoading ? (
-                  <span className="inline-block h-6 w-20 rounded bg-slate-700 animate-pulse" />
-                ) : (
-                  formatPrice(walletSummary?.earningsBalance || 0)
-                )}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                COD Liability (Cash Owed)
-              </p>
-              <p className="text-lg font-black font-mono text-orange-400">
-                {isLoading ? (
-                  <span className="inline-block h-6 w-20 rounded bg-slate-700 animate-pulse" />
-                ) : (
-                  formatPrice(walletSummary?.codLiability || 0)
-                )}
-              </p>
-            </div>
-          </div>
-
-          {/* Quick Action Withdrawal Button */}
-          <div className="relative z-10">
-            {netBalance >= 100 ? (
-              <button
-                onClick={() => setWithdrawModalOpen(true)}
-                className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider shadow-lg transition-all"
-              >
-                Request Withdrawal
-              </button>
-            ) : (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-2 text-xs font-semibold text-red-300">
-                <FiAlertCircle className="text-base flex-shrink-0 mt-0.5" />
-                <div>
-                  {netBalance < 0
-                    ? `Withdrawals locked. Please clear your COD dues of ${formatPrice(walletSummary?.codLiability || 0)} to restore balance.`
-                    : `Minimum payout threshold is ₹100. Current available: ${formatPrice(netBalance)}`}
-                </div>
+              <div className="relative z-10 space-y-1">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  Available for Withdrawal
+                </p>
+                <h2 className="text-4xl font-black font-mono tracking-tight">
+                  {isLoading ? (
+                    <span className="inline-block h-9 w-32 rounded bg-slate-700 animate-pulse" />
+                  ) : (
+                    formatPrice(netBalance)
+                  )}
+                </h2>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* COD Cash Settlement Instructions */}
-        {!isLoading && walletSummary && (
-          <div className="space-y-3">
-            {Number(walletSummary.codLiability || 0) <= 0 ? (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-4 flex items-center gap-3">
-                <div className="p-2 bg-emerald-500 text-white rounded-xl">
-                  <FiCheckCircle className="text-base" />
+              <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-white/10 pt-4">
+                <div className="space-y-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    Logistics Earnings
+                  </p>
+                  <p className="text-lg font-black font-mono text-emerald-400">
+                    {isLoading ? (
+                      <span className="inline-block h-6 w-20 rounded bg-slate-700 animate-pulse" />
+                    ) : (
+                      formatPrice(walletSummary?.earningsBalance || 0)
+                    )}
+                  </p>
                 </div>
-                <div>
-                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                    All Clear!
-                  </h4>
-                  <p className="text-[10px] text-slate-500 font-medium">
-                    All COD cash collections are fully settled. No outstanding
-                    liabilities.
+                <div className="space-y-1">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    COD Liability (Cash Owed)
+                  </p>
+                  <p className="text-lg font-black font-mono text-orange-400">
+                    {isLoading ? (
+                      <span className="inline-block h-6 w-20 rounded bg-slate-700 animate-pulse" />
+                    ) : (
+                      formatPrice(walletSummary?.codLiability || 0)
+                    )}
                   </p>
                 </div>
               </div>
-            ) : (
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden transition-all duration-300">
-                <button
-                  onClick={() => setInstructionsOpen(!instructionsOpen)}
-                  className="w-full p-5 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
-                >
-                  <div className="flex items-center gap-3 text-left">
-                    <div className="p-2.5 bg-orange-500/10 text-orange-600 rounded-2xl">
-                      <FiInfo className="text-lg" />
+
+              {/* Quick Action Withdrawal Button */}
+              <div className="relative z-10">
+                {netBalance >= 100 ? (
+                  <button
+                    onClick={() => setWithdrawModalOpen(true)}
+                    className="w-full py-3.5 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider shadow-lg transition-all"
+                  >
+                    Request Withdrawal
+                  </button>
+                ) : (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-2 text-xs font-semibold text-red-300">
+                    <FiAlertCircle className="text-base flex-shrink-0 mt-0.5" />
+                    <div>
+                      {netBalance < 0
+                        ? `Withdrawals locked. Please clear your COD dues of ${formatPrice(walletSummary?.codLiability || 0)} to restore balance.`
+                        : `Minimum payout threshold is ₹100. Current available: ${formatPrice(netBalance)}`}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* COD Cash Settlement Instructions */}
+            {!isLoading && walletSummary && (
+              <div className="space-y-3">
+                {Number(walletSummary.codLiability || 0) <= 0 ? (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-3xl p-4 flex items-center gap-3">
+                    <div className="p-2 bg-emerald-500 text-white rounded-xl">
+                      <FiCheckCircle className="text-base" />
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                        How to Settle COD Cash
+                        All Clear!
                       </h4>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                        Due Amount:{" "}
-                        <span className="font-mono text-orange-600 font-black">
-                          {formatPrice(walletSummary.codLiability)}
-                        </span>
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        All COD cash collections are fully settled. No outstanding
+                        liabilities.
                       </p>
                     </div>
                   </div>
-                  <div className="p-1.5 bg-slate-50 rounded-xl text-slate-500">
-                    {instructionsOpen ? (
-                      <FiChevronUp className="text-lg" />
-                    ) : (
-                      <FiChevronDown className="text-lg" />
-                    )}
-                  </div>
-                </button>
-
-                <AnimatePresence>
-                  {instructionsOpen && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3, ease: "easeInOut" }}
-                      className="border-t border-slate-50 overflow-hidden"
+                ) : (
+                  <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden transition-all duration-300">
+                    <button
+                      onClick={() => setInstructionsOpen(!instructionsOpen)}
+                      className="w-full p-5 flex items-center justify-between hover:bg-slate-50/50 transition-colors"
                     >
-                      <div className="p-5 space-y-5">
-                        {/* Dynamic QR Code Section */}
-                        <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                          <div className="p-2 bg-white rounded-2xl border border-slate-100 shadow-sm flex-shrink-0">
-                            <img
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(
-                                `upi://pay?pa=${companyPaymentDetails?.upiId || "Porutkal.pay@upi"}&pn=${encodeURIComponent(
-                                  companyPaymentDetails?.accountName ||
-                                    "Porutkal Logistics",
-                                )}&am=${walletSummary.codLiability}&cu=INR`,
-                              )}`}
-                              alt="UPI QR Code"
-                              className="w-28 h-28 object-contain"
-                              onError={(e) => {
-                                e.target.style.display = "none";
-                              }}
-                            />
-                          </div>
-                          <div className="text-center sm:text-left space-y-1">
-                            <h5 className="text-[10px] font-black text-slate-800 uppercase tracking-wider">
-                              Scan & Pay Instantly
-                            </h5>
-                            <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                              Scan this QR code with any UPI app (GPay, PhonePe,
-                              Paytm) to transfer the exact amount of{" "}
-                              <span className="font-bold text-slate-800 font-mono">
-                                {formatPrice(walletSummary.codLiability)}
-                              </span>{" "}
-                              directly to the platform.
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-3 text-left">
+                        <div className="p-2.5 bg-orange-500/10 text-orange-600 rounded-2xl">
+                          <FiInfo className="text-lg" />
                         </div>
-
-                        {/* UPI ID Transfer */}
-                        <div className="space-y-2">
-                          <label className="text-[9px] text-slate-400 font-black uppercase tracking-wider">
-                            Deposit via UPI ID
-                          </label>
-                          <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-100 rounded-2xl">
-                            <span className="text-xs font-mono font-bold text-slate-700 flex-1 truncate">
-                              {companyPaymentDetails?.upiId ||
-                                "Porutkal.pay@upi"}
+                        <div>
+                          <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                            How to Settle COD Cash
+                          </h4>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                            Due Amount:{" "}
+                            <span className="font-mono text-orange-600 font-black">
+                              {formatPrice(walletSummary.codLiability)}
                             </span>
-                            <button
-                              onClick={() =>
-                                handleCopy(
-                                  companyPaymentDetails?.upiId ||
-                                    "Porutkal.pay@upi",
-                                  "UPI ID",
-                                )
-                              }
-                              className="p-2 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 border border-slate-100 rounded-xl shadow-sm transition-all"
-                            >
-                              {copiedField === "UPI ID" ? (
-                                <FiCheck className="text-emerald-600 text-sm" />
-                              ) : (
-                                <FiCopy className="text-sm" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Bank Transfer Details */}
-                        <div className="space-y-3">
-                          <label className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">
-                            Deposit via Bank Transfer
-                          </label>
-                          <div className="bg-slate-50 border border-slate-100 rounded-3xl p-4 space-y-3">
-                            <div className="grid grid-cols-2 gap-3 text-xs">
-                              <div>
-                                <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">
-                                  Account Name
-                                </span>
-                                <span className="font-semibold text-slate-800 truncate block">
-                                  {companyPaymentDetails?.accountName ||
-                                    "Porutkal LOGISTICS PVT LTD"}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between min-w-0">
-                                <div className="truncate flex-1 min-w-0">
-                                  <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">
-                                    Bank Name
-                                  </span>
-                                  <span className="font-semibold text-slate-800 truncate block">
-                                    {companyPaymentDetails?.bankName ||
-                                      "HDFC Bank"}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="border-t border-slate-100 pt-3 space-y-2">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0 flex-1">
-                                  <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">
-                                    Account Number
-                                  </span>
-                                  <span className="font-bold font-mono text-xs text-slate-800 block truncate">
-                                    {companyPaymentDetails?.accountNumber ||
-                                      "50200081729012"}
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() =>
-                                    handleCopy(
-                                      companyPaymentDetails?.accountNumber ||
-                                        "50200081729012",
-                                      "Account Number",
-                                    )
-                                  }
-                                  className="p-1.5 bg-white hover:bg-slate-50 border border-slate-100 rounded-lg shadow-sm transition-all"
-                                >
-                                  {copiedField === "Account Number" ? (
-                                    <FiCheck className="text-emerald-600 text-xs" />
-                                  ) : (
-                                    <FiCopy className="text-xs" />
-                                  )}
-                                </button>
-                              </div>
-
-                              <div className="flex items-center justify-between gap-3 border-t border-slate-100/50 pt-2">
-                                <div className="min-w-0 flex-1">
-                                  <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">
-                                    IFSC Code
-                                  </span>
-                                  <span className="font-bold font-mono text-xs text-slate-800 block truncate">
-                                    {companyPaymentDetails?.ifscCode ||
-                                      "HDFC0000103"}
-                                  </span>
-                                </div>
-                                <button
-                                  onClick={() =>
-                                    handleCopy(
-                                      companyPaymentDetails?.ifscCode ||
-                                        "HDFC0000103",
-                                      "IFSC Code",
-                                    )
-                                  }
-                                  className="p-1.5 bg-white hover:bg-slate-50 border border-slate-100 rounded-lg shadow-sm transition-all"
-                                >
-                                  {copiedField === "IFSC Code" ? (
-                                    <FiCheck className="text-emerald-600 text-xs" />
-                                  ) : (
-                                    <FiCopy className="text-xs" />
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Step Instructions */}
-                        <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-[10px] text-amber-700 leading-relaxed font-semibold">
-                          <p className="font-black uppercase tracking-wider text-[9px] mb-1">
-                            Settlement instructions:
                           </p>
-                          <ol className="list-decimal pl-4 space-y-1">
-                            <li>
-                              Transfer the exact amount above to the platform
-                              bank or UPI details.
-                            </li>
-                            <li>
-                              Save the receipt/transaction reference number.
-                            </li>
-                            <li>
-                              Submit the transaction screenshot/proof to the
-                              Admin for verification.
-                            </li>
-                          </ol>
                         </div>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                      <div className="p-1.5 bg-slate-50 rounded-xl text-slate-500">
+                        {instructionsOpen ? (
+                          <FiChevronUp className="text-lg" />
+                        ) : (
+                          <FiChevronDown className="text-lg" />
+                        )}
+                      </div>
+                    </button>
+
+                    <AnimatePresence>
+                      {instructionsOpen && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: "easeInOut" }}
+                          className="border-t border-slate-50 overflow-hidden"
+                        >
+                          <div className="p-5 space-y-5">
+                            {/* Dynamic QR Code Section */}
+                            <div className="flex flex-col sm:flex-row items-center gap-5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                              <div className="p-2 bg-white rounded-2xl border border-slate-100 shadow-sm flex-shrink-0">
+                                <img
+                                  src={`https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(
+                                    `upi://pay?pa=${companyPaymentDetails?.upiId || "Porutkal.pay@upi"}&pn=${encodeURIComponent(
+                                      companyPaymentDetails?.accountName ||
+                                        "Porutkal Logistics",
+                                    )}&am=${walletSummary.codLiability}&cu=INR`,
+                                  )}`}
+                                  alt="UPI QR Code"
+                                  className="w-28 h-28 object-contain"
+                                  onError={(e) => {
+                                    e.target.style.display = "none";
+                                  }}
+                                />
+                              </div>
+                              <div className="text-center sm:text-left space-y-1">
+                                <h5 className="text-[10px] font-black text-slate-800 uppercase tracking-wider">
+                                  Scan & Pay Instantly
+                                </h5>
+                                <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                                  Scan this QR code with any UPI app (GPay, PhonePe,
+                                  Paytm) to transfer the exact amount of{" "}
+                                  <span className="font-bold text-slate-800 font-mono">
+                                    {formatPrice(walletSummary.codLiability)}
+                                  </span>{" "}
+                                  directly to the platform.
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* UPI ID Transfer */}
+                            <div className="space-y-2">
+                              <label className="text-[9px] text-slate-400 font-black uppercase tracking-wider">
+                                Deposit via UPI ID
+                              </label>
+                              <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-100 rounded-2xl">
+                                <span className="text-xs font-mono font-bold text-slate-700 flex-1 truncate">
+                                  {companyPaymentDetails?.upiId ||
+                                    "Porutkal.pay@upi"}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    handleCopy(
+                                      companyPaymentDetails?.upiId ||
+                                        "Porutkal.pay@upi",
+                                      "UPI ID",
+                                    )
+                                  }
+                                  className="p-2 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-800 border border-slate-100 rounded-xl shadow-sm transition-all"
+                                >
+                                  {copiedField === "UPI ID" ? (
+                                    <FiCheck className="text-emerald-600 text-sm" />
+                                  ) : (
+                                    <FiCopy className="text-sm" />
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Bank Transfer Details */}
+                            <div className="space-y-3">
+                              <label className="text-[9px] text-slate-400 font-black uppercase tracking-wider block">
+                                Deposit via Bank Transfer
+                              </label>
+                              <div className="bg-slate-50 border border-slate-100 rounded-3xl p-4 space-y-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                  <div>
+                                    <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">
+                                      Account Name
+                                    </span>
+                                    <span className="font-semibold text-slate-800 truncate block">
+                                      {companyPaymentDetails?.accountName ||
+                                        "Porutkal LOGISTICS PVT LTD"}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between min-w-0">
+                                    <div className="truncate flex-1 min-w-0">
+                                      <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">
+                                        Bank Name
+                                      </span>
+                                      <span className="font-semibold text-slate-800 truncate block">
+                                        {companyPaymentDetails?.bankName ||
+                                          "HDFC Bank"}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="border-t border-slate-100 pt-3 space-y-2">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                      <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">
+                                        Account Number
+                                      </span>
+                                      <span className="font-bold font-mono text-xs text-slate-800 block truncate">
+                                        {companyPaymentDetails?.accountNumber ||
+                                          "50200081729012"}
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={() =>
+                                        handleCopy(
+                                          companyPaymentDetails?.accountNumber ||
+                                            "50200081729012",
+                                          "Account Number",
+                                        )
+                                      }
+                                      className="p-1.5 bg-white hover:bg-slate-50 border border-slate-100 rounded-lg shadow-sm transition-all"
+                                    >
+                                      {copiedField === "Account Number" ? (
+                                        <FiCheck className="text-emerald-600 text-xs" />
+                                      ) : (
+                                        <FiCopy className="text-xs" />
+                                      )}
+                                    </button>
+                                  </div>
+
+                                  <div className="flex items-center justify-between gap-3 border-t border-slate-100/50 pt-2">
+                                    <div className="min-w-0 flex-1">
+                                      <span className="text-[8px] text-slate-400 font-black uppercase tracking-wider block">
+                                        IFSC Code
+                                      </span>
+                                      <span className="font-bold font-mono text-xs text-slate-800 block truncate">
+                                        {companyPaymentDetails?.ifscCode ||
+                                          "HDFC0000103"}
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={() =>
+                                        handleCopy(
+                                          companyPaymentDetails?.ifscCode ||
+                                            "HDFC0000103",
+                                          "IFSC Code",
+                                        )
+                                      }
+                                      className="p-1.5 bg-white hover:bg-slate-50 border border-slate-100 rounded-lg shadow-sm transition-all"
+                                    >
+                                      {copiedField === "IFSC Code" ? (
+                                        <FiCheck className="text-emerald-600 text-xs" />
+                                      ) : (
+                                        <FiCopy className="text-xs" />
+                                      )}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Step Instructions */}
+                            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-[10px] text-amber-700 leading-relaxed font-semibold">
+                              <p className="font-black uppercase tracking-wider text-[9px] mb-1">
+                                Settlement instructions:
+                              </p>
+                              <ol className="list-decimal pl-4 space-y-1">
+                                <li>
+                                  Transfer the exact amount above to the platform
+                                  bank or UPI details.
+                                </li>
+                                <li>
+                                  Save the receipt/transaction reference number.
+                                </li>
+                                <li>
+                                  Submit the transaction screenshot/proof to the
+                                  Admin for verification.
+                                </li>
+                              </ol>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
 
-        {/* Transaction Ledger Statement List */}
-        <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-4">
-          <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
-            Transaction Statement Ledger
-          </h3>
+          {/* Right Column: Transaction Statement Ledger */}
+          <div className="lg:col-span-7">
+            <div className="bg-white rounded-3xl p-5 border border-slate-100 shadow-sm space-y-4">
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">
+                Transaction Statement Ledger
+              </h3>
 
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-16 rounded-2xl bg-slate-50 animate-pulse"
-                />
-              ))}
-            </div>
-          ) : walletTransactions.length === 0 ? (
-            <div className="py-8 text-center text-xs text-slate-400 space-y-1">
-              <FiInfo className="text-lg mx-auto mb-1 text-slate-300" />
-              <p>No wallet transaction ledger history found.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {walletTransactions.map((tx) => {
-                const config = getTransactionIcon(tx.type);
-                const Icon = config.icon;
-                const isDebit = tx.amount < 0;
+              {isLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div
+                      key={i}
+                      className="h-16 rounded-2xl bg-slate-50 animate-pulse"
+                    />
+                  ))}
+                </div>
+              ) : walletTransactions.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400 space-y-1">
+                  <FiInfo className="text-lg mx-auto mb-1 text-slate-300" />
+                  <p>No wallet transaction ledger history found.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {walletTransactions.map((tx) => {
+                    const config = getTransactionIcon(tx.type);
+                    const Icon = config.icon;
+                    const isDebit = tx.amount < 0;
 
-                return (
-                  <div
-                    key={tx._id}
-                    className="p-4 border border-slate-100 rounded-2xl flex items-center justify-between gap-3 hover:bg-slate-50/50 transition-all"
-                  >
-                    <div className="flex items-center gap-3">
+                    return (
                       <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${config.color}`}
+                        key={tx._id}
+                        className="p-4 border border-slate-100 rounded-2xl flex items-center justify-between gap-3 hover:bg-slate-50/50 transition-all"
                       >
-                        <Icon className="text-lg" />
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${config.color}`}
+                          >
+                            <Icon className="text-lg" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-slate-800 capitalize leading-tight truncate">
+                              {formatTxType(tx.type)}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                              {tx.notes}
+                            </p>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
+                              {new Date(tx.createdAt).toLocaleDateString(
+                                undefined,
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p
+                            className={`text-xs font-extrabold font-mono ${isDebit ? "text-slate-600" : "text-green-600"}`}
+                          >
+                            {isDebit ? "-" : "+"}
+                            {formatPrice(Math.abs(tx.amount))}
+                          </p>
+                          <div className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-1">
+                            Bal: {formatPrice(tx.walletBalanceAfter)}
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 capitalize leading-tight">
-                          {formatTxType(tx.type)}
-                        </p>
-                        <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
-                          {tx.notes}
-                        </p>
-                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">
-                          {new Date(tx.createdAt).toLocaleDateString(
-                            undefined,
-                            {
-                              month: "short",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            },
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p
-                        className={`text-xs font-extrabold font-mono ${isDebit ? "text-slate-600" : "text-green-600"}`}
-                      >
-                        {isDebit ? "-" : "+"}
-                        {formatPrice(Math.abs(tx.amount))}
-                      </p>
-                      <div className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-1">
-                        Bal: {formatPrice(tx.walletBalanceAfter)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    );
+                  })}
+                </div>
+              )}
 
-          {/* Simple statement pagination */}
-          {!isLoading && walletTransactionsPagination.pages > 1 && (
-            <div className="flex justify-between items-center pt-2">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-50 disabled:hover:bg-slate-100 rounded-xl text-[10px] font-bold uppercase tracking-wider"
-              >
-                Previous
-              </button>
-              <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">
-                Page {currentPage} of {walletTransactionsPagination.pages}
-              </span>
-              <button
-                onClick={() =>
-                  setCurrentPage((prev) =>
-                    Math.min(prev + 1, walletTransactionsPagination.pages),
-                  )
-                }
-                disabled={currentPage === walletTransactionsPagination.pages}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-50 disabled:hover:bg-slate-100 rounded-xl text-[10px] font-bold uppercase tracking-wider"
-              >
-                Next
-              </button>
+              {/* Simple statement pagination */}
+              {!isLoading && walletTransactionsPagination.pages > 1 && (
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-50 disabled:hover:bg-slate-100 rounded-xl text-[10px] font-bold uppercase tracking-wider"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">
+                    Page {currentPage} of {walletTransactionsPagination.pages}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((prev) =>
+                        Math.min(prev + 1, walletTransactionsPagination.pages),
+                      )
+                    }
+                    disabled={currentPage === walletTransactionsPagination.pages}
+                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 disabled:opacity-50 disabled:hover:bg-slate-100 rounded-xl text-[10px] font-bold uppercase tracking-wider"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          </div>
+
         </div>
 
         {/* Withdrawal request modal */}

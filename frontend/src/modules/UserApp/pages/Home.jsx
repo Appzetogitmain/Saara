@@ -214,7 +214,7 @@ const isSafeInternalPath = (target) => String(target || "").startsWith("/");
 
 const getButtonStyleClasses = (style = "primary", isDarkBg = false) => {
   const base =
-    "inline-flex items-center justify-center gap-2 font-black py-2.5 px-6 md:py-3.5 md:px-8 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-[10px] md:text-sm active:scale-95";
+    "inline-flex items-center justify-center gap-2 font-black py-2.5 px-6 md:py-3.5 md:px-8 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-[10px] md:text-sm active:scale-95 whitespace-nowrap";
   if (isDarkBg) {
     switch (style) {
       case "secondary":
@@ -854,7 +854,7 @@ const MobileHome = () => {
                 className="hidden lg:flex lg:col-span-1 h-[400px] xl:h-[450px] rounded-3xl overflow-hidden relative bg-gradient-to-br from-[#111111] to-[#1e1e1e] p-8 border border-gray-800 cursor-pointer group shadow-lg"
               >
                 {/* Text and Actions (Left side) */}
-                <div className="flex-1 flex flex-col justify-between z-20 text-left h-full max-w-[55%]">
+                <div className="flex-1 flex flex-col justify-between z-20 text-left h-full max-w-[60%]">
                   <div className="space-y-4">
                     <span className="text-yellow-500 font-extrabold text-xs tracking-widest uppercase">
                       {sideBanner?.subtitle || "PREMIUM COLLECTION"}
@@ -871,10 +871,10 @@ const MobileHome = () => {
                   {sideBanner?.showButton !== false && (
                     <button
                       type="button"
-                      className={getButtonStyleClasses(
+                      className={`${getButtonStyleClasses(
                         sideBanner?.buttonStyle,
                         true,
-                      )}
+                      )} self-start`}
                     >
                       <span>{sideBanner?.buttonText || "Explore Now"}</span>
                       <span>&rarr;</span>

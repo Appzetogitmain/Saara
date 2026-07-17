@@ -4,7 +4,7 @@ import { matchPath, useNavigate } from "react-router-dom";
 import { FiArrowRight, FiZap, FiTag } from "react-icons/fi";
 
 const getButtonStyleClasses = (style = "primary", isDarkBg = false) => {
-  const base = "inline-flex items-center justify-center gap-1.5 font-bold py-1.5 px-4 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-[10px] md:text-xs active:scale-95 mt-2 self-start border border-gray-100/10 group-hover:translate-x-1";
+  const base = "inline-flex items-center justify-center gap-1.5 font-bold py-1.5 px-4 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-[10px] md:text-xs active:scale-95 mt-2 self-start border border-gray-100/10 group-hover:translate-x-1 whitespace-nowrap";
   if (isDarkBg) {
     switch (style) {
       case "secondary":

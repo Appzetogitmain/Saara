@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import LazyImage from '../../../../shared/components/LazyImage';
 
 const getButtonStyleClasses = (style = "primary", isDarkBg = false) => {
-  const base = "inline-flex items-center justify-center gap-1.5 font-bold py-2 px-5 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-xs active:scale-95 mt-3 self-start";
+  const base = "inline-flex items-center justify-center gap-1.5 font-bold py-2 px-5 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-xs active:scale-95 mt-3 self-start whitespace-nowrap";
   if (isDarkBg) {
     switch (style) {
       case "secondary":

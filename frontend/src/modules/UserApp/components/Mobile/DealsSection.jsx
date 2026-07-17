@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 
 const getButtonStyleClasses = (style = "primary") => {
-  const base = "inline-flex items-center justify-center gap-1 font-bold py-1.5 px-3.5 rounded-lg transition-all duration-300 shadow-sm cursor-pointer select-none text-[10px] active:scale-95 mt-2 self-start";
+  const base = "inline-flex items-center justify-center gap-1 font-bold py-1.5 px-3.5 rounded-lg transition-all duration-300 shadow-sm cursor-pointer select-none text-[10px] active:scale-95 mt-2 self-start whitespace-nowrap";
   switch (style) {
     case "secondary":
       return `${base} bg-gray-100 hover:bg-gray-200 text-gray-800 hover:scale-[1.02]`;
