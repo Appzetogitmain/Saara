@@ -29,7 +29,8 @@ export const useCampaignStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await adminService.getAllCampaigns(params);
-      set({ campaigns: response.data, isLoading: false });
+      const payload = response?.data ?? response;
+      set({ campaigns: Array.isArray(payload) ? payload : [], isLoading: false });
     } catch (error) {
       set({ isLoading: false });
       toast.error(error.message || 'Failed to fetch campaigns');
@@ -40,9 +41,10 @@ export const useCampaignStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await adminService.createCampaign(campaignData);
-      const reassignment = getReassignmentMeta(response?.data);
+      const payload = response?.data ?? response;
+      const reassignment = getReassignmentMeta(payload);
       set(state => ({
-        campaigns: [...state.campaigns, response.data],
+        campaigns: [...state.campaigns, payload],
         isLoading: false
       }));
       if (reassignment) {
@@ -65,9 +67,10 @@ export const useCampaignStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await adminService.updateCampaign(id, campaignData);
-      const reassignment = getReassignmentMeta(response?.data);
+      const payload = response?.data ?? response;
+      const reassignment = getReassignmentMeta(payload);
       set(state => ({
-        campaigns: state.campaigns.map(c => c._id === id ? response.data : c),
+        campaigns: state.campaigns.map(c => c._id === id ? payload : c),
         isLoading: false
       }));
       if (reassignment) {
@@ -109,8 +112,9 @@ export const useCampaignStore = create((set, get) => ({
   },
 
   getCampaignsByType: (type) => {
-    if (!type) return get().campaigns;
-    return get().campaigns.filter((campaign) => campaign.type === type);
+    const allCampaigns = get().campaigns || [];
+    if (!type) return allCampaigns;
+    return allCampaigns.filter((campaign) => campaign.type === type);
   }
 }));
 

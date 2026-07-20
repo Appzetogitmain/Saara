@@ -55,9 +55,9 @@ const ShopConfiguration = () => {
         api.get('/admin/marketing/homepage-banners')
       ]);
 
-      setAllCategories(catRes.data?.data || catRes.data || []);
-      setAllBrands(brandRes.data?.data || brandRes.data || []);
-      setLibraryBanners(bannerRes.data?.data || bannerRes.data || []);
+      setAllCategories(Array.isArray(catRes) ? catRes : (catRes?.data ?? catRes ?? []));
+      setAllBrands(Array.isArray(brandRes) ? brandRes : (brandRes?.data ?? brandRes ?? []));
+      setLibraryBanners(Array.isArray(bannerRes) ? bannerRes : (bannerRes?.data ?? bannerRes ?? []));
     } catch (err) {
       console.error('Failed to load metadata lists:', err);
     }
@@ -67,7 +67,7 @@ const ShopConfiguration = () => {
     setLoading(true);
     try {
       const res = await api.get('/admin/marketing/shop-config');
-      const data = res.data?.data || res.data || {};
+      const data = res?.data ?? res ?? {};
       
       setDefaultSort(data.defaultSort || 'newest');
       setProductsPerPage(data.productsPerPage || 20);

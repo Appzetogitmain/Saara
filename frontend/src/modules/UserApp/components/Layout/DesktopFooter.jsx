@@ -14,7 +14,7 @@ const DesktopFooter = () => {
 
   return (
     <footer className="hidden lg:block bg-slate-900 text-slate-300 border-t border-slate-800 pt-16 pb-8 w-full mt-auto">
-      <div className="max-w-[1440px] mx-auto px-12 grid grid-cols-1 md:grid-cols-4 gap-10">
+      <div className="max-w-[1440px] mx-auto px-6 md:px-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10">
         {/* Brand Column */}
         <div className="space-y-6">
           <Link to="/" className="flex items-center gap-2">
@@ -89,10 +89,32 @@ const DesktopFooter = () => {
           </h4>
           <ul className="space-y-3 text-sm font-medium">
             {[
-              { name: "Help & Support", path: "/support" },
-              { name: "Returns & Refund Policy", path: "/policy/return" },
-              { name: "Seller Terms & Conditions", path: "/policy/seller" },
-              { name: "FAQ", path: "/policy/support" },
+              { name: "Help Center", path: "/policy/faq" },
+              { name: "Frequently Asked Questions", path: "/policy/faq" },
+              { name: "Returns & Refund Policy", path: "/policy/refund-policy" },
+            ].map((link, idx) => (
+              <li key={idx}>
+                <Link
+                  to={link.path}
+                  className="hover:text-white hover:underline transition-all"
+                >
+                  {link.name}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* Legal Column */}
+        <div className="space-y-6">
+          <h4 className="text-sm font-bold uppercase text-white tracking-widest">
+            Legal
+          </h4>
+          <ul className="space-y-3 text-sm font-medium">
+            {[
+              { name: "Privacy Policy", path: "/policy/privacy-policy" },
+              { name: "Terms & Conditions", path: "/policy/terms-conditions" },
+              { name: "Seller Terms & Conditions", path: "/policy/seller-terms" },
             ].map((link, idx) => (
               <li key={idx}>
                 <Link
@@ -129,12 +151,12 @@ const DesktopFooter = () => {
       </div>
 
       {/* Bottom Bar */}
-      <div className="max-w-[1440px] mx-auto px-12 mt-16 pt-8 border-t border-slate-800 flex flex-col md:flex-row items-center justify-between gap-6">
-        <p className="text-xs text-slate-500 font-semibold">
+      <div className="max-w-[1440px] mx-auto px-6 md:px-12 mt-16 pt-8 border-t border-slate-800 flex flex-col lg:flex-row items-center justify-between gap-6">
+        <p className="text-xs text-slate-500 font-semibold text-center lg:text-left">
           © {new Date().getFullYear()} Porutkal Marketplace. All rights
           reserved. Developed with ❤️.
         </p>
-        <div className="flex items-center gap-6 text-xs text-slate-500 font-bold uppercase tracking-wider">
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-xs text-slate-500 font-bold uppercase tracking-wider">
           <Link to="/policy/privacy-policy" className="hover:text-white transition-colors">
             Privacy Policy
           </Link>
@@ -143,6 +165,9 @@ const DesktopFooter = () => {
           </Link>
           <Link to="/policy/refund-policy" className="hover:text-white transition-colors">
             Refund Policy
+          </Link>
+          <Link to="/policy/seller-terms" className="hover:text-white transition-colors">
+            Seller Terms & Conditions
           </Link>
         </div>
       </div>

@@ -5,67 +5,15 @@ import {
   FiShield,
   FiRotateCcw,
   FiHeadphones,
+  FiChevronDown,
+  FiHome,
+  FiChevronRight
 } from "react-icons/fi";
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import PageTransition from "../../../shared/components/PageTransition";
 import api from "../../../shared/utils/api";
-
-const POLICY_CONTENT = {
-  seller: {
-    title: "Seller Policy",
-    icon: <FiShield className="text-3xl text-[#024d3e]" />,
-    content: [
-      {
-        heading: "Verification & Standards",
-        text: "Every seller on our platform undergoes a rigorous verification process. We ensure that all products sold are authentic and meet our high-quality standards.",
-      },
-      {
-        heading: "Shipping & Fulfillment",
-        text: "Sellers are committed to dispatching orders within 24-48 hours. You will receive tracking updates as soon as the package leaves the warehouse.",
-      },
-      {
-        heading: "Seller Responsibility",
-        text: "The seller is responsible for the accuracy of product descriptions, professional packaging, and ensuring items match the listed specifications.",
-      },
-    ],
-  },
-  return: {
-    title: "Return Policy",
-    icon: <FiRotateCcw className="text-3xl text-pink-500" />,
-    content: [
-      {
-        heading: "7-Day Return Window",
-        text: "We offer a hassle-free 7-day return policy for most items. If you're not satisfied, you can initiate a return directly from the 'My Orders' section.",
-      },
-      {
-        heading: "Condition for Returns",
-        text: "Items must be returned in their original packaging, with all tags intact and in unused condition to qualify for a full refund.",
-      },
-      {
-        heading: "Refund Process",
-        text: "Once the item is picked up and verified, the refund will be initiated to your original payment method within 3-5 business days.",
-      },
-    ],
-  },
-  support: {
-    title: "Support Policy",
-    icon: <FiHeadphones className="text-3xl text-indigo-500" />,
-    content: [
-      {
-        heading: "24/7 Availability",
-        text: "Our customer support team is available round the clock to assist you with any queries regarding orders, payments, or product information.",
-      },
-      {
-        heading: "Response Time",
-        text: "We aim to respond to all chat queries within 5 minutes and email support tickets within 4 hours during business days.",
-      },
-      {
-        heading: "Escalation Matrix",
-        text: "If your issue remains unresolved for more than 24 hours, it is automatically escalated to our senior management for priority resolution.",
-      },
-    ],
-  },
-};
+import HelpCenter from "./HelpCenter";
 
 const PolicyPage = () => {
   const { type } = useParams();
@@ -73,24 +21,23 @@ const PolicyPage = () => {
   const [dynamicPolicy, setDynamicPolicy] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [openFaq, setOpenFaq] = useState(null);
 
-  const isDynamicType = useMemo(() => 
-    ["privacy-policy", "terms-conditions", "refund-policy"].includes(type),
-    [type]
-  );
+  // Map legacy URLs to valid backend types
+  const apiType = useMemo(() => {
+    if (type === "return") return "refund-policy";
+    if (type === "seller") return "seller-terms";
+    if (type === "support") return "faq";
+    return type;
+  }, [type]);
 
   useEffect(() => {
-    if (!isDynamicType) {
-      setDynamicPolicy(null);
-      setError(null);
-      return;
-    }
 
     const fetchPolicy = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await api.get(`/policies/${type}`);
+        const response = await api.get(`/policies/${apiType}`);
         const data = response?.data ?? response;
         setDynamicPolicy(data);
       } catch (err) {
@@ -102,7 +49,7 @@ const PolicyPage = () => {
     };
 
     fetchPolicy();
-  }, [type, isDynamicType]);
+  }, [apiType]);
 
   const formatLastUpdated = (dateString) => {
     if (!dateString) return "";
@@ -119,114 +66,118 @@ const PolicyPage = () => {
   };
 
   const title = useMemo(() => {
-    if (isDynamicType) {
-      if (type === "privacy-policy") return "Privacy Policy";
-      if (type === "terms-conditions") return "Terms & Conditions";
-      if (type === "refund-policy") return "Refund Policy";
+    switch (apiType) {
+      case "privacy-policy": return "Privacy Policy";
+      case "terms-conditions": return "Terms & Conditions";
+      case "refund-policy": return "Refund Policy";
+      case "seller-terms": return "Seller Terms & Conditions";
+      case "faq": return "Frequently Asked Questions";
+      default: return "Policy Details";
     }
-    const data = POLICY_CONTENT[type] || POLICY_CONTENT["seller"];
-    return data.title;
-  }, [type, isDynamicType]);
+  }, [apiType]);
 
   const icon = useMemo(() => {
-    if (isDynamicType) {
-      if (type === "privacy-policy") return <FiShield className="text-3xl text-[#024d3e]" />;
-      if (type === "terms-conditions") return <FiShield className="text-3xl text-indigo-500" />;
-      if (type === "refund-policy") return <FiRotateCcw className="text-3xl text-pink-500" />;
+    switch (apiType) {
+      case "privacy-policy": return <FiShield className="text-3xl text-[#024d3e]" />;
+      case "terms-conditions": return <FiShield className="text-3xl text-indigo-500" />;
+      case "refund-policy": return <FiRotateCcw className="text-3xl text-pink-500" />;
+      case "seller-terms": return <FiShield className="text-3xl text-[#024d3e]" />;
+      case "faq": return <FiHeadphones className="text-3xl text-indigo-500" />;
+      default: return <FiShield className="text-3xl text-gray-500" />;
     }
-    const data = POLICY_CONTENT[type] || POLICY_CONTENT["seller"];
-    return data.icon;
-  }, [type, isDynamicType]);
+  }, [apiType]);
 
   return (
     <PageTransition>
-      <div className="min-h-screen bg-gray-50 pb-20">
-        {/* Header */}
-        <div className="bg-white px-4 py-4 sticky top-0 z-50 flex items-center gap-4 border-b border-gray-100">
+      <div className="min-h-screen bg-white pb-20">
+        {/* Mobile Header (Hidden on Desktop) */}
+        <div className="md:hidden bg-white px-4 py-4 sticky top-0 z-50 flex items-center gap-4 border-b border-gray-100 shadow-sm">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 -ml-2 rounded-full active:bg-gray-100 transition-colors"
+            className="p-2 -ml-2 rounded-full hover:bg-gray-50 active:bg-gray-100 transition-colors"
           >
             <FiChevronLeft className="text-2xl text-slate-800" />
           </button>
-          <h1 className="text-lg font-bold text-slate-900">{title}</h1>
-        </div>
-
-        {/* Hero Section */}
-        <div className="bg-white px-6 py-10 flex flex-col items-center text-center border-b border-gray-100">
-          <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mb-4 shadow-sm">
-            {icon}
-          </div>
-          <h2 className="text-2xl font-black text-slate-900 mb-2">
-            Our Commitment
-          </h2>
-          <p className="text-sm text-slate-500 max-w-[280px]">
-            Ensuring a safe, transparent, and premium shopping experience for
-            you.
-          </p>
+          <h1 className="text-lg font-bold text-slate-900 truncate">{title}</h1>
         </div>
 
         {/* Content Section */}
-        <div className="px-4 py-8 max-w-3xl mx-auto">
+        {apiType === "faq" && !isLoading && !error && dynamicPolicy ? (
+          <HelpCenter dynamicPolicy={dynamicPolicy} />
+        ) : (
+          <div className="px-4 md:px-8 py-8 md:py-12 w-full max-w-[900px] mx-auto">
+            {/* Desktop Breadcrumb (Hidden on Mobile) */}
+            <div className="hidden md:flex items-center gap-2 text-sm text-slate-500 mb-10">
+              <Link to="/" className="flex items-center gap-1 hover:text-primary-600 transition-colors">
+                <FiHome />
+                <span>Home</span>
+              </Link>
+              <FiChevronRight className="text-slate-400" />
+              <span className="font-semibold text-slate-900">{title}</span>
+            </div>
+
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20 space-y-4">
+            <div className="flex flex-col items-center justify-center py-32 space-y-4">
               <div className="w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-sm text-slate-500 font-semibold animate-pulse">Loading policy content...</p>
             </div>
           ) : error ? (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center max-w-md mx-auto shadow-sm">
-              <p className="text-sm font-bold text-red-700 mb-1">Error Loading Policy</p>
-              <p className="text-xs text-red-500 font-medium">{error}</p>
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-8 text-center shadow-sm">
+              <p className="text-base font-bold text-red-700 mb-2">Error Loading Policy</p>
+              <p className="text-sm text-red-500 font-medium">{error}</p>
             </div>
-          ) : isDynamicType ? (
-            dynamicPolicy && dynamicPolicy.content ? (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-100 space-y-6"
-              >
+          ) : dynamicPolicy ? (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-8"
+            >
+              {/* Document Header */}
+              <div>
+                <h1 className="text-3xl md:text-4xl font-black text-slate-900 mb-4">{title}</h1>
                 {dynamicPolicy.lastUpdated && (
-                  <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider border-b border-gray-100 pb-3">
-                    Last Updated: {formatLastUpdated(dynamicPolicy.lastUpdated)}
-                  </div>
-                )}
-                <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">
-                  {dynamicPolicy.content}
-                </div>
-              </motion.div>
-            ) : (
-              <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center max-w-md mx-auto shadow-sm">
-                <p className="text-sm font-bold text-gray-500">Policy not available.</p>
-              </div>
-            )
-          ) : (
-            <div className="space-y-6">
-              {(POLICY_CONTENT[type] || POLICY_CONTENT["seller"]).content.map((item, idx) => (
-                <motion.div
-                  key={idx}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.1 }}
-                  className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100"
-                >
-                  <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-pink-500" />
-                    {item.heading}
-                  </h3>
-                  <p className="text-sm text-slate-600 leading-relaxed">
-                    {item.text}
+                  <p className="text-sm font-semibold tracking-wider text-slate-400 uppercase">
+                    Updated {formatLastUpdated(dynamicPolicy.lastUpdated)}
                   </p>
-                </motion.div>
-              ))}
+                )}
+              </div>
+              
+              <hr className="border-t-2 border-gray-100" />
+
+              {/* Document Content */}
+              {dynamicPolicy.content ? (
+                <div 
+                  className="text-base text-slate-600 leading-relaxed font-medium mt-8
+                             [&>h1]:text-2xl [&>h1]:font-black [&>h1]:text-slate-900 [&>h1]:mt-10 [&>h1]:mb-5 [&>h1:first-child]:mt-0
+                             [&>h2]:text-xl [&>h2]:font-bold [&>h2]:text-slate-800 [&>h2]:mt-8 [&>h2]:mb-4 
+                             [&>h3]:text-lg [&>h3]:font-bold [&>h3]:text-slate-800 [&>h3]:mt-6 [&>h3]:mb-3 
+                             [&>p]:mb-5 [&>p:last-child]:mb-0
+                             [&>b]:font-bold [&>b]:text-slate-800
+                             [&>strong]:font-bold [&>strong]:text-slate-800
+                             [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:mb-6 [&>ul>li]:mb-2 [&>ul>li]:pl-2 [&>ul>li::marker]:text-primary-500
+                             [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:mb-6 [&>ol>li]:mb-2 [&>ol>li]:pl-2
+                             [&>a]:text-primary-600 [&>a]:underline [&>a]:underline-offset-2 [&>a]:hover:text-primary-700 [&>a]:transition-colors"
+                  dangerouslySetInnerHTML={{ __html: dynamicPolicy.content }}
+                />
+              ) : (
+                <div className="text-center py-20 text-slate-500">
+                  <FiShield className="text-4xl text-slate-200 mx-auto mb-4" />
+                  <p className="font-semibold text-lg">No content available.</p>
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <div className="text-center py-20">
+              <p className="text-lg font-bold text-slate-700">No content available.</p>
             </div>
           )}
         </div>
+        )}
 
         {/* Footer Note */}
-        <div className="px-8 py-6 text-center">
+        <div className="px-8 py-10 mt-10 border-t border-gray-50 text-center bg-gray-50/50">
           <p className="text-xs text-slate-400 font-medium leading-relaxed">
-            For more details or specific inquiries, please reach out to our
-            legal department at legal@Porutkal.com
+            For more details or specific inquiries, please reach out to our legal department at legal@Porutkal.com
           </p>
         </div>
       </div>

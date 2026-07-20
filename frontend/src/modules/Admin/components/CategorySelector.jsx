@@ -70,8 +70,9 @@ const CategorySelector = ({
     setIsUploadingImage(true);
     try {
       const res = await uploadVendorImage(file, "categories");
-      if (res?.data?.url) {
-        setRequestFormData((prev) => ({ ...prev, image: res.data.url }));
+      const payload = res?.data ?? res ?? {};
+      if (payload?.url) {
+        setRequestFormData((prev) => ({ ...prev, image: payload.url }));
         toast.success("Image uploaded");
       }
     } catch (err) {

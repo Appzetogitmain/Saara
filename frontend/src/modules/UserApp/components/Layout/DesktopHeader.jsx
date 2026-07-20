@@ -6,6 +6,7 @@ import { useCategoryStore } from "../../../../shared/store/categoryStore";
 import { appLogo } from "../../../../data/logos";
 import api from "../../../../shared/utils/api";
 import { formatPrice } from "../../../../shared/utils/helpers";
+import useSpeechRecognition from "../../../../shared/hooks/useSpeechRecognition";
 import {
   FiHeart,
   FiShoppingBag,
@@ -21,13 +22,14 @@ import {
   FiPercent,
   FiZap,
   FiCreditCard,
+  FiMic,
 } from "react-icons/fi";
 import { HiOutlineUserCircle } from "react-icons/hi";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useUserNotificationStore } from "../../store/userNotificationStore";
 
-const DesktopHeader = () => {
+const DesktopHeader = ({ onSearch }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuthStore();
   const itemCount = useCartStore((state) => state.getItemCount());
@@ -45,6 +47,15 @@ const DesktopHeader = () => {
     useState("All Categories");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+
+  const { isListening, isSupported, startListening, stopListening } = useSpeechRecognition({
+    onResult: (text, isFinal) => {
+      setSearchQuery(text);
+      if (isFinal && text.trim()) {
+        handleSearchSubmit(null, text.trim());
+      }
+    }
+  });
 
   const [showNavCategories, setShowNavCategories] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -104,10 +115,17 @@ const DesktopHeader = () => {
     navigate("/home");
   };
 
-  const handleSearchSubmit = (e) => {
+  const handleSearchSubmit = (e, queryOverride) => {
     if (e) e.preventDefault();
-    let searchRoute = `/shop?q=${encodeURIComponent(searchQuery.trim())}`;
-    navigate(searchRoute);
+    const finalQuery = (queryOverride !== undefined ? queryOverride : searchQuery).trim();
+    if (finalQuery) {
+      if (onSearch) {
+        onSearch(finalQuery);
+      } else {
+        let searchRoute = `/shop?q=${encodeURIComponent(finalQuery)}`;
+        navigate(searchRoute);
+      }
+    }
   };
 
   const rootCategories = getRootCategories() || [];
@@ -144,14 +162,30 @@ const DesktopHeader = () => {
               onSubmit={handleSearchSubmit}
               className="relative flex items-center bg-gray-50 rounded-full pl-5 pr-1 py-1 border border-gray-200 focus-within:border-primary-500 focus-within:bg-white focus-within:shadow-md transition-all duration-300"
             >
-              {/* Text Input */}
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search for products, brands and more..."
+                placeholder={isListening ? "🎤 Listening... (Tap mic to stop)" : "Search for products, brands and more..."}
                 className="w-full bg-transparent focus:outline-none text-xs lg:text-sm text-gray-700 placeholder:text-gray-400 py-1.5"
               />
+
+              {/* Voice Search Button */}
+              <button
+                type="button"
+                onClick={isListening ? stopListening : startListening}
+                disabled={!isSupported && !isListening}
+                className={`p-2 rounded-full transition-all shrink-0 ml-1 ${
+                  isListening 
+                  ? 'bg-red-50 text-red-500 animate-pulse' 
+                  : !isSupported
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50 cursor-pointer'
+                }`}
+                title={!isSupported ? "Voice search is not supported in your browser" : "Voice Search"}
+              >
+                <FiMic className="text-base lg:text-lg" />
+              </button>
 
               {/* Search Button */}
               <button
@@ -332,16 +366,8 @@ const DesktopHeader = () => {
                   exit={{ opacity: 0, y: 10 }}
                   className="absolute left-0 mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 p-2.5 z-[1000] min-w-[240px]"
                 >
-                  <Link
-                    to="/categories"
-                    onClick={() => setShowNavCategories(false)}
-                    className="flex items-center gap-2 px-3.5 py-2.5 hover:bg-gray-50 rounded-xl transition-colors text-left text-gray-800 text-xs lg:text-sm font-bold border-b border-gray-100"
-                  >
-                    <FiGrid className="text-gray-500" />
-                    <span>View All Categories</span>
-                  </Link>
                   <div className="mt-1.5 space-y-0.5">
-                    {rootCategories.map((cat) => (
+                    {rootCategories.slice(0, 5).map((cat) => (
                       <Link
                         key={cat.id || cat._id}
                         to={`/category/${cat.id || cat._id}`}
@@ -355,6 +381,14 @@ const DesktopHeader = () => {
                       </Link>
                     ))}
                   </div>
+                  <Link
+                    to="/categories"
+                    onClick={() => setShowNavCategories(false)}
+                    className="flex items-center justify-center gap-2 mt-2 px-3.5 py-2 hover:bg-primary-50 bg-gray-50 text-primary-600 rounded-xl transition-colors text-center text-xs lg:text-sm font-bold border border-gray-100"
+                  >
+                    <FiGrid className="text-primary-500 text-sm" />
+                    <span>View All Categories</span>
+                  </Link>
                 </motion.div>
               )}
             </AnimatePresence>

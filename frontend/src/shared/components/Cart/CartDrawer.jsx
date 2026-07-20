@@ -271,7 +271,7 @@ const CartDrawer = () => {
                         refunded excluding Convenience Fee
                       </p>
                       <Link
-                        to="/policy/return"
+                        to="/policy/refund-policy"
                         onClick={toggleCart}
                         className="mt-2 inline-block text-[13px] font-semibold text-sky-500"
                       >

@@ -1057,9 +1057,9 @@ const MobileProductDetail = () => {
                 {/* Policy Links Section */}
                 <div className="mt-4 bg-white border-y border-gray-50 lg:border lg:border-gray-100 lg:rounded-3xl lg:p-6 lg:shadow-sm lg:border-y-0 lg:mt-0">
                   {[
-                    { title: "Seller Policy", path: "/policy/seller" },
-                    { title: "Return Policy", path: "/policy/return" },
-                    { title: "Support Policy", path: "/policy/support" }
+                    { title: "Seller Policy", path: "/policy/seller-terms" },
+                    { title: "Return Policy", path: "/policy/refund-policy" },
+                    { title: "Support Policy", path: "/policy/faq" }
                   ].map((item, idx) => (
                     <Link
                       key={idx}

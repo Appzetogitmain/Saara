@@ -28,7 +28,7 @@ const categoryGradients = {
   6: "from-blue-50 via-cyan-50 to-teal-50", // Athletic
 };
 
-const MobileHeader = () => {
+const MobileHeader = ({ onSearch }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showCartAnimation, setShowCartAnimation] = useState(false);
@@ -485,7 +485,7 @@ const MobileHeader = () => {
             style={{
               pointerEvents: isTopRowVisible ? "auto" : "none",
             }}>
-            <SearchBar />
+            <SearchBar onSearch={onSearch} />
           </motion.div>
         )}
       </div>

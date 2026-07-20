@@ -10,7 +10,9 @@ const getOrCreatePolicyDoc = async () => {
         doc = await PlatformPolicy.create({
             privacy: { title: 'Privacy Policy', content: '' },
             refund: { title: 'Refund Policy', content: '' },
-            terms: { title: 'Terms & Conditions', content: '' }
+            terms: { title: 'Terms & Conditions', content: '' },
+            sellerTerms: { title: 'Seller Terms & Conditions', content: '' },
+            faq: { title: 'Frequently Asked Questions', items: [] }
         });
     }
     return doc;
@@ -21,16 +23,23 @@ export const getPolicy = asyncHandler(async (req, res) => {
     const { type } = req.params;
     const doc = await getOrCreatePolicyDoc();
     
-    let policy = null;
-    if (type === 'privacy' || type === 'privacy-policy') {
-        policy = doc.privacy;
-    } else if (type === 'refund' || type === 'refund-policy') {
-        policy = doc.refund;
-    } else if (type === 'terms' || type === 'terms-conditions') {
-        policy = doc.terms;
-    } else {
+    const policyKeyMap = {
+        'privacy': 'privacy',
+        'privacy-policy': 'privacy',
+        'refund': 'refund',
+        'refund-policy': 'refund',
+        'terms': 'terms',
+        'terms-conditions': 'terms',
+        'seller-terms': 'sellerTerms',
+        'faq': 'faq'
+    };
+
+    const docKey = policyKeyMap[type];
+    if (!docKey) {
         throw new ApiError(400, 'Invalid policy type.');
     }
+
+    const policy = doc[docKey];
 
     res.status(200).json(new ApiResponse(200, policy, 'Policy fetched.'));
 });
@@ -38,38 +47,44 @@ export const getPolicy = asyncHandler(async (req, res) => {
 // PUT /api/admin/policies/:type
 export const updatePolicy = asyncHandler(async (req, res) => {
     const { type } = req.params;
-    const { content } = req.body;
+    const { content, items } = req.body;
 
-    if (content === undefined) {
+    if (type !== 'faq' && content === undefined) {
         throw new ApiError(400, 'Content is required.');
+    }
+    if (type === 'faq' && items === undefined) {
+        throw new ApiError(400, 'Items array is required for FAQ.');
     }
 
     const doc = await getOrCreatePolicyDoc();
     const now = new Date();
 
-    if (type === 'privacy' || type === 'privacy-policy') {
-        doc.privacy.content = content;
-        doc.privacy.lastUpdated = now;
-    } else if (type === 'refund' || type === 'refund-policy') {
-        doc.refund.content = content;
-        doc.refund.lastUpdated = now;
-    } else if (type === 'terms' || type === 'terms-conditions') {
-        doc.terms.content = content;
-        doc.terms.lastUpdated = now;
-    } else {
+    const policyKeyMap = {
+        'privacy': 'privacy',
+        'privacy-policy': 'privacy',
+        'refund': 'refund',
+        'refund-policy': 'refund',
+        'terms': 'terms',
+        'terms-conditions': 'terms',
+        'seller-terms': 'sellerTerms',
+        'faq': 'faq'
+    };
+
+    const docKey = policyKeyMap[type];
+    if (!docKey) {
         throw new ApiError(400, 'Invalid policy type.');
     }
 
+    if (docKey === 'faq') {
+        doc[docKey].items = items;
+    } else {
+        doc[docKey].content = content;
+    }
+    doc[docKey].lastUpdated = now;
+
     await doc.save();
     
-    let updatedPolicy = null;
-    if (type === 'privacy' || type === 'privacy-policy') {
-        updatedPolicy = doc.privacy;
-    } else if (type === 'refund' || type === 'refund-policy') {
-        updatedPolicy = doc.refund;
-    } else if (type === 'terms' || type === 'terms-conditions') {
-        updatedPolicy = doc.terms;
-    }
+    const updatedPolicy = doc[docKey];
 
     res.status(200).json(new ApiResponse(200, updatedPolicy, 'Policy updated.'));
 });

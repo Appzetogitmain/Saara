@@ -60,7 +60,7 @@ const HomepageBanners = () => {
     setLoading(true);
     try {
       const response = await api.get('/admin/marketing/homepage-banners');
-      setBanners(response?.data || response?.data?.data || []);
+      setBanners(Array.isArray(response) ? response : (response?.data ?? response ?? []));
     } catch (err) {
       toast.error('Failed to load banner library');
     } finally {

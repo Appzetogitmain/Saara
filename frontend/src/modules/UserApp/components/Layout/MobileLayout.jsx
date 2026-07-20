@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import MobileHeader from './MobileHeader';
 import DesktopHeader from './DesktopHeader';
 import DesktopFooter from './DesktopFooter';
@@ -8,9 +8,31 @@ import MobileCartBar from './MobileCartBar';
 import CartDrawer from '../../../../shared/components/Cart/CartDrawer';
 import useMobileHeaderHeight from '../../hooks/useMobileHeaderHeight';
 
-const MobileLayout = ({ children, showBottomNav = true, showCartBar = true, showHeader = true }) => {
+const MobileLayout = ({ children, showBottomNav = true, showCartBar = true, showHeader = true, onSearch }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const headerHeight = useMobileHeaderHeight();
+  
+  const handleGlobalSearch = (query) => {
+    if (onSearch) {
+      onSearch(query);
+      return;
+    }
+    
+    const SEARCH_CONTEXTS = {
+      HOME: ['/', '/home'],
+      SHOP: ['/shop']
+    };
+    
+    if (SEARCH_CONTEXTS.HOME.includes(location.pathname)) {
+      navigate(`${location.pathname}?q=${encodeURIComponent(query)}`);
+    } else if (SEARCH_CONTEXTS.SHOP.includes(location.pathname)) {
+      navigate(`/shop?q=${encodeURIComponent(query)}`);
+    } else {
+      navigate(`/shop?q=${encodeURIComponent(query)}`);
+    }
+  };
+
   // Hide header and bottom nav on login, register, and verification pages
   const isAuthPage = location.pathname === '/login' ||
     location.pathname === '/register' ||
@@ -53,8 +75,8 @@ const MobileLayout = ({ children, showBottomNav = true, showCartBar = true, show
 
   return (
     <div className="min-h-screen flex flex-col">
-      {isDesktopHeaderVisible && <DesktopHeader />}
-      {shouldShowHeader && <MobileHeader />}
+      {isDesktopHeaderVisible && <DesktopHeader onSearch={handleGlobalSearch} />}
+      {shouldShowHeader && <MobileHeader onSearch={handleGlobalSearch} />}
       <main
         className={`flex-grow w-full max-w-[1440px] mx-auto px-0 md:px-8 lg:px-12 ${
           showCartBar 

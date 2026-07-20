@@ -27,7 +27,8 @@ const OrderTracking = () => {
       setIsLoading(true);
       try {
         const response = await getAllOrders({ limit: 100 });
-        const normalizedOrders = response.data.orders.map(order => ({
+        const orderList = response?.data?.orders || response?.orders || [];
+        const normalizedOrders = orderList.map(order => ({
           ...order,
           id: order.orderId || order._id,
           customer: {

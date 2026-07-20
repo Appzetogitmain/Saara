@@ -34,12 +34,13 @@ export const useCouponStore = create((set, get) => ({
                     limit: pageSize,
                 });
 
-                const pageCoupons = Array.isArray(response?.data?.coupons)
-                    ? response.data.coupons
-                    : [];
+                const payload = response?.data ?? response;
+                const pageCoupons = Array.isArray(payload?.coupons)
+                    ? payload.coupons
+                    : (Array.isArray(payload) ? payload : []);
                 allCoupons.push(...pageCoupons);
 
-                const pagination = response?.data?.pagination || {};
+                const pagination = payload?.pagination || response?.pagination || {};
                 latestPagination = {
                     total: Number.isFinite(Number(pagination.total))
                         ? Number(pagination.total)
@@ -79,12 +80,13 @@ export const useCouponStore = create((set, get) => ({
         set({ isLoading: true });
         try {
             const response = await adminService.createCoupon(couponData);
+            const payload = response?.data ?? response;
             set(state => ({
-                coupons: [response.data, ...state.coupons],
+                coupons: [payload, ...state.coupons],
                 isLoading: false
             }));
             toast.success('Coupon created successfully');
-            return response.data;
+            return payload;
         } catch (error) {
             set({ isLoading: false });
             toast.error(error.message || 'Failed to create coupon');
@@ -96,12 +98,13 @@ export const useCouponStore = create((set, get) => ({
         set({ isLoading: true });
         try {
             const response = await adminService.updateCoupon(id, couponData);
+            const payload = response?.data ?? response;
             set(state => ({
-                coupons: state.coupons.map(c => c._id === id ? response.data : c),
+                coupons: state.coupons.map(c => c._id === id ? payload : c),
                 isLoading: false
             }));
             toast.success('Coupon updated successfully');
-            return response.data;
+            return payload;
         } catch (error) {
             set({ isLoading: false });
             toast.error(error.message || 'Failed to update coupon');

@@ -14,7 +14,8 @@ export const useBannerStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await adminService.getAllBanners();
-      set({ banners: response.data, isLoading: false });
+      const data = response?.data ?? response;
+      set({ banners: Array.isArray(data) ? data : [], isLoading: false });
     } catch (error) {
       set({ isLoading: false });
       toast.error(error.message || 'Failed to fetch banners');
@@ -25,8 +26,9 @@ export const useBannerStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await adminService.createBanner(bannerData);
+      const newBanner = response?.data ?? response;
       set(state => ({
-        banners: [...state.banners, response.data],
+        banners: [...(state.banners || []), newBanner],
         isLoading: false
       }));
       toast.success("Banner created successfully");
@@ -42,8 +44,9 @@ export const useBannerStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await adminService.updateBanner(id, bannerData);
+      const updatedBanner = response?.data ?? response;
       set(state => ({
-        banners: state.banners.map(b => b._id === id ? response.data : b),
+        banners: (state.banners || []).map(b => b._id === id ? updatedBanner : b),
         isLoading: false
       }));
       toast.success("Banner updated successfully");
@@ -60,7 +63,7 @@ export const useBannerStore = create((set, get) => ({
     try {
       await adminService.deleteBanner(id);
       set(state => ({
-        banners: state.banners.filter(b => b._id !== id),
+        banners: (state.banners || []).filter(b => b._id !== id),
         isLoading: false
       }));
       toast.success("Banner deleted successfully");
@@ -79,12 +82,14 @@ export const useBannerStore = create((set, get) => ({
   },
 
   getBannersByType: (type) => {
-    if (!type) return get().banners;
-    return get().banners.filter((banner) => banner.type === type);
+    const currentBanners = get().banners || [];
+    if (!type) return currentBanners;
+    return currentBanners.filter((banner) => banner.type === type);
   },
 
   getBannersByTypes: (types) => {
-    if (!types || !types.length) return get().banners;
-    return get().banners.filter((banner) => types.includes(banner.type));
+    const currentBanners = get().banners || [];
+    if (!types || !types.length) return currentBanners;
+    return currentBanners.filter((banner) => types.includes(banner.type));
   }
 }));

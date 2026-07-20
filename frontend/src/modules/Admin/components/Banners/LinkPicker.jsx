@@ -115,11 +115,13 @@ const LinkPicker = ({ value, onChange }) => {
           }
         } else if (searchType === 'product') {
           const res = await getAllProducts({ search: searchQuery, limit: 10 });
-          const productsList = Array.isArray(res.data?.products) ? res.data.products : [];
+          const payload = Array.isArray(res) ? res : (res?.data ?? res ?? []);
+          const productsList = Array.isArray(payload?.products) ? payload.products : payload;
           items = productsList.map(p => ({ id: p._id, name: p.name, link: `/product/${p._id}` }));
         } else if (searchType === 'seller') {
           const res = await getAllVendors({ search: searchQuery, limit: 20 });
-          const vendorsList = Array.isArray(res.data?.vendors) ? res.data.vendors : Array.isArray(res.data) ? res.data : [];
+          const payload = Array.isArray(res) ? res : (res?.data ?? res ?? []);
+          const vendorsList = Array.isArray(payload?.vendors) ? payload.vendors : (Array.isArray(payload) ? payload : []);
           items = vendorsList.map(v => ({ id: v._id, name: v.storeName || v.name || 'Unknown Store', link: `/seller/${v._id}` }));
           if (searchQuery) {
             items = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));

@@ -117,6 +117,8 @@ const getChildRoute = (parentRoute, childName) => {
       "Privacy Policy": "/admin/policies/privacy-policy",
       "Refund Policy": "/admin/policies/refund-policy",
       "Terms & Conditions": "/admin/policies/terms-conditions",
+      "Seller Terms & Conditions": "/admin/policies/seller-terms",
+      "Frequently Asked Questions": "/admin/policies/faq",
     },
     "/admin/vendors": {
       "Manage Vendors": "/admin/vendors/manage-vendors",

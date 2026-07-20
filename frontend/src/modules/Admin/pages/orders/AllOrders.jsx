@@ -412,7 +412,8 @@ const AllOrders = () => {
       const response = await getAllOrders(params);
 
       // Normalize data to match existing UI structure
-      const normalizedOrders = response.data.orders.map(order => ({
+      const orderList = response?.data?.orders || response?.orders || [];
+      const normalizedOrders = orderList.map(order => ({
         ...order,
         id: order.orderId || order._id,
         customer: {

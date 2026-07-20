@@ -345,94 +345,13 @@ const Shop = () => {
       <MobileLayout showBottomNav={true} showCartBar={true}>
         <div className="w-full min-h-screen bg-gray-50 flex flex-col">
           
-          {/* 1. Dynamic Search Header */}
-          <div className="px-4 py-4 bg-white border-b border-gray-100 sticky top-0 z-40 shadow-sm">
-            <div className="flex flex-col gap-2.5 max-w-2xl mx-auto">
-              <form onSubmit={handleSearchSubmit} className="relative">
-                <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg z-10" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setShowSuggestions(true);
-                  }}
-                  onFocus={() => setShowSuggestions(true)}
-                  placeholder="Search brands, products, categories, styles..."
-                  className="w-full pl-11 pr-10 py-2.5 rounded-full border border-gray-250 bg-gray-50 focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary-500/30 text-sm font-semibold transition-all shadow-sm"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery('');
-                      const newParams = new URLSearchParams(searchParams);
-                      newParams.delete('q');
-                      setSearchParams(newParams);
-                    }}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 p-1 hover:bg-gray-100 rounded-full"
-                  >
-                    <FiX />
-                  </button>
-                )}
-              </form>
-
-              {/* Suggestions overlay */}
-              {showSuggestions && (suggestions.products.length > 0 || suggestions.categories.length > 0) && (
-                <>
-                  <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowSuggestions(false)} />
-                  <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-200 shadow-2xl rounded-2xl p-3 z-50 max-h-96 overflow-y-auto space-y-4">
-                    {suggestions.categories.length > 0 && (
-                      <div>
-                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2.5 mb-1.5">Categories</h4>
-                        <div className="space-y-1">
-                          {suggestions.categories.map(cat => (
-                            <button
-                              key={cat.id || cat._id}
-                              onClick={() => {
-                                handleFilterChange('category', cat.id || cat._id);
-                                setShowSuggestions(false);
-                              }}
-                              className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold text-gray-700 hover:bg-primary-50 hover:text-primary-600 transition-colors"
-                            >
-                              {cat.name}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {suggestions.products.length > 0 && (
-                      <div>
-                        <h4 className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-2.5 mb-1.5">Products</h4>
-                        <div className="space-y-1.5">
-                          {suggestions.products.map(prod => (
-                            <button
-                              key={prod.id}
-                              onClick={() => {
-                                navigate(`/product/${prod.id}`);
-                                setShowSuggestions(false);
-                              }}
-                              className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-gray-50 flex items-center gap-2.5 text-xs text-gray-700 font-semibold"
-                            >
-                              <img src={prod.image} className="w-8 h-8 rounded object-cover border" alt="" />
-                              <span className="truncate">{prod.name}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
 
           {/* 2. Shop Hero Promo Banner */}
           {shopBanner && (
             <div className="px-4 pt-4">
               <div
                 onClick={() => shopBanner.ctaLink && navigate(shopBanner.ctaLink)}
-                className="relative rounded-2xl overflow-hidden h-36 sm:h-44 flex flex-col justify-center px-6 text-white cursor-pointer group shadow-sm"
+                className="relative rounded-2xl overflow-hidden h-56 sm:h-72 md:h-80 flex flex-col justify-center px-6 text-white cursor-pointer group shadow-sm"
                 style={{
                   background: `linear-gradient(135deg, ${shopBanner.textColor === '#ffffff' ? '#7C3AED' : '#f3f4f6'}, #4F46E5)`
                 }}

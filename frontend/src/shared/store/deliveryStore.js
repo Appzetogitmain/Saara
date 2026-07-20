@@ -18,7 +18,8 @@ export const useDeliveryStore = create(
             set({ isLoading: true });
             try {
                 const response = await adminService.getAllDeliveryBoys(params);
-                const deliveryBoys = (response.data.deliveryBoys || []).map((boy) => ({
+                const payload = response?.data ?? response;
+                const deliveryBoys = (payload.deliveryBoys || []).map((boy) => ({
                     ...boy,
                     id: boy.id || boy._id,
                     status: boy.status || (boy.isActive ? 'active' : 'inactive'),
@@ -30,7 +31,7 @@ export const useDeliveryStore = create(
                 }));
                 set({
                     deliveryBoys,
-                    pagination: response.data.pagination,
+                    pagination: payload.pagination,
                     isLoading: false
                 });
             } catch (error) {
@@ -43,13 +44,14 @@ export const useDeliveryStore = create(
             set({ isLoading: true });
             try {
                 const response = await adminService.createDeliveryBoy(boyData);
+                const payload = response?.data ?? response;
                 const createdBoy = {
-                    ...response.data,
-                    id: response.data.id || response.data._id,
-                    status: response.data.status || (response.data.isActive ? 'active' : 'inactive'),
-                    totalDeliveries: response.data.totalDeliveries ?? 0,
-                    pendingDeliveries: response.data.pendingDeliveries ?? 0,
-                    cashInHand: response.data.cashInHand ?? 0
+                    ...payload,
+                    id: payload.id || payload._id,
+                    status: payload.status || (payload.isActive ? 'active' : 'inactive'),
+                    totalDeliveries: payload.totalDeliveries ?? 0,
+                    pendingDeliveries: payload.pendingDeliveries ?? 0,
+                    cashInHand: payload.cashInHand ?? 0
                 };
                 set((state) => ({
                     deliveryBoys: [createdBoy, ...state.deliveryBoys],
@@ -81,7 +83,7 @@ export const useDeliveryStore = create(
         updateApplicationStatus: async (id, applicationStatus, reason = '') => {
             try {
                 const response = await adminService.updateDeliveryBoyApplicationStatus(id, applicationStatus, reason);
-                const updated = response?.data || {};
+                const updated = response?.data ?? response ?? {};
                 set((state) => ({
                     deliveryBoys: state.deliveryBoys.map((boy) =>
                         String(boy.id) === String(id)
@@ -107,10 +109,11 @@ export const useDeliveryStore = create(
             set({ isLoading: true });
             try {
                 const response = await adminService.updateDeliveryBoy(id, payload);
+                const data = response?.data ?? response;
                 const updatedBoy = {
-                    ...response.data,
-                    id: response.data.id || response.data._id,
-                    status: response.data.status || (response.data.isActive ? 'active' : 'inactive')
+                    ...data,
+                    id: data.id || data._id,
+                    status: data.status || (data.isActive ? 'active' : 'inactive')
                 };
                 set((state) => ({
                     deliveryBoys: state.deliveryBoys.map((boy) =>

@@ -24,7 +24,8 @@ const Orders = () => {
     if (showLoading) setIsLoading(true);
     try {
       const response = await getAllOrders({ limit: 1000 });
-      setOrders(response.data.orders || []);
+      const orderList = response?.data?.orders || response?.orders || [];
+      setOrders(orderList);
     } catch (error) {
       console.error("Orders overview fetch error:", error);
     } finally {

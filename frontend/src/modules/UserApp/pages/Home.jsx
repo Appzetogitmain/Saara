@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Link, matchPath, useNavigate } from "react-router-dom";
+import { Link, matchPath, useNavigate, useSearchParams } from "react-router-dom";
 import { FiHeart } from "react-icons/fi";
 import { useAuthStore } from "../../../shared/store/authStore";
 import React from 'react';
@@ -249,10 +249,36 @@ const SECTION_COMPONENTS = {
 
 const MobileHome = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const q = searchParams.get("q");
+  
   const { isAuthenticated } = useAuthStore();
   const [homepageSections, setHomepageSections] = useState([]);
   const [userSections, setUserSections] = useState([]);
   const [homepageLoading, setHomepageLoading] = useState(true);
+
+  // Search State
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    if (q) {
+      setIsSearching(true);
+      api.get("/shop/products", { params: { q, limit: 50 } })
+        .then(res => {
+          const payload = extractResponseData(res);
+          const list = (payload?.products || []).map(normalizeProduct);
+          setSearchResults(list);
+          setIsSearching(false);
+        })
+        .catch(err => {
+          setIsSearching(false);
+        });
+    } else {
+      setSearchResults([]);
+    }
+  }, [q]);
+
   const [currentSlide, setCurrentSlide] = useState(0);
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
@@ -710,6 +736,62 @@ const MobileHome = () => {
             transition: isPulling ? "none" : "transform 0.3s ease-out",
           }}
         >
+          {q ? (
+            <div className="px-4 py-6 md:px-8 min-h-[60vh]">
+              <div className="mb-6">
+                <h2 className="text-xl md:text-2xl font-black text-gray-800">Search Results</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Showing {searchResults.length} {searchResults.length === 1 ? 'product' : 'products'} for <span className="font-bold text-gray-900">"{q}"</span>
+                </p>
+              </div>
+
+              {isSearching ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-5">
+                  {[...Array(12)].map((_, i) => (
+                    <div key={i} className="bg-white border rounded-2xl p-3 animate-pulse space-y-3">
+                      <div className="bg-gray-200 rounded-xl h-36 w-full" />
+                      <div className="h-4 bg-gray-200 rounded w-3/4" />
+                      <div className="h-3 bg-gray-200 rounded w-1/2" />
+                      <div className="h-6 bg-gray-200 rounded w-1/3" />
+                    </div>
+                  ))}
+                </div>
+              ) : searchResults.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4 lg:gap-5">
+                  {searchResults.map((product, idx) => (
+                    <motion.div
+                      key={product.id}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(idx * 0.04, 0.4) }}
+                    >
+                      <ProductCard product={product} />
+                    </motion.div>
+                  ))}
+                </div>
+              ) : (
+                <div className="w-full max-w-md md:max-w-2xl mx-auto bg-white rounded-3xl border border-gray-150 shadow-sm p-8 md:p-12 flex flex-col items-center text-center my-8">
+                  <span className="text-5xl md:text-7xl mb-4">😔</span>
+                  <h3 className="text-lg md:text-xl font-black text-gray-800 mb-2">No products found</h3>
+                  <p className="text-sm text-gray-500 mb-6">
+                    Try searching for something else, like:
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {['Shoes', 'Watches', 'Bags', 'Clothing'].map(term => (
+                      <button
+                        key={term}
+                        onClick={() => setSearchParams({ q: term })}
+                        className="px-4 py-2 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full text-xs font-bold text-gray-700 transition-colors"
+                      >
+                        {term}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
           {/* Hero Banner */}
           <div className="px-4 pb-4 pt-2">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -1013,25 +1095,11 @@ const MobileHome = () => {
           {/* Trust Bar */}
           <TrustBar />
 
-          {/* Tagline Section */}
-          <div className="py-12 px-6 text-center bg-gray-50 border border-gray-100 rounded-3xl mt-8 mx-4 shadow-sm">
-            <div className="max-w-2xl mx-auto space-y-4">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#e0d6ff] text-[#5b21b6] border border-[#d8b4fe]">
-                ✨ Porutkal E-Commerce
-              </span>
-              <h2 className="text-xl md:text-3xl font-black text-gray-900 tracking-tight">
-                Shop from 50+ Trusted Vendors
-              </h2>
-              <p className="text-xs md:text-sm text-gray-500 font-semibold max-w-md mx-auto leading-relaxed">
-                Porutkal brings together the best local and international shops
-                in one marketplace. Enjoy secure payments, verified products,
-                and fast local dispatch.
-              </p>
-            </div>
-          </div>
 
           {/* Bottom Spacing */}
           <div className="h-4" />
+            </>
+          )}
         </div>
       </MobileLayout>
     </PageTransition>

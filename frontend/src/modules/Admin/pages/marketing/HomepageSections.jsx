@@ -66,7 +66,7 @@ const HomepageSections = () => {
     setLoading(true);
     try {
       const res = await api.get('/admin/marketing/homepage-sections');
-      const payload = res.data?.data || res.data || [];
+      const payload = Array.isArray(res) ? res : (res?.data ?? res ?? []);
       setSections(payload);
     } catch (err) {
       toast.error('Failed to load homepage sections');
@@ -85,10 +85,10 @@ const HomepageSections = () => {
         api.get('/admin/marketing/homepage-banners')
       ]);
 
-      const prodPayload = prodRes.data?.data?.products || prodRes.data?.products || [];
-      const catPayload = catRes.data?.data || catRes.data || [];
-      const brandPayload = brandRes.data?.data || brandRes.data || [];
-      const bannerPayload = bannerRes.data?.data || bannerRes.data || [];
+      const prodPayload = Array.isArray(prodRes) ? prodRes : (prodRes?.products || prodRes?.data?.products || []);
+      const catPayload = Array.isArray(catRes) ? catRes : (catRes?.data ?? catRes ?? []);
+      const brandPayload = Array.isArray(brandRes) ? brandRes : (brandRes?.data ?? brandRes ?? []);
+      const bannerPayload = Array.isArray(bannerRes) ? bannerRes : (bannerRes?.data ?? bannerRes ?? []);
 
       setAllProducts(prodPayload);
       setAllCategories(catPayload);

@@ -439,7 +439,7 @@ const getShopProducts = asyncHandler(async (req, res) => {
     const filter = { isActive: true };
 
     // Search Query
-    const searchQuery = String(search || q || '').trim();
+    const searchQuery = String(search || q || '').replace(/\s+/g, ' ').trim();
     if (searchQuery) {
         if (searchQuery.includes(' ')) {
             filter.$text = { $search: searchQuery };
@@ -553,13 +553,23 @@ const getShopProducts = asyncHandler(async (req, res) => {
         filter._id = { $nin: activeSaleProductIds };
     }
 
+    let projection = {};
+    if (filter.$text) {
+        projection = { score: { $meta: "textScore" } };
+    }
+
+    let finalSort = sortMap[sort] || { createdAt: -1 };
+    if (filter.$text && (!sort || sort === 'newest')) {
+        finalSort = { score: { $meta: "textScore" }, createdAt: -1 };
+    }
+
     const [products, total] = await Promise.all([
-        Product.find(filter)
+        Product.find(filter, projection)
             .select('name slug price originalPrice images image categoryId brandId vendorId stock stockQuantity rating reviewCount isNewArrival isFeatured flashSale variants')
             .populate('categoryId', 'name')
             .populate('brandId', 'name')
             .populate('vendorId', 'storeName')
-            .sort(sortMap[sort] || { createdAt: -1 })
+            .sort(finalSort)
             .skip(skip)
             .limit(numericLimit)
             .lean(),
@@ -1121,13 +1131,22 @@ router.get('/policies/:policyKey', asyncHandler(async (req, res) => {
     const { policyKey } = req.params;
     const doc = await PlatformPolicy.findOne().lean();
 
+    const policyKeyMap = {
+        'privacy': 'privacy',
+        'privacy-policy': 'privacy',
+        'refund': 'refund',
+        'refund-policy': 'refund',
+        'terms': 'terms',
+        'terms-conditions': 'terms',
+        'seller-terms': 'sellerTerms',
+        'faq': 'faq'
+    };
+
+    const docKey = policyKeyMap[policyKey];
     let policy = null;
-    if (policyKey === 'privacy' || policyKey === 'privacy-policy') {
-        policy = doc?.privacy;
-    } else if (policyKey === 'refund' || policyKey === 'refund-policy') {
-        policy = doc?.refund;
-    } else if (policyKey === 'terms' || policyKey === 'terms-conditions') {
-        policy = doc?.terms;
+    
+    if (docKey && doc) {
+        policy = doc[docKey];
     }
 
     if (!policy) {
@@ -1137,6 +1156,7 @@ router.get('/policies/:policyKey', asyncHandler(async (req, res) => {
     res.status(200).json(new ApiResponse(200, {
         title: policy.title,
         content: policy.content,
+        items: policy.items,
         lastUpdated: policy.lastUpdated
     }, 'Public policy fetched.'));
 }));

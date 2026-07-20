@@ -5,19 +5,18 @@ import { FiSearch, FiClock, FiTrendingUp, FiMic } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCatalogProducts } from '../../modules/UserApp/data/catalogData';
 import api from '../utils/api';
+import useSpeechRecognition from '../hooks/useSpeechRecognition';
 
 const RECENT_SEARCHES_KEY = 'recent-searches';
 const MAX_RECENT_SEARCHES = 5;
 const MAX_SUGGESTIONS = 5;
 
-const SearchBar = () => {
+const SearchBar = ({ onSearch }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [suggestions, setSuggestions] = useState([]);
   const [isFocused, setIsFocused] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,45 +26,14 @@ const SearchBar = () => {
   const suggestionsRef = useRef(null);
   const inputRef = useRef(null);
 
-  // Voice Search Handler
-  const startListening = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Voice search is not supported in this browser.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setSearchQuery(transcript);
-      setIsListening(false);
-      if (transcript.trim()) {
-        saveRecentSearch(transcript.trim());
-        navigate(`/search?q=${encodeURIComponent(transcript.trim())}`);
-        setShowSuggestions(false);
+  const { isListening, isSupported, startListening, stopListening } = useSpeechRecognition({
+    onResult: (text, isFinal) => {
+      setSearchQuery(text);
+      if (isFinal && text.trim()) {
+        handleSubmit(null, text.trim());
       }
-    };
-
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.start();
-  };
+    }
+  });
 
   // Popular searches (can be made dynamic later)
   const popularSearches = ['Diapers', 'Vegetables', 'Meat', 'Fruits', 'Baby Care'];
@@ -195,12 +163,17 @@ const SearchBar = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e, queryOverride) => {
     if (e) e.preventDefault();
-    if (searchQuery.trim()) {
-      saveRecentSearch(searchQuery);
-      const searchRoute = `/search?q=${encodeURIComponent(searchQuery.trim())}`;
-      navigate(searchRoute);
+    const finalQuery = (queryOverride !== undefined ? queryOverride : searchQuery).trim();
+    if (finalQuery) {
+      saveRecentSearch(finalQuery);
+      if (onSearch) {
+        onSearch(finalQuery);
+      } else {
+        const searchRoute = `/search?q=${encodeURIComponent(finalQuery)}`;
+        navigate(searchRoute);
+      }
       setShowSuggestions(false);
     }
   };
@@ -274,18 +247,21 @@ const SearchBar = () => {
             onFocus={handleInputFocus}
             onBlur={handleInputBlur}
             onKeyDown={handleKeyDown}
-            placeholder={isListening ? "Listening..." : "Search products..."}
+            placeholder={isListening ? "🎤 Listening... (Tap mic to stop)" : "Search products..."}
             className="w-full pl-12 pr-12 py-2 glass-card rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/50 focus:shadow-glow transition-all duration-300 text-gray-700 placeholder:text-gray-400"
           />
           <button
             type="button"
-            onClick={startListening}
+            onClick={isListening ? stopListening : startListening}
+            disabled={!isSupported && !isListening}
             className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-2 rounded-full transition-all duration-300 z-20 ${
               isListening 
               ? 'bg-red-500 text-white shadow-lg scale-110 animate-pulse' 
-              : 'text-gray-400 hover:text-primary-500 hover:bg-primary-50'
+              : !isSupported
+                ? 'text-gray-300 cursor-not-allowed'
+                : 'text-gray-400 hover:text-primary-500 hover:bg-primary-50'
             }`}
-            title="Voice Search"
+            title={!isSupported ? "Voice search is not supported in your browser" : "Voice Search"}
           >
             <FiMic className={`${isListening ? 'scale-110' : ''}`} />
           </button>
@@ -347,7 +323,7 @@ const SearchBar = () => {
               </div>
 
               <button
-                onClick={() => setIsListening(false)}
+                onClick={stopListening}
                 className="mt-1 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest"
               >
                 Cancel

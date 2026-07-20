@@ -345,25 +345,6 @@ const MobileNewArrivals = () => {
                 </div>
               </div>
             </div>
-
-            <div className="relative mt-2 w-full">
-              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm" />
-              <input
-                type="text"
-                placeholder="Search new arrivals..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-10 py-2.5 bg-white border border-gray-200 shadow-sm rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 p-1 hover:bg-gray-100 rounded-full transition-colors"
-                >
-                  <FiX className="text-sm" />
-                </button>
-              )}
-            </div>
           </div>
 
           <div className="px-4 py-4">
