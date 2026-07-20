@@ -24,7 +24,8 @@ export const useAdminAuthStore = create(
         set({ isLoading: true });
         try {
           const response = await apiLogin(email, password);
-          const { accessToken, refreshToken, admin } = response.data;
+          const payload = response?.data ?? response;
+          const { accessToken, refreshToken, admin } = payload;
 
           // Store token under 'adminToken' key (used by interceptor)
           localStorage.setItem('adminToken', accessToken);

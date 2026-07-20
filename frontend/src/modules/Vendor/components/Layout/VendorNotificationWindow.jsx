@@ -47,6 +47,9 @@ const VendorNotificationWindow = ({ isOpen, onClose, position = "right" }) => {
   };
 
   const getNotificationRoute = (notification) => {
+    if (notification.data?.inquiryId) {
+      return `/vendor/store-builder?inquiryId=${notification.data.inquiryId}`;
+    }
     if (notification.data?.returnRequestId) {
       return `/vendor/return-requests/${notification.data.returnRequestId}`;
     }

@@ -339,6 +339,18 @@ const MobileProductDetail = () => {
     if (product.vendor?.id) return product.vendor;
     return getVendorById(product.vendorId);
   }, [product]);
+  const storeLink = useMemo(() => {
+    const popVendor = product?.vendorId;
+    if (popVendor && popVendor.storefrontId?.slug) {
+      return `/store/${popVendor.storefrontId.slug}`;
+    }
+    const rawVendor = product?.vendor || product?.vendorId;
+    if (rawVendor && rawVendor.storefrontId?.slug) {
+      return `/store/${rawVendor.storefrontId.slug}`;
+    }
+    return vendor ? `/seller/${vendor.id || vendor._id}` : "#";
+  }, [product, vendor]);
+
   const brand = useMemo(() => {
     if (!product) return null;
     if (product.brand?.id) return product.brand;
@@ -835,17 +847,27 @@ const MobileProductDetail = () => {
                 <div className="bg-white border-b border-gray-100 lg:border lg:border-gray-100 lg:rounded-3xl lg:p-6 lg:shadow-sm flex flex-col lg:gap-6">
                   {/* Seller Bar */}
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 lg:bg-transparent lg:border-none lg:px-0 lg:py-0 lg:border-b-0">
-                    <Link to={vendor ? `/seller/${vendor.id}` : "#"} className="flex flex-col">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-gray-400 text-sm font-medium">Seller</span>
-                        <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                          <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                        </div>
+                    <div className="flex items-center flex-wrap gap-2 text-xs">
+                      <span className="text-gray-500 font-semibold">Sold by:</span>
+                      <Link to={storeLink} className="flex items-center gap-1 font-bold text-[#024d3e] hover:underline">
+                        <span>{vendor?.storeName || vendor?.name || product?.vendorName || "ecom storess"}</span>
+                        {(vendor?.isVerified || (product?.vendorId && product.vendorId.isVerified)) && (
+                          <div className="w-3.5 h-3.5 bg-blue-500 rounded-full flex items-center justify-center">
+                            <svg className="w-2 h-2 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          </div>
+                        )}
+                      </Link>
+                      <div className="flex items-center gap-0.5 text-[10px] bg-yellow-50 text-yellow-700 px-1.5 py-0.5 rounded-full font-bold">
+                        <FiStar className="fill-current text-[8px]" />
+                        <span>{vendor?.rating || 4.5}</span>
                       </div>
-                      <span className="text-base font-bold text-gray-900 leading-tight mt-0.5">{vendor?.storeName || vendor?.name || "ecom storess"}</span>
-                    </Link>
+                      <span className="text-gray-300">|</span>
+                      <Link to={storeLink} className="text-xs font-black text-pink-500 hover:text-pink-600 transition-colors uppercase tracking-wider flex items-center gap-0.5">
+                        Visit Store <span>&rarr;</span>
+                      </Link>
+                    </div>
                   </div>
 
                   <div className="px-4 py-4 space-y-4 lg:px-0 lg:py-0 lg:space-y-6">

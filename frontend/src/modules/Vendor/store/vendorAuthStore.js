@@ -34,7 +34,7 @@ export const useVendorAuthStore = create(
             email,
             password,
           });
-          const authData = response?.data || {};
+          const authData = response?.data ?? response ?? {};
           const vendor = authData.vendor;
           const accessToken = authData.accessToken;
           const refreshToken = authData.refreshToken;

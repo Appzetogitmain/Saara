@@ -197,6 +197,11 @@ const Seller = () => {
                 const vendorPayload = vendorRes?.data ?? vendorRes;
                 const productsPayload = productsRes?.data ?? productsRes;
                 const vendorDoc = vendorPayload ? normalizeVendor(vendorPayload) : null;
+
+                if (vendorDoc && vendorDoc.storefrontId?.slug) {
+                    navigate(`/store/${vendorDoc.storefrontId.slug}`, { replace: true });
+                    return;
+                }
                 const allProducts = Array.isArray(productsPayload?.products)
                     ? [...productsPayload.products]
                     : [];

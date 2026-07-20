@@ -19,6 +19,16 @@ import AppConfig from '../models/AppConfig.model.js';
 import HomeBanner from '../models/HomeBanner.model.js';
 
 const router = Router();
+import * as storefrontController from '../modules/vendor/controllers/storefront.controller.js';
+import { optionalAuth } from '../middlewares/authenticate.js';
+
+// GET /api/store/:slug (Public Storefront API)
+router.get('/store/:slug', storefrontController.getPublicStorefront);
+router.get('/store/:slug/page/:pageKey', storefrontController.getPublicStorefront);
+router.get('/store/:slug/products', storefrontController.getStorefrontProducts);
+router.get('/store/:slug/search', storefrontController.searchStorefrontProducts);
+router.get('/store/:slug/about', storefrontController.getStorefrontAbout);
+router.post('/store/:slug/contact', optionalAuth, storefrontController.createStorefrontInquiry);
 
 // GET /api/homepage (Public dynamic homepage data resolver)
 router.get('/homepage', getHomepage);
@@ -707,7 +717,11 @@ const getProductDetail = asyncHandler(async (req, res) => {
     const product = await Product.findById(req.params.id)
         .populate('categoryId', 'name')
         .populate('brandId', 'name')
-        .populate('vendorId', 'storeName storeLogo rating')
+        .populate({
+            path: 'vendorId',
+            select: 'storeName storeLogo rating storefrontId isVerified',
+            populate: { path: 'storefrontId', select: 'slug' }
+        })
         .lean();
     if (!product) throw new ApiError(404, 'Product not found.');
     res.status(200).json(new ApiResponse(200, product, 'Product detail.'));
@@ -829,12 +843,77 @@ router.get('/vendors/all', detailCache, asyncHandler(async (req, res) => {
 
 // GET /api/vendors/:id (public)
 router.get('/vendors/:id', detailCache, asyncHandler(async (req, res) => {
-    const vendor = await Vendor.findOne({
+    let vendor = await Vendor.findOne({
         _id: req.params.id,
         status: 'approved',
-    }).select('-password -otp -otpExpiry').lean();
+    })
+    .populate('storefrontId', 'slug');
+
     if (!vendor) throw new ApiError(404, 'Vendor not found.');
-    res.status(200).json(new ApiResponse(200, toPublicVendor(vendor), 'Vendor detail fetched.'));
+
+    if (!vendor.storefrontId) {
+        const { default: VendorStore } = await import('../models/VendorStore.model.js');
+        const { default: StorePage } = await import('../models/StorePage.model.js');
+        const { slugify } = await import('../utils/slugify.js');
+
+        let baseSlug = slugify(vendor.storeName || vendor.name || 'store');
+        let uniqueSlug = baseSlug;
+        let suffix = 1;
+        while (await VendorStore.exists({ slug: uniqueSlug })) {
+            uniqueSlug = `${baseSlug}-${suffix}`;
+            suffix += 1;
+        }
+
+        const store = await VendorStore.create({
+            vendorId: vendor._id,
+            storeName: vendor.storeName || vendor.name,
+            slug: uniqueSlug,
+            description: vendor.storeDescription || '',
+            logo: vendor.storeLogo || '',
+            verified: vendor.isVerified || false,
+            navigation: [
+                { title: 'Home', iconName: 'FiHome', target: { type: 'page', path: 'home' }, order: 1, enabled: true },
+                { title: 'About', iconName: 'FiInfo', target: { type: 'custom', path: '/about' }, order: 2, enabled: true }
+            ]
+        });
+
+        await StorePage.create({
+            ownerId: vendor._id,
+            ownerType: 'vendor',
+            pageType: 'home',
+            pageKey: 'home',
+            slug: 'home',
+            title: 'Home Page',
+            pageSettings: { title: 'Home Page', enabled: true },
+            sections: [
+                {
+                    sectionType: 'Text Block',
+                    title: `Welcome to ${store.storeName}`,
+                    subtitle: 'Designing high-quality collections for our marketplace.',
+                    order: 1,
+                    enabled: true
+                }
+            ],
+            publishedSections: [
+                {
+                    sectionType: 'Text Block',
+                    title: `Welcome to ${store.storeName}`,
+                    subtitle: 'Designing high-quality collections for our marketplace.',
+                    order: 1,
+                    enabled: true
+                }
+            ],
+            status: 'published',
+            publishVersion: 1
+        });
+
+        vendor.storefrontId = store._id;
+        await vendor.save();
+
+        vendor = await Vendor.findOne({ _id: vendor._id }).populate('storefrontId', 'slug');
+    }
+
+    res.status(200).json(new ApiResponse(200, toPublicVendor(vendor.toObject()), 'Vendor detail fetched.'));
 }));
 
 // GET /api/vendors/:id/products (public)

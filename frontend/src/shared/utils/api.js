@@ -169,7 +169,13 @@ api.interceptors.request.use(
 );
 
 api.interceptors.response.use(
-  (response) => response.data,
+  (response) => {
+    const data = response.data;
+    if (data && data.data !== undefined) {
+      return data.data;
+    }
+    return data;
+  },
   async (error) => {
     const originalRequest = error.config || {};
     const scope = getScopeFromUrl(originalRequest.url || '');

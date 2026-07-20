@@ -116,6 +116,11 @@
                      ]
     },
     {
+        "title": "Store Builder",
+        "route": "/vendor/store-builder",
+        "children": []
+    },
+    {
         "title":  "Settings",
         "route":  "/vendor/settings",
         "children":  [

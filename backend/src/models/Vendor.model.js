@@ -10,6 +10,11 @@ const vendorSchema = new mongoose.Schema(
         storeName: { type: String, required: true },
         storeLogo: { type: String },
         storeDescription: { type: String },
+        storefrontId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'VendorStore',
+            default: null
+        },
         status: {
             type: String,
             enum: ['pending', 'approved', 'suspended', 'rejected'],

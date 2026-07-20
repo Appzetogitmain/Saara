@@ -16,6 +16,7 @@ import * as walletController from '../controllers/wallet.controller.js';
 import * as supportController from '../controllers/support.controller.js';
 import * as brandController from '../controllers/brand.controller.js';
 import * as categoryController from '../controllers/category.controller.js';
+import * as storefrontController from '../controllers/storefront.controller.js';
 import { authenticate } from '../../../middlewares/authenticate.js';
 import { authorize, enforceAccountStatus } from '../../../middlewares/authorize.js';
 import { authLimiter, otpLimiter, otpVerifyLimiter } from '../../../middlewares/rateLimiter.js';
@@ -142,5 +143,26 @@ router.delete('/shipping/rates/:id', ...vendorAuth, shippingController.deleteShi
 // Uploads (Cloudinary via temp local multer upload)
 router.post('/uploads/image', ...vendorAuth, uploadSingle('image'), uploadController.uploadImage);
 router.post('/uploads/images', ...vendorAuth, uploadMultiple('images', 8), uploadController.uploadImages);
+
+// Store Builder Routes
+router.get('/store', ...vendorAuth, storefrontController.getVendorStorefront);
+router.put('/store', ...vendorAuth, storefrontController.updateVendorStorefront);
+router.get('/store/menus', ...vendorAuth, storefrontController.getVendorStoreMenus);
+router.put('/store/menus/:menuType', ...vendorAuth, storefrontController.updateVendorStoreMenu);
+router.get('/store/pages', ...vendorAuth, storefrontController.getVendorStorefrontPages);
+router.put('/store/pages/:pageKey', ...vendorAuth, storefrontController.saveVendorStorefrontPage);
+router.delete('/store/pages/:pageKey', ...vendorAuth, storefrontController.deleteVendorStorefrontPage);
+router.post('/store/pages/:pageKey/publish', ...vendorAuth, storefrontController.publishVendorPage);
+router.get('/store/collections', ...vendorAuth, storefrontController.getVendorCollections);
+router.post('/store/collections', ...vendorAuth, storefrontController.createVendorCollection);
+router.put('/store/collections/:collectionId', ...vendorAuth, storefrontController.updateVendorCollection);
+router.delete('/store/collections/:collectionId', ...vendorAuth, storefrontController.deleteVendorCollection);
+router.get('/store/analytics', ...vendorAuth, storefrontController.getVendorStorefrontAnalytics);
+
+// Store Builder - Inquiries
+router.get('/store/inquiries', ...vendorAuth, storefrontController.getVendorInquiries);
+router.get('/store/inquiries/:id', ...vendorAuth, storefrontController.getVendorInquiryById);
+router.post('/store/inquiries/:id/replies', ...vendorAuth, storefrontController.replyToInquiry);
+router.patch('/store/inquiries/:id/status', ...vendorAuth, storefrontController.updateInquiryStatus);
 
 export default router;
