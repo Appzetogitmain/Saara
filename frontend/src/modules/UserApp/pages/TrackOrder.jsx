@@ -178,17 +178,17 @@ const MobileTrackOrder = () => {
                     const shipmentSteps = getTrackingSteps(shipment.status, shipment);
                     const vendorGroup = order.vendorItems?.find(v => String(v.vendorId) === String(shipment.vendorId));
                     return (
-                      <div key={shipment._id || index} className="glass-card rounded-2xl p-4">
-                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-gray-100">
+                      <div key={shipment._id || index} className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
+                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
                           <div className="w-8 h-8 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center">
                             <FiPackage />
                           </div>
                           <div>
-                            <h2 className="text-sm font-bold text-gray-800">
+                            <h2 className="text-sm font-extrabold text-gray-900">
                               {order.shipments.length > 1 ? `Package ${index + 1} of ${order.shipments.length}` : 'Order Status'}
                             </h2>
                             {vendorGroup && (
-                              <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">
+                              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                                 Dispatched by {vendorGroup.vendorName}
                               </p>
                             )}
@@ -203,16 +203,16 @@ const MobileTrackOrder = () => {
                             return (
                               <div key={sIdx} className="flex items-start gap-4">
                                 <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${step.completed
-                                  ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
-                                  : 'bg-gray-100 text-gray-400'
+                                  ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md shadow-primary-500/20'
+                                  : 'bg-slate-100 text-slate-400'
                                   }`}>
                                   <Icon className="text-sm" />
                                 </div>
                                 <div className="flex-1 pb-4 relative">
                                   {sIdx < shipmentSteps.length - 1 && (
-                                    <div className={`absolute left-[-23px] top-8 bottom-0 w-[2px] rounded-full ${step.completed ? 'bg-emerald-200' : 'bg-gray-100'}`} />
+                                    <div className={`absolute left-[-23px] top-8 bottom-0 w-[2px] rounded-full ${step.completed ? 'bg-primary-300' : 'bg-slate-100'}`} />
                                   )}
-                                  <h3 className={`font-semibold text-sm mb-0.5 transition-colors ${step.completed ? 'text-gray-800' : 'text-gray-400'
+                                  <h3 className={`font-bold text-sm mb-0.5 transition-colors ${step.completed ? 'text-gray-900' : 'text-slate-400'
                                     }`}>
                                     {step.label}
                                   </h3>

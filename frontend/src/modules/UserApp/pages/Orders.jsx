@@ -105,7 +105,7 @@ const MobileOrders = () => {
 
           {/* Filter Options */}
           {showFilter && (
-            <div className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm mb-6 flex gap-2 overflow-x-auto scrollbar-hide">
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-4 shadow-sm mb-6 flex gap-2 overflow-x-auto scrollbar-hide">
               {statusOptions.map((option) => (
                 <button
                   key={option.value}
@@ -114,8 +114,8 @@ const MobileOrders = () => {
                   }}
                   className={`px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
                     selectedStatus === option.value
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-gray-100'
+                      ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md shadow-primary-500/20'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
                   }`}
                 >
                   {option.label}
@@ -152,7 +152,7 @@ const MobileOrders = () => {
                   actionButton={
                     <button
                       onClick={() => navigate('/home')}
-                      className="gradient-green text-white px-6 py-3 rounded-xl font-semibold"
+                      className="bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white px-6 py-3 rounded-2xl font-bold shadow-md shadow-primary-500/20 active:scale-95 transition-all"
                     >
                       Start Shopping
                     </button>

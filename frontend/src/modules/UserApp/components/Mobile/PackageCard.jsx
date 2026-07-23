@@ -33,25 +33,25 @@ const PackageCard = ({ shipment, index, totalPackages, items, getItemReturnStatu
   const showOTP = shipment?.deliveryOtpDebug && ['shipped', 'out_for_delivery'].includes(shipment?.status);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-4 transition-all duration-300">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-4 transition-all duration-300">
       {/* Header */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+      <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center">
             <FiPackage className="text-sm" />
           </div>
           <div>
-            <h3 className="font-bold text-gray-800 text-sm">
+            <h3 className="font-extrabold text-gray-900 text-sm">
               {isMultiPackage ? `Package ${index + 1} of ${totalPackages}` : 'Your Package'}
             </h3>
             {shipment?.providerId && (
-              <p className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
                 Via {shipment.providerId === 'shiprocket' ? 'Shiprocket 3PL' : 'Local Delivery'}
               </p>
             )}
           </div>
         </div>
-        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}>
+        <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}>
           {statusConfig.label}
         </span>
       </div>
@@ -62,23 +62,23 @@ const PackageCard = ({ shipment, index, totalPackages, items, getItemReturnStatu
           <div key={`${item.id}-${itemIndex}-${getVariantSignature(item?.variant || {})}`} className="flex gap-3 items-center">
             <Link
               to={`/product/${item.productId || item.id}?variantSize=${encodeURIComponent(item?.variant?.size || '')}&variantColor=${encodeURIComponent(item?.variant?.color || '')}`}
-              className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0"
+              className="w-14 h-14 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 flex-shrink-0 p-0.5"
             >
-              <LazyImage src={item.image} alt={item.name} className="w-full h-full object-cover" />
+              <LazyImage src={item.image} alt={item.name} className="w-full h-full object-contain" />
             </Link>
             <div className="flex-1 min-w-0">
               <Link
                 to={`/product/${item.productId || item.id}?variantSize=${encodeURIComponent(item?.variant?.size || '')}&variantColor=${encodeURIComponent(item?.variant?.color || '')}`}
                 className="hover:underline"
               >
-                <h4 className="font-semibold text-gray-800 text-sm truncate">{item.name}</h4>
+                <h4 className="font-bold text-gray-900 text-sm truncate">{item.name}</h4>
               </Link>
               <div className="flex justify-between items-center mt-0.5">
-                <p className="text-xs text-gray-600">Qty: {item.quantity}</p>
-                <p className="text-sm font-bold text-gray-800">{formatPrice(item.price * item.quantity)}</p>
+                <p className="text-xs text-slate-500 font-medium">Qty: {item.quantity}</p>
+                <p className="text-sm font-extrabold text-gray-900">{formatPrice(item.price * item.quantity)}</p>
               </div>
               {formatVariantLabel(item?.variant) && (
-                <p className="text-[10px] text-gray-500 mt-0.5">{formatVariantLabel(item?.variant)}</p>
+                <p className="text-[10px] text-slate-400 font-medium mt-0.5">{formatVariantLabel(item?.variant)}</p>
               )}
               {/* Return Status */}
               {(() => {
@@ -86,13 +86,13 @@ const PackageCard = ({ shipment, index, totalPackages, items, getItemReturnStatu
                 if (!ret) return null;
                 if (ret.status === 'completed') {
                   return (
-                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-[9px] font-bold uppercase tracking-wider border border-rose-100">
+                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-[9px] font-extrabold uppercase tracking-wider border border-rose-100">
                       {ret.requestType === 'exchange' ? 'Exchanged' : 'Returned'}
                     </span>
                   );
                 } else if (ret.status !== 'rejected') {
                   return (
-                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[9px] font-bold uppercase tracking-wider border border-amber-200">
+                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[9px] font-extrabold uppercase tracking-wider border border-amber-200">
                       Return Pending
                     </span>
                   );

@@ -1561,7 +1561,7 @@ const MobileOrderDetail = () => {
               <button
                 onClick={handleRequestReturn}
                 disabled={isSubmittingReturn}
-                className="w-full py-3 gradient-green text-white rounded-xl font-semibold disabled:opacity-70"
+                className="w-full py-3.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-2xl font-bold shadow-lg shadow-primary-500/20 active:scale-95 transition-all disabled:opacity-70"
               >
                 {isSubmittingReturn
                   ? "Submitting..."

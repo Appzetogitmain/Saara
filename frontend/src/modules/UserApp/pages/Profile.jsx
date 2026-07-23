@@ -185,7 +185,7 @@ const MobileProfile = () => {
                     </div>
                     {personalErrors.phone && <p className="mt-1 text-sm text-red-600">{personalErrors.phone.message}</p>}
                   </div>
-                  <button type="submit" disabled={isLoading} className="w-full bg-[#7C3AED] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
+                  <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary-500/20 active:scale-95 transition-all disabled:opacity-50">
                     <FiSave /> {isLoading ? 'Saving...' : 'Save Changes'}
                   </button>
                 </form>
@@ -213,7 +213,7 @@ const MobileProfile = () => {
                       {name === 'newPassword' && <PasswordStrengthMeter password={newPassword} />}
                     </div>
                   ))}
-                  <button type="submit" disabled={isLoading} className="w-full bg-[#7C3AED] text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 disabled:opacity-50">
+                  <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-3.5 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary-500/20 active:scale-95 transition-all disabled:opacity-50">
                     <FiSave /> {isLoading ? 'Changing...' : 'Change Password'}
                   </button>
                 </form>
@@ -238,7 +238,7 @@ const MobileProfile = () => {
                       {/* Desktop name + buttons */}
                       <div className="hidden md:flex items-center gap-4">
                         <h2 className="text-xl font-light">{user?.name}</h2>
-                        <button onClick={() => setEditTab('personal')} className="bg-[#7C3AED] text-white px-4 py-1.5 rounded-lg text-sm font-bold">Edit Profile</button>
+                        <button onClick={() => setEditTab('personal')} className="bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white px-4 py-1.5 rounded-xl text-sm font-bold shadow-md shadow-primary-500/20 active:scale-95 transition-all">Edit Profile</button>
                         <Link to="/support" className="bg-gray-100 px-4 py-1.5 rounded-lg text-sm font-bold">Contact</Link>
                       </div>
                       {/* Stats */}

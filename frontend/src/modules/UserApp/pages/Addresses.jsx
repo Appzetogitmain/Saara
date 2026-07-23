@@ -321,7 +321,7 @@ const AddressFormModal = ({
           <div className="flex gap-3 pt-4">
             <button
               type="submit"
-              className="flex-1 gradient-green text-white py-3 rounded-xl font-semibold hover:shadow-glow-green transition-all"
+              className="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-3.5 rounded-2xl font-bold shadow-lg shadow-primary-500/20 active:scale-95 transition-all"
             >
               {editingAddress ? 'Update Address' : 'Add Address'}
             </button>

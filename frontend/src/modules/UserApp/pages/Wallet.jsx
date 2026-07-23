@@ -194,33 +194,33 @@ const Wallet = () => {
             {/* Quick Metrics Cards */}
             {wallet && (
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600">
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
                     <FiTrendingUp className="text-lg" />
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-500 uppercase font-medium">Total Refunded</span>
-                    <h4 className="font-bold text-gray-800 text-sm mt-0.5">{formatPrice(wallet.totalCredits)}</h4>
+                    <span className="text-[10px] text-slate-500 uppercase font-bold">Total Refunded</span>
+                    <h4 className="font-extrabold text-gray-900 text-sm mt-0.5">{formatPrice(wallet.totalCredits)}</h4>
                   </div>
                 </div>
 
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center text-red-600">
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center text-rose-600">
                     <FiTrendingDown className="text-lg" />
                   </div>
                   <div>
-                    <span className="text-[10px] text-gray-500 uppercase font-medium">Total Spent</span>
-                    <h4 className="font-bold text-gray-800 text-sm mt-0.5">{formatPrice(wallet.totalDebits)}</h4>
+                    <span className="text-[10px] text-slate-500 uppercase font-bold">Total Spent</span>
+                    <h4 className="font-extrabold text-gray-900 text-sm mt-0.5">{formatPrice(wallet.totalDebits)}</h4>
                   </div>
                 </div>
               </div>
             )}
 
             {/* Filters Section */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-4">
-              <div className="flex items-center gap-2 pb-2 border-b border-gray-50">
-                <FiFilter className="text-purple-600 text-base" />
-                <h3 className="font-bold text-gray-800 text-sm">Filters & Date Range</h3>
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+                <FiFilter className="text-primary-600 text-base" />
+                <h3 className="font-bold text-gray-900 text-sm">Filters & Date Range</h3>
               </div>
 
               {/* Transaction Category Filter */}
@@ -242,10 +242,10 @@ const Wallet = () => {
                     <button
                       key={idx}
                       onClick={item.action}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all focus:outline-none ${
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all focus:outline-none ${
                         isActive
-                          ? 'bg-purple-600 text-white shadow-sm shadow-purple-200'
-                          : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                          ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md shadow-primary-500/20'
+                          : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
                       }`}
                     >
                       {item.label}
