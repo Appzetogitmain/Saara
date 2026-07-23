@@ -67,18 +67,18 @@ const StatsCards = ({ stats }) => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
             onClick={() => navigate(card.path)}
-            className={`${card.cardBg} rounded-xl p-4 sm:p-6 shadow-md border-2 border-transparent hover:shadow-lg hover:border-gray-200/50 hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden`}
+            className="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-200/80 hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden"
           >
             {/* Decorative gradient overlay */}
             <div className={`absolute top-0 right-0 w-32 h-32 ${card.bgColor} opacity-10 rounded-full -mr-16 -mt-16`}></div>
 
             <div className="flex items-center justify-between mb-3 sm:mb-4 relative z-10">
-              <div className={`${card.bgColor} ${card.iconBg} p-2 sm:p-3 rounded-lg shadow-md`}>
+              <div className={`${card.bgColor} ${card.iconBg} p-2 sm:p-3 rounded-2xl shadow-md`}>
                 <Icon className={`${card.color} text-lg sm:text-xl`} />
               </div>
               {hasChange && (
                 <div
-                  className={`text-xs sm:text-sm font-semibold px-2 py-1 rounded-full ${isPositive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                  className={`text-xs sm:text-sm font-extrabold px-2.5 py-0.5 rounded-md ${isPositive ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/60' : 'bg-rose-50 text-rose-600 border border-rose-200/60'
                     }`}
                 >
                   {isPositive ? '+' : ''}
@@ -87,8 +87,8 @@ const StatsCards = ({ stats }) => {
               )}
             </div>
             <div className="relative z-10">
-              <h3 className="text-gray-600 text-xs sm:text-sm font-medium mb-1">{card.title}</h3>
-              <p className="text-gray-800 text-xl sm:text-2xl font-bold">{card.value}</p>
+              <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">{card.title}</h3>
+              <p className="text-gray-900 text-xl sm:text-2xl font-black tracking-tight">{card.value}</p>
             </div>
           </motion.div>
         );

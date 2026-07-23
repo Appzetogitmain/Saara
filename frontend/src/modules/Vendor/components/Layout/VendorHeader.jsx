@@ -50,7 +50,7 @@ const VendorHeader = ({ onMenuClick, isCollapsed, onToggleSidebar }) => {
 
   return (
     <header
-      className={`bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-30 transition-all duration-300 ${isCollapsed ? 'lg:left-0' : 'lg:left-64'}`}
+      className={`bg-white/90 backdrop-blur-md border-b border-slate-200/80 fixed top-0 left-0 right-0 z-30 transition-all duration-300 shadow-sm ${isCollapsed ? 'lg:left-0' : 'lg:left-64'}`}
       style={{
         paddingTop: "env(safe-area-inset-top, 0px)",
       }}>
@@ -72,11 +72,11 @@ const VendorHeader = ({ onMenuClick, isCollapsed, onToggleSidebar }) => {
 
           {/* Page Heading - Desktop Only */}
           <div className="hidden lg:block">
-            <h1 className="text-2xl font-bold text-gray-800 mb-1">
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight mb-1">
               {pageName}
             </h1>
-            <p className="text-sm text-gray-600 flex items-center gap-2">
-              <FiShoppingBag className="text-primary-500" />
+            <p className="text-xs font-bold text-slate-500 flex items-center gap-2">
+              <FiShoppingBag className="text-primary-600" />
               {storeName}
             </p>
           </div>

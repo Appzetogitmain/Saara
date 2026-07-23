@@ -177,17 +177,17 @@ const VendorDashboard = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
             onClick={() => stat.link && navigate(stat.link)}
-            className={`${stat.bgColor} rounded-xl p-4 cursor-pointer hover:shadow-lg transition-shadow`}>
+            className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm hover:shadow-md cursor-pointer transition-all">
             <div className="flex items-center justify-between mb-2">
-              <div className={`${stat.color} p-3 rounded-lg`}>
+              <div className={`${stat.color} p-3 rounded-2xl`}>
                 <stat.icon className="text-white text-xl" />
               </div>
-              <FiArrowRight className={`${stat.textColor} text-lg`} />
+              <FiArrowRight className="text-slate-400 text-lg" />
             </div>
-            <h3 className={`${stat.textColor} text-sm font-medium mb-1`}>
+            <h3 className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
               {stat.label}
             </h3>
-            <p className={`${stat.textColor} text-2xl font-bold`}>
+            <p className="text-gray-900 text-2xl font-black tracking-tight">
               {isLoading ? "—" : stat.value}
             </p>
           </motion.div>
@@ -195,8 +195,8 @@ const VendorDashboard = () => {
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">Quick Actions</h2>
+      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80">
+        <h2 className="text-lg font-black text-gray-900 tracking-tight mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button
             onClick={() => navigate("/vendor/products/add-product")}

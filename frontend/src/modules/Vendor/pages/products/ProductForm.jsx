@@ -533,10 +533,10 @@ const ProductForm = () => {
       {/* Form */}
       <form
         onSubmit={handleSubmit}
-        className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-200 space-y-4">
+        className="bg-white rounded-3xl p-5 sm:p-8 shadow-sm border border-slate-200/80 space-y-6">
         {/* Basic Information */}
         <div>
-          <h2 className="text-base font-bold text-gray-800 mb-2">
+          <h2 className="text-lg font-black text-gray-900 tracking-tight mb-3">
             Basic Information
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

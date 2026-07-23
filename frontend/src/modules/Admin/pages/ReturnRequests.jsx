@@ -346,17 +346,17 @@ const ReturnRequests = () => {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-200">
-          <p className="text-xs sm:text-sm text-gray-600 mb-1">Total</p>
-          <p className="text-lg sm:text-2xl font-bold text-gray-800">{statusCounts.all}</p>
+        <div className="bg-white rounded-3xl p-3 sm:p-4 shadow-sm border border-slate-200/80">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total</p>
+          <p className="text-lg sm:text-2xl font-black text-gray-900">{statusCounts.all}</p>
         </div>
-        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-200">
-          <p className="text-xs sm:text-sm text-gray-600 mb-1">Pending</p>
-          <p className="text-lg sm:text-2xl font-bold text-yellow-600">{statusCounts.pending}</p>
+        <div className="bg-white rounded-3xl p-3 sm:p-4 shadow-sm border border-slate-200/80">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Pending</p>
+          <p className="text-lg sm:text-2xl font-black text-amber-600">{statusCounts.pending}</p>
         </div>
-        <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-200">
-          <p className="text-xs sm:text-sm text-gray-600 mb-1">Approved</p>
-          <p className="text-lg sm:text-2xl font-bold text-green-600">{statusCounts.approved}</p>
+        <div className="bg-white rounded-3xl p-3 sm:p-4 shadow-sm border border-slate-200/80">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Approved</p>
+          <p className="text-lg sm:text-2xl font-black text-emerald-600">{statusCounts.approved}</p>
         </div>
         <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-200">
           <p className="text-xs sm:text-sm text-gray-600 mb-1">Processing</p>

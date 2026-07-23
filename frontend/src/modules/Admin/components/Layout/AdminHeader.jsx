@@ -68,7 +68,7 @@ const AdminHeader = ({ onMenuClick, isCollapsed, onToggleSidebar }) => {
 
   return (
     <header
-      className={`bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-30 transition-all duration-300 ${isCollapsed ? 'lg:left-0' : 'lg:left-64'}`}
+      className={`bg-white/90 backdrop-blur-md border-b border-slate-200/80 fixed top-0 left-0 right-0 z-30 transition-all duration-300 shadow-sm ${isCollapsed ? 'lg:left-0' : 'lg:left-64'}`}
       style={{
         paddingTop: 'env(safe-area-inset-top, 0px)',
       }}

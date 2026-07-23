@@ -242,7 +242,7 @@ const AllOrders = () => {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
         {/* Filters */}
         <div className="mb-6 pb-6 border-b border-gray-200">
           <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4">

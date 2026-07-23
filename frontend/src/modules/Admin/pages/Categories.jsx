@@ -147,7 +147,7 @@ const Categories = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl p-3 sm:p-4 shadow-sm border border-gray-200">
+      <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-sm border border-slate-200/80">
         {/* Mobile Filter Toggle */}
         <div className="flex items-center justify-between mb-3 sm:hidden">
           <span className="text-sm font-semibold text-gray-700">Filters</span>

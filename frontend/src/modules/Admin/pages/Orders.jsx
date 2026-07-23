@@ -198,7 +198,7 @@ const Orders = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
               onClick={() => navigate(card.path)}
-              className={`${card.cardBg} rounded-xl p-3 sm:p-4 shadow-md border-2 border-transparent hover:border-gray-200/50 hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden`}
+              className="bg-white rounded-3xl p-3 sm:p-4 shadow-sm border border-slate-200/80 hover:shadow-md hover:scale-[1.02] cursor-pointer transition-all duration-300 relative overflow-hidden"
             >
               {/* Decorative gradient overlay */}
               <div className={`absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 ${card.bgColor} opacity-10 rounded-full -mr-12 -mt-12 sm:-mr-16 sm:-mt-16`}></div>

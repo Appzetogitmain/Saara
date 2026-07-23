@@ -212,7 +212,7 @@ const ManageProducts = () => {
 
             <button
               onClick={() => navigate("/vendor/products/add-product")}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2.5 gradient-green text-white rounded-lg hover:shadow-glow-green transition-all font-semibold text-sm sm:text-base whitespace-nowrap">
+              className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-2xl shadow-md shadow-primary-500/20 active:scale-95 transition-all font-bold text-sm sm:text-base whitespace-nowrap">
               <span>Add New Product</span>
             </button>
 

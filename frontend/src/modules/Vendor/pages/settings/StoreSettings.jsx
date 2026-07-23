@@ -310,10 +310,10 @@ const StoreSettings = () => {
             </div>
           )}
 
-          <div className="flex justify-end pt-4 sm:pt-6 border-t border-gray-200 mt-4 sm:mt-6">
+          <div className="flex justify-end pt-4 sm:pt-6 border-t border-slate-200 mt-4 sm:mt-6">
             <button
               type="submit"
-              className="flex items-center gap-2 px-4 sm:px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all font-semibold text-sm sm:text-base w-full sm:w-auto">
+              className="flex items-center justify-center gap-2 px-6 py-3.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-2xl shadow-lg shadow-primary-500/20 active:scale-95 transition-all font-bold text-sm sm:text-base w-full sm:w-auto">
               <FiSave />
               Save Settings
             </button>
