@@ -4,26 +4,26 @@ import { matchPath, useNavigate } from "react-router-dom";
 import { FiArrowRight, FiZap, FiTag } from "react-icons/fi";
 
 const getButtonStyleClasses = (style = "primary", isDarkBg = false) => {
-  const base = "inline-flex items-center justify-center gap-1.5 font-bold py-1.5 px-4 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-[10px] md:text-xs active:scale-95 mt-2 self-start border border-gray-100/10 group-hover:translate-x-1 whitespace-nowrap";
+  const base = "inline-flex items-center justify-center gap-1.5 font-bold py-1.5 px-4 rounded-xl transition-all duration-300 shadow-md cursor-pointer select-none text-[10px] md:text-xs active:scale-95 mt-2 self-start border border-white/20 group-hover:translate-x-1 whitespace-nowrap";
   if (isDarkBg) {
     switch (style) {
       case "secondary":
-        return `${base} bg-gray-800 text-white hover:bg-gray-700 border border-gray-700 hover:scale-[1.02]`;
+        return `${base} bg-slate-800 text-white hover:bg-slate-700 border border-slate-700 hover:scale-[1.02]`;
       case "outline":
-        return `${base} bg-transparent text-white border-2 border-white hover:bg-white/10 hover:scale-[1.02]`;
+        return `${base} bg-transparent text-white border-2 border-white/80 hover:bg-white/10 hover:scale-[1.02]`;
       case "primary":
       default:
-        return `${base} bg-white text-gray-900 hover:bg-gray-100 hover:scale-[1.02]`;
+        return `${base} bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:from-primary-600 hover:to-primary-700 hover:scale-[1.02] shadow-[0_4px_15px_rgba(124,58,237,0.35)]`;
     }
   } else {
     switch (style) {
       case "secondary":
-        return `${base} bg-gray-100 hover:bg-gray-200 text-gray-800 hover:scale-[1.02]`;
+        return `${base} bg-slate-100 hover:bg-slate-200 text-slate-800 hover:scale-[1.02]`;
       case "outline":
         return `${base} bg-transparent border-2 border-primary-600 text-primary-600 hover:bg-primary-50 hover:scale-[1.02]`;
       case "primary":
       default:
-        return `${base} bg-primary-600 hover:bg-primary-700 text-white hover:scale-[1.02]`;
+        return `${base} bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white hover:scale-[1.02] shadow-[0_4px_15px_rgba(109,40,217,0.35)]`;
     }
   }
 };
@@ -166,7 +166,7 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
 
   return (
     <div className={`${showPadding ? "px-4 py-3" : ""} ${className}`}>
-      <div className="relative w-full h-40 md:h-[180px] lg:h-[230px] rounded-3xl overflow-hidden shadow-xl">
+      <div className="relative w-full h-40 md:h-[180px] lg:h-[230px] rounded-3xl overflow-hidden shadow-2xl border border-slate-800/80">
         <AnimatePresence mode="wait">
           {resolvedBanners.map((banner, index) => {
             if (index !== currentBanner) return null;
@@ -184,6 +184,10 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
                 }}
                 style={{ willChange: "transform, opacity" }}
                 className={`absolute inset-0 bg-gradient-to-br ${banner.gradient} p-4 md:p-6 flex flex-col justify-center select-none`}>
+                
+                {/* Dark Vignette Overlay for High Text Contrast */}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent pointer-events-none z-0" />
+
                 {/* 3D Depth Parallax Background */}
                 <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
                   {/* Layer 1: Background (Blurred Product) */}
@@ -284,7 +288,7 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
                         }}>
                         <Icon className="text-white text-sm md:text-lg drop-shadow-md" />
                       </motion.div>
-                      <span className="text-white/95 text-[10px] md:text-sm font-extrabold uppercase tracking-wider drop-shadow-sm">
+                      <span className="bg-primary-500/20 text-primary-300 border border-primary-500/30 backdrop-blur-md rounded-full px-2.5 py-0.5 text-[10px] md:text-xs font-extrabold uppercase tracking-wider shadow-sm">
                         {banner.subtitle}
                       </span>
                     </motion.div>
@@ -302,7 +306,7 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.4 }}
-                        className="text-white/80 text-[10px] md:text-sm font-semibold max-w-sm line-clamp-1 leading-relaxed">
+                        className="text-white/90 text-[10px] md:text-sm font-semibold max-w-sm line-clamp-1 leading-relaxed drop-shadow-sm">
                         {banner.description}
                       </motion.p>
                     )}
@@ -340,14 +344,14 @@ const AnimatedBanner = ({ banners = null, showPadding = true, className = "" }) 
                   opacity: index === currentBanner ? 1 : 0.5,
                 }}
                 transition={{ duration: 0.3 }}
-                className={`h-1.5 rounded-full bg-white ${index === currentBanner ? "w-6" : "w-1.5"
+                className={`h-1.5 rounded-full transition-all ${index === currentBanner ? "w-6 bg-primary-400 shadow-[0_0_10px_rgba(167,139,250,0.6)]" : "w-1.5 bg-white/40 hover:bg-white/60"
                   }`}
               />
             </button>
           ))}
         </div>
       </div>
-    </div >
+    </div>
   );
 };
 
