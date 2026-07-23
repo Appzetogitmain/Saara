@@ -8,10 +8,10 @@ const RecentlyViewedSection = ({
   if (!products || products.length === 0) return null;
 
   return (
-    <div className="py-6 my-4 bg-gray-50/50 border border-gray-100/60 rounded-3xl p-4 md:p-6 shadow-sm">
+    <div className="py-6 my-4 bg-slate-900/90 border border-slate-800/80 rounded-3xl p-5 md:p-7 shadow-xl">
       <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-800 tracking-tight">{title}</h2>
-        <p className="text-xs text-gray-400 font-semibold mt-0.5">{subtitle}</p>
+        <h2 className="text-xl lg:text-2xl font-black text-white tracking-tight">{title}</h2>
+        <p className="text-xs text-slate-400 font-semibold mt-0.5">{subtitle}</p>
       </div>
       <ScrollableRow products={products} />
     </div>

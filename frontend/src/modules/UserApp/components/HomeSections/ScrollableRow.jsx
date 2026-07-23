@@ -53,7 +53,7 @@ const ScrollableRow = ({ products = [] }) => {
         onMouseUp={handleMouseUpOrLeave}
         onMouseLeave={handleMouseUpOrLeave}
         onClickCapture={handleClickCapture}
-        className={`flex gap-4 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0 select-none ${
+        className={`flex gap-4 overflow-x-auto pb-2 scrollbar-hide -mx-2 px-2 md:mx-0 md:px-0 select-none ${
           isDragging ? 'cursor-grabbing' : 'cursor-grab'
         } ${isDragging ? '' : 'scroll-smooth'}`}
       >
