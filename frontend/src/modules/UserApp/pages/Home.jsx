@@ -218,22 +218,22 @@ const getButtonStyleClasses = (style = "primary", isDarkBg = false) => {
   if (isDarkBg) {
     switch (style) {
       case "secondary":
-        return `${base} bg-gray-800 text-white hover:bg-gray-700 border border-gray-700 hover:scale-[1.02]`;
+        return `${base} bg-slate-800 text-white hover:bg-slate-700 border border-slate-700 hover:scale-[1.02] shadow-[0_4px_15px_rgba(0,0,0,0.3)]`;
       case "outline":
-        return `${base} bg-transparent text-white border-2 border-white hover:bg-white/10 hover:scale-[1.02]`;
+        return `${base} bg-transparent text-white border-2 border-white/80 hover:bg-white/10 hover:scale-[1.02]`;
       case "primary":
       default:
-        return `${base} bg-white text-gray-900 hover:bg-gray-100 hover:scale-[1.02]`;
+        return `${base} bg-gradient-to-r from-primary-500 to-primary-600 text-white hover:from-primary-600 hover:to-primary-700 hover:scale-[1.02] shadow-[0_4px_20px_rgba(124,58,237,0.35)]`;
     }
   } else {
     switch (style) {
       case "secondary":
-        return `${base} bg-gray-100 hover:bg-gray-200 text-gray-800 hover:scale-[1.02]`;
+        return `${base} bg-slate-100 hover:bg-slate-200 text-slate-800 hover:scale-[1.02] border border-slate-200/80`;
       case "outline":
         return `${base} bg-transparent border-2 border-primary-600 text-primary-600 hover:bg-primary-50 hover:scale-[1.02]`;
       case "primary":
       default:
-        return `${base} bg-primary-600 hover:bg-primary-700 text-white hover:scale-[1.02]`;
+        return `${base} bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white hover:scale-[1.02] shadow-[0_4px_20px_rgba(109,40,217,0.35)]`;
     }
   }
 };
@@ -714,7 +714,7 @@ const MobileHome = () => {
           <div className="px-4 pb-4 pt-2">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div
-                className="relative w-full h-40 md:h-80 lg:h-[400px] xl:h-[450px] rounded-xl md:rounded-2xl overflow-hidden lg:col-span-2"
+                className="relative w-full h-40 md:h-80 lg:h-[400px] xl:h-[450px] rounded-2xl md:rounded-3xl overflow-hidden lg:col-span-2 border border-slate-800/80 shadow-[0_12px_40px_rgba(0,0,0,0.35)]"
                 data-carousel
                 onTouchStart={onTouchStart}
                 onTouchMove={onTouchMove}
@@ -774,18 +774,18 @@ const MobileHome = () => {
                       {/* Text & Button overlays on the left */}
                       {slide.hasOverlay !== false && (
                         <>
-                          <div className="absolute inset-0 bg-gradient-to-r from-white/30 via-transparent to-transparent z-10 pointer-events-none" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent md:bg-gradient-to-r md:from-slate-950/90 md:via-slate-950/50 md:to-transparent z-10 pointer-events-none" />
                           <div className="absolute inset-y-0 left-0 pl-6 pr-4 md:pl-16 flex flex-col justify-center text-left z-20 max-w-[65%] pointer-events-auto">
                             <div className="space-y-2 md:space-y-4">
                               {slide.subtitle && (
-                                <span className="inline-block bg-[#e0d6ff] text-[#5b21b6] px-3 py-0.5 md:px-3.5 md:py-1 rounded-full text-[9px] md:text-xs font-black tracking-wide uppercase select-none">
+                                <span className="inline-block bg-primary-500/15 text-primary-300 border border-primary-500/30 backdrop-blur-md px-3 py-0.5 md:px-3.5 md:py-1 rounded-full text-[9px] md:text-xs font-extrabold tracking-wider uppercase select-none shadow-[0_2px_10px_rgba(124,58,237,0.2)]">
                                   {slide.subtitle}
                                 </span>
                               )}
-                              <h2 className="text-gray-900 text-lg md:text-3xl lg:text-4xl xl:text-5xl font-black leading-tight tracking-tight drop-shadow-sm">
+                              <h2 className="text-white text-lg md:text-3xl lg:text-4xl xl:text-5xl font-black leading-tight tracking-tight drop-shadow-md">
                                 {slide.title || "Shop Smart. Live Better."}
                               </h2>
-                              <p className="text-gray-600 text-[10px] md:text-sm lg:text-base font-semibold leading-relaxed max-w-sm line-clamp-2 md:line-clamp-none">
+                              <p className="text-slate-200 text-[10px] md:text-sm lg:text-base font-medium leading-relaxed max-w-sm line-clamp-2 md:line-clamp-none drop-shadow">
                                 {slide.description ||
                                   "Discover the best products at unbeatable prices."}
                               </p>
@@ -802,7 +802,7 @@ const MobileHome = () => {
                                   }}
                                   className={getButtonStyleClasses(
                                     slide.buttonStyle,
-                                    false,
+                                    true,
                                   )}
                                 >
                                   <span>{slide.buttonText || "Shop Now"}</span>
@@ -814,9 +814,9 @@ const MobileHome = () => {
                                     e.stopPropagation(); // Avoid triggering parent click
                                     navigate("/offers");
                                   }}
-                                  className="flex items-center gap-1.5 md:gap-2 text-gray-700 font-black text-[9px] md:text-sm hover:text-primary-600 transition-colors cursor-pointer select-none"
+                                  className="flex items-center gap-1.5 md:gap-2 text-slate-200 font-bold text-[9px] md:text-sm hover:text-white transition-colors cursor-pointer select-none bg-slate-900/60 hover:bg-slate-900/80 border border-slate-700/60 backdrop-blur-md px-3 py-1.5 md:px-4 md:py-2 rounded-xl shadow-sm"
                                 >
-                                  <span className="w-5 h-5 md:w-8 md:h-8 rounded-full bg-white flex items-center justify-center shadow border border-gray-100 text-xs font-bold font-mono">
+                                  <span className="w-5 h-5 md:w-7 md:h-7 rounded-full bg-slate-800/90 text-slate-200 flex items-center justify-center shadow border border-slate-700 text-xs font-bold font-mono">
                                     &gt;
                                   </span>
                                   <span>Explore Deals</span>
@@ -829,19 +829,21 @@ const MobileHome = () => {
                     </div>
                   ))}
                 </motion.div>
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-10 pointer-events-none">
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 z-30 pointer-events-none">
                   {slides.map((_, index) => (
                     <button
                       key={index}
-                      onClick={() => {
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setCurrentSlide(index);
                         setAutoSlidePaused(true);
                         setTimeout(() => setAutoSlidePaused(false), 2000);
                       }}
-                      className={`h-1.5 rounded-full transition-all pointer-events-auto ${
+                      className={`h-1.5 rounded-full transition-all duration-300 pointer-events-auto ${
                         index === currentSlide
-                          ? "bg-white w-6"
-                          : "bg-white/50 w-1.5"
+                          ? "bg-gradient-to-r from-primary-400 to-primary-500 w-8 shadow-[0_0_10px_rgba(167,139,250,0.6)]"
+                          : "bg-white/40 hover:bg-white/70 w-2"
                       }`}
                     />
                   ))}
@@ -851,18 +853,21 @@ const MobileHome = () => {
               {/* Side Banner for Large Screens (Luxury Collection) */}
               <div
                 onClick={() => handleBannerNavigation(sideBanner)}
-                className="hidden lg:flex lg:col-span-1 h-[400px] xl:h-[450px] rounded-3xl overflow-hidden relative bg-gradient-to-br from-[#111111] to-[#1e1e1e] p-8 border border-gray-800 cursor-pointer group shadow-lg"
+                className="hidden lg:flex lg:col-span-1 h-[400px] xl:h-[450px] rounded-3xl overflow-hidden relative bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 p-8 border border-slate-800/90 cursor-pointer group shadow-[0_12px_40px_rgba(0,0,0,0.4)]"
               >
+                {/* Ambient glowing backlight behind watch */}
+                <div className="absolute -right-10 -bottom-10 w-56 h-56 bg-primary-500/10 rounded-full blur-3xl group-hover:bg-primary-500/20 transition-all duration-700 pointer-events-none" />
+
                 {/* Text and Actions (Left side) */}
                 <div className="flex-1 flex flex-col justify-between z-20 text-left h-full max-w-[60%]">
                   <div className="space-y-4">
-                    <span className="text-yellow-500 font-extrabold text-xs tracking-widest uppercase">
+                    <span className="inline-block bg-amber-500/10 text-amber-400 border border-amber-500/20 px-3 py-1 rounded-full text-xs font-black tracking-widest uppercase">
                       {sideBanner?.subtitle || "PREMIUM COLLECTION"}
                     </span>
                     <h3 className="text-white text-3xl font-black leading-tight tracking-tight drop-shadow-sm">
                       {sideBanner?.title || "Luxury that Defines You"}
                     </h3>
-                    <p className="text-gray-400 text-sm font-semibold leading-relaxed">
+                    <p className="text-slate-300 text-sm font-medium leading-relaxed">
                       {sideBanner?.description ||
                         "Exclusive watches for every occasion."}
                     </p>
