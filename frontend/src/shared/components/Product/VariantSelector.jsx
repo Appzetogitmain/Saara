@@ -235,20 +235,20 @@ const VariantSelector = ({ variants, onVariantChange, currentPrice, selectedVari
                     onClick={() => handleOptionSelect(axis.key, option)}
                     disabled={!isAvailable}
                     className={`relative w-10 h-10 rounded-full border-2 transition-all duration-300 ${isSelected
-                        ? "border-slate-800 scale-110 shadow-md"
+                        ? "border-primary-600 scale-110 shadow-md ring-2 ring-primary-500/30"
                         : isAvailable
-                          ? "border-transparent hover:border-gray-300"
-                          : "border-gray-100 opacity-50 cursor-not-allowed"
+                          ? "border-transparent hover:border-slate-300"
+                          : "border-slate-200 opacity-50 cursor-not-allowed"
                       }`}
                     title={option}
                   >
                     <div
-                      className="w-full h-full rounded-full border border-gray-100 shadow-inner"
+                      className="w-full h-full rounded-full border border-slate-200 shadow-inner"
                       style={{ backgroundColor: option.toLowerCase() }}
                     />
                     {isSelected && (
                       <span className="absolute inset-0 flex items-center justify-center">
-                        <FiCheck className={`${['white', '#fff', '#ffffff', 'yellow'].includes(option.toLowerCase()) ? 'text-gray-800' : 'text-white'} text-base`} />
+                        <FiCheck className={`${['white', '#fff', '#ffffff', 'yellow'].includes(option.toLowerCase()) ? 'text-gray-900' : 'text-white'} text-base font-bold`} />
                       </span>
                     )}
                   </button>
@@ -260,11 +260,11 @@ const VariantSelector = ({ variants, onVariantChange, currentPrice, selectedVari
                   key={`${axis.key}-${option}`}
                   onClick={() => handleOptionSelect(axis.key, option)}
                   disabled={!isAvailable}
-                  className={`relative px-2.5 py-0.5 rounded-xl text-sm font-bold border-2 transition-all duration-300 ${isSelected
-                      ? "border-teal-600 bg-teal-50 text-teal-700"
+                  className={`relative px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all duration-300 ${isSelected
+                      ? "border-primary-600 bg-primary-50/80 text-primary-700 shadow-sm"
                       : isAvailable
-                        ? "border-gray-200 hover:border-teal-400 bg-white text-gray-700"
-                        : "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-50"
+                        ? "border-slate-200 hover:border-primary-500/50 bg-white text-gray-800"
+                        : "border-slate-200 bg-slate-50 text-slate-400 cursor-not-allowed opacity-50"
                     }`}
                 >
                   {option}
@@ -276,9 +276,9 @@ const VariantSelector = ({ variants, onVariantChange, currentPrice, selectedVari
       ))}
 
       {getVariantPrice() !== Number(currentPrice || 0) && (
-        <div className="p-4 bg-primary-50 rounded-xl border border-primary-200">
-          <p className="text-sm text-gray-600 mb-1">Selected variant price:</p>
-          <p className="text-xl font-bold text-primary-700">{formatPrice(getVariantPrice())}</p>
+        <div className="p-4 bg-primary-50/80 rounded-2xl border border-primary-200/80 shadow-sm">
+          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Selected Variant Price:</p>
+          <p className="text-xl font-black text-primary-700">{formatPrice(getVariantPrice())}</p>
         </div>
       )}
     </div>

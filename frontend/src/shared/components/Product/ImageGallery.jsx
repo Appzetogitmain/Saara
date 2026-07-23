@@ -58,7 +58,7 @@ const ImageGallery = ({
       <div className="w-full flex flex-col">
         {/* Main Image */}
         <div
-          className="relative w-full aspect-[3/4] lg:aspect-[3/4] bg-white lg:rounded-3xl p-0 lg:p-4 overflow-hidden"
+          className="relative w-full aspect-[3/4] lg:aspect-[3/4] bg-white rounded-3xl p-2 lg:p-4 border border-slate-200/80 shadow-sm overflow-hidden"
           data-gallery>
           <motion.div
             key={selectedIndex}
@@ -92,7 +92,7 @@ const ImageGallery = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4"
+            className="fixed inset-0 bg-slate-950/95 backdrop-blur-xl z-[9999] flex items-center justify-center p-4"
             onClick={() => setIsLightboxOpen(false)}>
             <button
               onClick={() => setIsLightboxOpen(false)}
