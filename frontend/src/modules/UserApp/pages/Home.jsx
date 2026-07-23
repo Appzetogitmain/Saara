@@ -924,14 +924,14 @@ const MobileHome = () => {
           {/* Featured Products */}
           <div className="py-4 bg-white mb-2">
             <div className="px-4 flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-800 tracking-tight">
+              <h2 className="text-xl lg:text-2xl font-black text-gray-900 tracking-tight">
                 Featured Products
               </h2>
               <Link
                 to="/search"
-                className="text-sm text-primary-600 font-semibold hover:text-primary-700 transition-colors"
+                className="text-xs lg:text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors uppercase tracking-wider"
               >
-                See All
+                See All &rarr;
               </Link>
             </div>
             <div className="flex gap-4 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
