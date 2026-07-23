@@ -35,28 +35,28 @@ const MobileCategoryGrid = () => {
 
   // Color tints for circular category backgrounds
   const tints = [
-    'bg-[#f3f4f6]', // Gray
-    'bg-[#f5eefc]', // Purple
-    'bg-[#eefcf4]', // Green
-    'bg-[#eef6fc]', // Blue
-    'bg-[#fcf8ee]', // Yellow
-    'bg-[#fceeee]', // Red/Rose
-    'bg-[#eefcfc]', // Cyan
-    'bg-[#fcf4ee]', // Orange
+    'bg-slate-50', // Slate/Gray
+    'bg-purple-50/80', // Purple
+    'bg-emerald-50/80', // Green
+    'bg-sky-50/80', // Blue
+    'bg-amber-50/80', // Amber/Yellow
+    'bg-rose-50/80', // Rose/Red
+    'bg-teal-50/80', // Teal
+    'bg-indigo-50/80', // Indigo
   ];
 
   return (
     <div className="px-4 py-6">
       {/* Header section with Shop by Category and View All */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl lg:text-2xl font-black text-gray-800 tracking-tight">
+        <h2 className="text-xl lg:text-2xl font-black text-gray-900 tracking-tight">
           Shop by Category
         </h2>
         <Link
           to="/categories"
           className="text-xs lg:text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors uppercase tracking-wider"
         >
-          View All
+          View All &rarr;
         </Link>
       </div>
 
@@ -76,7 +76,7 @@ const MobileCategoryGrid = () => {
                 to={`/category/${category.id}`}
                 className="flex flex-col items-center w-20 group"
               >
-                <div className={`w-20 h-20 rounded-full overflow-hidden flex items-center justify-center p-2 border border-gray-100/50 group-hover:scale-105 group-hover:shadow-md transition-all duration-300 ${bgTint}`}>
+                <div className={`w-20 h-20 rounded-full overflow-hidden flex items-center justify-center p-2.5 border border-slate-200/80 shadow-sm group-hover:scale-105 group-hover:border-primary-500/50 group-hover:ring-2 group-hover:ring-primary-500/30 group-hover:shadow-md transition-all duration-300 ${bgTint}`}>
                   <LazyImage
                     src={category.image}
                     alt={category.name}
@@ -87,7 +87,7 @@ const MobileCategoryGrid = () => {
                     }}
                   />
                 </div>
-                <span className="text-xs md:text-sm font-bold text-gray-700 text-center line-clamp-2 mt-3 group-hover:text-primary-600 transition-colors">
+                <span className="text-xs md:text-sm font-bold text-gray-800 text-center line-clamp-2 mt-3 group-hover:text-primary-600 transition-colors">
                   {category.name}
                 </span>
               </Link>
@@ -106,10 +106,10 @@ const MobileCategoryGrid = () => {
             to="/categories"
             className="flex flex-col items-center w-20 group"
           >
-            <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center border border-gray-100/50 bg-gray-50 group-hover:scale-105 group-hover:shadow-md transition-all duration-300">
-              <FiGrid className="text-2xl text-primary-600 animate-pulse" />
+            <div className="w-20 h-20 rounded-full overflow-hidden flex items-center justify-center border border-slate-200/80 bg-slate-50 shadow-sm group-hover:scale-105 group-hover:border-primary-500/50 group-hover:ring-2 group-hover:ring-primary-500/30 group-hover:shadow-md transition-all duration-300">
+              <FiGrid className="text-2xl text-primary-600 group-hover:scale-110 transition-transform" />
             </div>
-            <span className="text-xs md:text-sm font-bold text-gray-700 text-center mt-3 group-hover:text-primary-600 transition-colors">
+            <span className="text-xs md:text-sm font-bold text-gray-800 text-center mt-3 group-hover:text-primary-600 transition-colors">
               More
             </span>
           </Link>
