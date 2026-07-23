@@ -113,6 +113,7 @@ const MobileLogin = () => {
                           : 'border-gray-200 focus:border-primary-500'
                         } focus:outline-none transition-colors text-base`}
                       placeholder="your.email@example.com"
+                      autoComplete="username"
                     />
                   </div>
                   {errors.email && (
@@ -141,6 +142,7 @@ const MobileLogin = () => {
                           : 'border-gray-200 focus:border-primary-500'
                         } focus:outline-none transition-colors text-base`}
                       placeholder="Enter your password"
+                      autoComplete="current-password"
                     />
                     <button
                       type="button"

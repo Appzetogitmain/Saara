@@ -58,6 +58,12 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
     cancelable: true,
     taxIncluded: false,
     taxRate: 18,
+    weight: "",
+    dimensions: {
+      length: "",
+      breadth: "",
+      height: "",
+    },
     description: "",
     tags: [],
     variants: {
@@ -76,6 +82,8 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
     relatedProducts: [],
     faqs: [],
   });
+
+  const isVendorProduct = isEdit && !!formData.vendorId;
 
   const extractId = (value) => {
     if (!value) return "";
@@ -156,6 +164,12 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
               product.taxIncluded !== undefined ? product.taxIncluded : false,
             taxRate:
               product.taxRate !== undefined ? product.taxRate : 18,
+            weight: product.weight || "",
+            dimensions: {
+              length: product.dimensions?.length || "",
+              breadth: product.dimensions?.breadth || "",
+              height: product.dimensions?.height || "",
+            },
             description: product.description || "",
             tags: product.tags || [],
             variants: {
@@ -632,6 +646,12 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
       subcategoryId: formData.subcategoryId || null,
       brandId: formData.brandId || null,
       vendorId: formData.vendorId || null,
+      weight: parseFloat(formData.weight) || undefined,
+      dimensions: {
+        length: parseFloat(formData.dimensions.length) || undefined,
+        breadth: parseFloat(formData.dimensions.breadth) || undefined,
+        height: parseFloat(formData.dimensions.height) || undefined,
+      },
       faqs: (formData.faqs || [])
         .map((faq) => ({
           question: String(faq?.question || "").trim(),
@@ -659,6 +679,9 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
   };
 
   if (!isOpen) return null;
+
+  const selectedVendor = isVendorProduct ? vendors.find(v => extractId(v) === extractId(formData.vendorId)) : null;
+  const vendorDisplayName = selectedVendor ? (selectedVendor.storeName || selectedVendor.name || "a Vendor") : "a vendor";
 
   return (
     <AnimatePresence>
@@ -739,6 +762,22 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
               {/* Form Content - Scrollable */}
               <div className="overflow-y-auto flex-1 p-4 sm:p-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Vendor Product Warning Banner */}
+                  {isVendorProduct && (
+                    <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4 rounded-r-lg">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <span className="text-amber-500 text-lg">⚠️</span>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm text-amber-700">
+                            <strong>Vendor Product:</strong> This product belongs to <strong>{vendorDisplayName}</strong>. Financial, inventory, and naming fields are strictly read-only to prevent accounting discrepancies.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Basic Information */}
                   <div>
                     <h3 className="text-lg font-bold text-gray-800 mb-4">
@@ -755,7 +794,8 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                           value={formData.name}
                           onChange={handleChange}
                           required
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          disabled={isVendorProduct}
+                          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${isVendorProduct ? "bg-gray-100 cursor-not-allowed" : ""}`}
                         />
                       </div>
 
@@ -842,7 +882,8 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                           required
                           min="0"
                           step="0.01"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          disabled={isVendorProduct}
+                          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${isVendorProduct ? "bg-gray-100 cursor-not-allowed" : ""}`}
                         />
                       </div>
 
@@ -857,7 +898,8 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                           onChange={handleChange}
                           min="0"
                           step="0.01"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          disabled={isVendorProduct}
+                          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${isVendorProduct ? "bg-gray-100 cursor-not-allowed" : ""}`}
                         />
                       </div>
                     </div>
@@ -1005,7 +1047,8 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                           onChange={handleChange}
                           required
                           min="0"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          disabled={isVendorProduct}
+                          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${isVendorProduct ? "bg-gray-100 cursor-not-allowed" : ""}`}
                         />
                       </div>
 
@@ -1100,7 +1143,8 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                           name="hsnCode"
                           value={formData.hsnCode}
                           onChange={handleChange}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          disabled={isVendorProduct}
+                          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${isVendorProduct ? "bg-gray-100 cursor-not-allowed" : ""}`}
                           placeholder="Enter HSN Code"
                         />
                       </div>
@@ -1116,7 +1160,8 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                           onChange={handleChange}
                           min="0"
                           max="100"
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          disabled={isVendorProduct}
+                          className={`w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${isVendorProduct ? "bg-gray-100 cursor-not-allowed" : ""}`}
                           placeholder="e.g. 18"
                         />
                       </div>
@@ -1275,6 +1320,7 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                                   min="0"
                                   step="0.01"
                                   value={formData.variants?.prices?.[combo.key] ?? ""}
+                                  disabled={isVendorProduct}
                                   onChange={(e) => {
                                     const nextValue = e.target.value;
                                     setFormData((prev) => ({
@@ -1288,7 +1334,7 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                                       },
                                     }));
                                   }}
-                                  className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-xs"
+                                  className={`w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-xs ${isVendorProduct ? "bg-gray-100 cursor-not-allowed" : ""}`}
                                   placeholder="Price"
                                 />
                                 <input
@@ -1296,6 +1342,7 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                                   min="0"
                                   step="1"
                                   value={formData.variants?.stockMap?.[combo.key] ?? ""}
+                                  disabled={isVendorProduct}
                                   onChange={(e) => {
                                     const nextValue = e.target.value;
                                     setFormData((prev) => ({
@@ -1309,7 +1356,7 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                                       },
                                     }));
                                   }}
-                                  className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-xs"
+                                  className={`w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-xs ${isVendorProduct ? "bg-gray-100 cursor-not-allowed" : ""}`}
                                   placeholder="Stock"
                                 />
                                 <div className="flex items-center gap-2">
@@ -1343,6 +1390,95 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                           </div>
                         </div>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Logistics & Shipping Info */}
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">
+                      Logistics & Shipping <span className="text-red-500">*</span>
+                    </h3>
+                    <p className="text-xs text-gray-500 mb-4">
+                      Required for accurate courier rates (Shiprocket, Delhivery, etc).
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Weight (g) <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={formData.weight}
+                          onChange={(e) =>
+                            setFormData({ ...formData, weight: e.target.value })
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          placeholder="e.g. 500"
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">Package weight in grams.</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Length (cm) <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={formData.dimensions?.length}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              dimensions: { ...formData.dimensions, length: e.target.value },
+                            })
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          placeholder="e.g. 15"
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">Package length.</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Breadth (cm) <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={formData.dimensions?.breadth}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              dimensions: { ...formData.dimensions, breadth: e.target.value },
+                            })
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          placeholder="e.g. 12"
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">Package breadth/width.</p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-1">
+                          Height (cm) <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={formData.dimensions?.height}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              dimensions: { ...formData.dimensions, height: e.target.value },
+                            })
+                          }
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                          placeholder="e.g. 8"
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">Package height.</p>
+                      </div>
                     </div>
                   </div>
 
@@ -1555,7 +1691,8 @@ const ProductFormModal = ({ isOpen, onClose, productId, onSuccess }) => {
                           name="taxIncluded"
                           checked={formData.taxIncluded}
                           onChange={handleChange}
-                          className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500"
+                          disabled={isVendorProduct}
+                          className={`w-4 h-4 text-primary-600 rounded focus:ring-primary-500 ${isVendorProduct ? "cursor-not-allowed opacity-60" : ""}`}
                         />
                         <span className="text-sm font-semibold text-gray-700">
                           Tax Included in Prices

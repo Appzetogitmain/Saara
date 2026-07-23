@@ -20,7 +20,7 @@ const normalizeDeliveryBoy = (raw) => {
 };
 
 const mapBackendStatusToUI = (status) => {
-  if (status === 'shipped') return 'in-transit';
+  if (status === 'shipped' || status === 'out_for_delivery') return 'in-transit';
   if (status === 'delivered') return 'completed';
   if (status === 'pending' || status === 'processing' || status === 'ready_for_pickup') return 'pending';
   return status || 'pending';

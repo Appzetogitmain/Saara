@@ -1,3 +1,4 @@
+import logger from '../utils/logger.js';
 import Settings from '../models/Settings.model.js';
 
 let settingsCache = {};
@@ -14,7 +15,7 @@ const getCachedSettings = async (key, defaultValue = {}) => {
         cacheExpiry[key] = now + 10000; // 10 seconds cache TTL
         return settingsCache[key];
     } catch (err) {
-        console.error(`Error fetching settings for key ${key}:`, err);
+        logger.error(`Error fetching settings for key ${key}:`, err);
         return defaultValue;
     }
 };
@@ -42,7 +43,7 @@ export const getDefaultCommissionRate = async () => {
             }
         }
     } catch (err) {
-        console.error('Error fetching default commission rate:', err);
+        logger.error('Error fetching default commission rate:', err);
     }
     return 10; // Default fallback
 };
@@ -59,7 +60,7 @@ export const isVendorApprovalRequired = async () => {
             return value.vendorApprovalRequired !== false;
         }
     } catch (err) {
-        console.error('Error fetching vendor approval required setting:', err);
+        logger.error('Error fetching vendor approval required setting:', err);
     }
     return true; // Default fallback
 };

@@ -23,15 +23,6 @@ const vendorSchema = new mongoose.Schema(
         reviewCount: { type: Number, default: 0 },
         totalSales: { type: Number, default: 0 },
         totalEarnings: { type: Number, default: 0 },
-        shippingEnabled: { type: Boolean, default: true },
-        freeShippingThreshold: { type: Number, default: 100, min: 0 },
-        defaultShippingRate: { type: Number, default: 5, min: 0 },
-        shippingMethods: {
-            type: [{ type: String, enum: ['standard', 'express', 'overnight'] }],
-            default: ['standard'],
-        },
-        handlingTime: { type: Number, default: 1, min: 0 },
-        processingTime: { type: Number, default: 1, min: 0 },
         address: {
             street: String,
             city: String,
@@ -42,6 +33,32 @@ const vendorSchema = new mongoose.Schema(
                 type: { type: String, default: 'Point' },
                 coordinates: [Number] // [lng, lat]
             }
+        },
+
+        // Warehouse / Pickup Address — required for courier provider pickup scheduling.
+        // This is distinct from the business registration address above.
+        // Couriers ALWAYS use this address for pickup, never the address above.
+        warehouseAddress: {
+            warehouseName:  { type: String, trim: true }, // e.g., "Main Warehouse"
+            contactPerson:  { type: String, trim: true }, // person courier should contact
+            contactNumber:  { type: String, trim: true },
+            address:        { type: String, trim: true }, // full street address
+            city:           { type: String, trim: true },
+            state:          { type: String, trim: true },
+            pincode:        { type: String, trim: true },
+            location: {
+                type:        { type: String, default: 'Point' },
+                coordinates: [Number] // [longitude, latitude]
+            },
+            // Map of providerId → provider's registered pickup location ID.
+            // Example: { 'shiprocket': 'WH_001', 'delhivery': 'DLV_PKL_9823' }
+            // No schema change needed when a new courier provider is added.
+            providerPickupLocationIds: {
+                type: Map,
+                of:   String,
+            },
+            isVerified: { type: Boolean, default: false }, // admin-verified
+            verifiedAt: { type: Date },
         },
         bankDetails: {
             accountName: { type: String, select: false },

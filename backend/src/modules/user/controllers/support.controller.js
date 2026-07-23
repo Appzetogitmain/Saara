@@ -1,6 +1,6 @@
 import SupportTicket from '../../../models/SupportTicket.model.js';
 import TicketType from '../../../models/TicketType.model.js';
-import { ApiError } from '../../../utils/ApiError.js';
+import ApiError from '../../../utils/ApiError.js';
 import { ApiResponse } from '../../../utils/ApiResponse.js';
 import { asyncHandler } from '../../../utils/asyncHandler.js';
 import { emitToRoom } from '../../../services/socket.service.js';

@@ -149,12 +149,33 @@ export const getVendorReturnRequestById = asyncHandler(async (req, res) => {
         vendorId: req.user.id,
     })
         .populate('userId', 'name email phone')
-        .populate('orderId', 'orderId total createdAt items vendorItems status paymentStatus');
+        .populate('orderId', 'orderId total createdAt items vendorItems status paymentStatus')
+        .populate('deliveryBoyId', 'name phone email');
 
     if (!request) throw new ApiError(404, 'Return request not found.');
 
+    const normalized = normalizeReturnRequest(request);
+
+    const Shipment = (await import('../../../models/Shipment.model.js')).default;
+    const shipment = await Shipment.findOne({
+        returnRequestId: request._id,
+        type: 'reverse'
+    }).lean().select('shipmentNumber providerId awbCode trackingUrl status deliveryBoyId').populate('deliveryBoyId', 'name phone');
+
+    if (shipment) {
+        normalized.reverseShipment = {
+            shipmentId: shipment._id,
+            shipmentNumber: shipment.shipmentNumber,
+            providerId: shipment.providerId,
+            awbCode: shipment.awbCode,
+            trackingUrl: shipment.trackingUrl,
+            status: shipment.status,
+            deliveryBoyId: shipment.deliveryBoyId
+        };
+    }
+
     res.status(200).json(
-        new ApiResponse(200, normalizeReturnRequest(request), 'Return request fetched.')
+        new ApiResponse(200, normalized, 'Return request fetched.')
     );
 });
 

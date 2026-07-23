@@ -62,6 +62,12 @@ const productBaseSchema = {
     relatedProducts: Joi.array().items(objectId).optional(),
     faqs: Joi.array().items(faqSchema).optional(),
     variants: variantSchema,
+    weight: Joi.number().min(1).required(),
+    dimensions: Joi.object({
+        length: Joi.number().min(1).required(),
+        breadth: Joi.number().min(1).required(),
+        height: Joi.number().min(1).required(),
+    }).required(),
 };
 
 export const createProductSchema = Joi.object({

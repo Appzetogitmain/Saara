@@ -77,6 +77,7 @@ const getChildRoute = (parentRoute, childName) => {
       "Delivery Boys": "/admin/delivery/delivery-boys",
       "Cash Collection": "/admin/delivery/cash-collection",
       "Payout Requests": "/admin/delivery/payout-requests",
+      "Courier Settlements": "/admin/delivery/courier-settlements",
     },
     "/admin/marketing": {
       "Home Sliders": "/admin/marketing/home-sliders",
@@ -112,6 +113,7 @@ const getChildRoute = (parentRoute, childName) => {
     "/admin/settings": {
       General: "/admin/settings/general",
       "Payment & Shipping": "/admin/settings/payment-shipping",
+      "Logistics & Delivery": "/admin/settings/logistics",
     },
     "/admin/policies": {
       "Privacy Policy": "/admin/policies/privacy-policy",

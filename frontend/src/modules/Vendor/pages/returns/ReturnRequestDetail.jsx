@@ -743,6 +743,102 @@ const ReturnRequestDetail = () => {
             </div>
           </div>
 
+          {/* Reverse Logistics */}
+          <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+            <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <FiPackage className="text-primary-600 text-base" />
+              Reverse Logistics
+            </h2>
+            <div className="space-y-3 text-xs text-gray-600">
+              {/* Check for modern Phase 5+ reverse shipment */}
+              {returnRequest.reverseShipment ? (
+                <>
+                  {returnRequest.reverseShipment.status === 'failed' ? (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <p className="font-semibold text-gray-800">Assigning Partner...</p>
+                        <Badge variant="warning" className="text-[10px] uppercase">
+                          Pending
+                        </Badge>
+                      </div>
+                      <p className="text-gray-400 italic bg-gray-50 p-2 rounded text-center">
+                        Pickup is being scheduled by the platform.
+                      </p>
+                    </div>
+                  ) : returnRequest.reverseShipment.providerId === 'own_fleet' ? (
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <p className="font-semibold text-gray-800">Own Fleet Assigned</p>
+                        <Badge variant="info" className="text-[10px] uppercase">
+                          {returnRequest.reverseShipment.status.replace(/_/g, ' ')}
+                        </Badge>
+                      </div>
+                      {returnRequest.reverseShipment.deliveryBoyId ? (
+                        <p className="mt-1 font-medium bg-gray-50 p-2 rounded border border-gray-150">
+                          🧑 {returnRequest.reverseShipment.deliveryBoyId.name}<br/>
+                          📞 {returnRequest.reverseShipment.deliveryBoyId.phone}<br/>
+                        </p>
+                      ) : (
+                        <p className="text-gray-400 italic bg-gray-50 p-2 rounded text-center">Finding nearest rider...</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <p className="font-semibold text-gray-800 capitalize">
+                          {returnRequest.reverseShipment.providerId} Scheduled
+                        </p>
+                        <Badge variant="success" className="text-[10px] uppercase">
+                          {returnRequest.reverseShipment.status.replace(/_/g, ' ')}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 bg-gray-50 p-2 rounded border border-gray-150 space-y-1">
+                        <p className="flex justify-between items-center">
+                          <span className="text-gray-500">AWB Number:</span>
+                          <span className="font-semibold text-gray-800">{returnRequest.reverseShipment.awbCode || 'N/A'}</span>
+                        </p>
+                        <p className="flex justify-between items-center">
+                          <span className="text-gray-500">Tracking:</span>
+                          {returnRequest.reverseShipment.trackingUrl ? (
+                            <a 
+                              href={returnRequest.reverseShipment.trackingUrl}
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              Track Package
+                            </a>
+                          ) : (
+                            <span className="text-gray-400 italic">Not available</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* Legacy Fallback or Not Yet Created */
+                <>
+                  {returnRequest.status === 'pending' || returnRequest.status === 'rejected' ? (
+                    <p className="text-gray-500 italic bg-gray-50 p-2 rounded text-center border border-gray-150">
+                      Pickup is being scheduled by the platform.
+                    </p>
+                  ) : returnRequest.deliveryBoyId ? (
+                    <div>
+                      <p className="font-semibold text-gray-800">Assigned Driver (Legacy)</p>
+                      <p className="mt-1 font-medium bg-gray-50 p-2 rounded border border-gray-150">
+                        🧑 {returnRequest.deliveryBoyId.name}<br/>
+                        📞 {returnRequest.deliveryBoyId.phone}<br/>
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 italic bg-gray-50 p-2 rounded text-center">Pickup is being scheduled by the platform.</p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
           {/* Workflow Progress */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">

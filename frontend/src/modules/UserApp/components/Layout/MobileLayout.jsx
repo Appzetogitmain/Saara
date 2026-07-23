@@ -7,6 +7,7 @@ import MobileBottomNav from './MobileBottomNav';
 import MobileCartBar from './MobileCartBar';
 import CartDrawer from '../../../../shared/components/Cart/CartDrawer';
 import useMobileHeaderHeight from '../../hooks/useMobileHeaderHeight';
+import ErrorBoundary from '../../../../shared/components/ErrorBoundary/ErrorBoundary';
 
 const MobileLayout = ({ children, showBottomNav = true, showCartBar = true, showHeader = true }) => {
   const location = useLocation();
@@ -52,24 +53,26 @@ const MobileLayout = ({ children, showBottomNav = true, showCartBar = true, show
   const isCategoriesPage = location.pathname === '/categories';
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {isDesktopHeaderVisible && <DesktopHeader />}
-      {shouldShowHeader && <MobileHeader />}
-      <main
-        className={`flex-grow w-full max-w-[1440px] mx-auto px-0 md:px-8 lg:px-12 ${
-          showCartBar 
-            ? 'pb-24' 
-            : (shouldShowBottomNav ? 'pb-14' : '')
-        }`}
-        style={mainStyle}
-      >
-        {children}
-      </main>
-      {!shouldHideFooter && <DesktopFooter />}
-      {showCartBar && <MobileCartBar />}
-      {shouldShowBottomNav && <MobileBottomNav />}
-      <CartDrawer />
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen flex flex-col">
+        {isDesktopHeaderVisible && <DesktopHeader />}
+        {shouldShowHeader && <MobileHeader />}
+        <main
+          className={`flex-grow w-full max-w-[1440px] mx-auto px-0 md:px-8 lg:px-12 ${
+            showCartBar 
+              ? 'pb-24' 
+              : (shouldShowBottomNav ? 'pb-14' : '')
+          }`}
+          style={mainStyle}
+        >
+          {children}
+        </main>
+        {!shouldHideFooter && <DesktopFooter />}
+        {showCartBar && <MobileCartBar />}
+        {shouldShowBottomNav && <MobileBottomNav />}
+        <CartDrawer />
+      </div>
+    </ErrorBoundary>
   );
 };
 

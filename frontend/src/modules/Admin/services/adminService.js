@@ -230,6 +230,9 @@ export const updateReturnRequestStatus = (id, statusOrPayload, adminNote = '') =
     return api.patch(`/admin/return-requests/${id}/status`, payload);
 };
 
+export const reassignReversePickup = (id, overrideProviderId, reason) => 
+    api.post(`/admin/return-requests/${id}/reassign`, { overrideProviderId, reason });
+
 // ——— Reviews —————————————————————————————————————————————————————————————————————
 export const getAllReviews = (params = {}) =>
     api.get('/admin/reviews', { params });

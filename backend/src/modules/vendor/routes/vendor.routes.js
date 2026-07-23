@@ -10,7 +10,6 @@ import * as documentController from '../controllers/document.controller.js';
 import * as notificationController from '../controllers/notification.controller.js';
 import * as returnController from '../controllers/return.controller.js';
 import * as reviewController from '../controllers/review.controller.js';
-import * as shippingController from '../controllers/shipping.controller.js';
 import * as uploadController from '../controllers/upload.controller.js';
 import * as walletController from '../controllers/wallet.controller.js';
 import * as supportController from '../controllers/support.controller.js';
@@ -127,17 +126,6 @@ router.get('/reviews', ...vendorAuth, reviewController.getVendorReviews);
 router.patch('/reviews/:id/status', ...vendorAuth, reviewController.updateVendorReviewStatus);
 router.patch('/reviews/:id/response', ...vendorAuth, reviewController.addVendorReviewResponse);
 
-
-
-// Shipping management
-router.get('/shipping/zones', ...vendorAuth, shippingController.getShippingZones);
-router.post('/shipping/zones', ...vendorAuth, shippingController.createShippingZone);
-router.put('/shipping/zones/:id', ...vendorAuth, shippingController.updateShippingZone);
-router.delete('/shipping/zones/:id', ...vendorAuth, shippingController.deleteShippingZone);
-router.get('/shipping/rates', ...vendorAuth, shippingController.getShippingRates);
-router.post('/shipping/rates', ...vendorAuth, shippingController.createShippingRate);
-router.put('/shipping/rates/:id', ...vendorAuth, shippingController.updateShippingRate);
-router.delete('/shipping/rates/:id', ...vendorAuth, shippingController.deleteShippingRate);
 
 // Uploads (Cloudinary via temp local multer upload)
 router.post('/uploads/image', ...vendorAuth, uploadSingle('image'), uploadController.uploadImage);

@@ -19,9 +19,23 @@ export const getAllOrders = asyncHandler(async (req, res) => {
     const numericPage = Number(page) || 1;
     const numericLimit = Number(limit) || 20;
     const skip = (numericPage - 1) * numericLimit;
-    const filter = { isDeleted: { $ne: true } };
+    let filter = { isDeleted: { $ne: true } };
 
-    if (status && status !== 'all') filter.status = status;
+    if (status && status !== 'all') {
+        const deliveryStatuses = ['ready_for_pickup', 'shipped', 'out_for_delivery', 'delivered'];
+        if (deliveryStatuses.includes(status)) {
+            const matchingShipments = await mongoose.model('Shipment').find({ status }).select('orderId').lean();
+            const orderIds = matchingShipments.map(s => s.orderId);
+            if (filter._id) {
+                filter._id.$in = filter._id.$in.filter(id => orderIds.some(oid => String(oid) === String(id)));
+            } else {
+                filter._id = { $in: orderIds };
+            }
+        } else {
+            filter.status = status;
+        }
+    }
+    
     if (String(req.query.assignableOnly || '') === 'true' && !filter.status) {
         filter.status = { $in: ['pending', 'processing', 'shipped'] };
     }
@@ -51,13 +65,21 @@ export const getAllOrders = asyncHandler(async (req, res) => {
         filter.userId = userId;
     }
     if (String(req.query.onlyUnassigned || '') === 'true') {
-        filter.deliveryBoyId = null;
+        const unassignedShipments = await mongoose.model('Shipment').find({
+            deliveryBoyId: { $in: [null, undefined] },
+            status: { $nin: ['delivered', 'cancelled', 'returned'] } // Only active shipments
+        }).select('orderId').lean();
+        const orderIds = unassignedShipments.map(s => s.orderId);
+        filter._id = { $in: orderIds };
     }
 
     const [orders, total] = await Promise.all([
         Order.find(filter)
             .populate('userId', 'name email phone')
-            .populate('deliveryBoyId', 'name phone')
+            .populate({
+                path: 'shipments',
+                populate: { path: 'deliveryBoyId', select: 'name phone' }
+            })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(numericLimit)
@@ -65,8 +87,26 @@ export const getAllOrders = asyncHandler(async (req, res) => {
         Order.countDocuments(filter),
     ]);
 
+    const ordersWithDynamicStatus = orders.map(order => {
+        if (order.shipments && order.shipments.length > 0) {
+            const allDelivered = order.shipments.every(s => s.status === 'delivered');
+            const anyShipped = order.shipments.some(s => ['shipped', 'out_for_delivery'].includes(s.status));
+            const anyReady = order.shipments.some(s => s.status === 'ready_for_pickup');
+            
+            if (allDelivered) {
+                order.status = 'delivered';
+                order.deliveredAt = order.shipments.find(s => s.deliveredAt)?.deliveredAt || new Date();
+            } else if (anyShipped) {
+                order.status = 'shipped';
+            } else if (anyReady) {
+                order.status = 'ready_for_pickup';
+            }
+        }
+        return order;
+    });
+
     res.status(200).json(new ApiResponse(200, {
-        orders,
+        orders: ordersWithDynamicStatus,
         total,
         page: numericPage,
         pages: Math.ceil(total / numericLimit),
@@ -80,7 +120,10 @@ export const getOrderById = asyncHandler(async (req, res) => {
         isDeleted: { $ne: true },
     })
         .populate('userId', 'name email phone')
-        .populate('deliveryBoyId', 'name phone email vehicleType vehicleNumber')
+        .populate({
+            path: 'shipments',
+            populate: { path: 'deliveryBoyId', select: 'name phone email vehicleType vehicleNumber' }
+        })
         .populate('items.productId', 'name images price')
         .lean();
 
@@ -88,6 +131,21 @@ export const getOrderById = asyncHandler(async (req, res) => {
 
     const commissions = await Commission.find({ orderId: order._id }).lean();
     order.commissions = commissions || [];
+
+    if (order.shipments && order.shipments.length > 0) {
+        const allDelivered = order.shipments.every(s => s.status === 'delivered');
+        const anyShipped = order.shipments.some(s => ['shipped', 'out_for_delivery'].includes(s.status));
+        const anyReady = order.shipments.some(s => s.status === 'ready_for_pickup');
+        
+        if (allDelivered) {
+            order.status = 'delivered';
+            order.deliveredAt = order.shipments.find(s => s.deliveredAt)?.deliveredAt || new Date();
+        } else if (anyShipped) {
+            order.status = 'shipped';
+        } else if (anyReady) {
+            order.status = 'ready_for_pickup';
+        }
+    }
 
     res.status(200).json(new ApiResponse(200, order, 'Order fetched.'));
 });
@@ -105,7 +163,21 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 
     if (!order) throw new ApiError(404, 'Order not found.');
 
-    const previousStatus = String(order.status || '').toLowerCase();
+    let currentDynamicStatus = String(order.status || '').toLowerCase();
+    
+    // Dynamically calculate status from shipments (if any exist)
+    const shipments = await mongoose.model('Shipment').find({ orderId: order._id }).lean();
+    if (shipments && shipments.length > 0) {
+        const allDelivered = shipments.every(s => s.status === 'delivered');
+        const anyShipped = shipments.some(s => ['shipped', 'out_for_delivery'].includes(s.status));
+        const anyReady = shipments.some(s => s.status === 'ready_for_pickup');
+        
+        if (allDelivered) currentDynamicStatus = 'delivered';
+        else if (anyShipped) currentDynamicStatus = 'shipped';
+        else if (anyReady) currentDynamicStatus = 'ready_for_pickup';
+    }
+
+    const previousStatus = currentDynamicStatus;
     const nextStatus = String(status || '').toLowerCase();
 
     const allowedTransitions = {
@@ -125,40 +197,31 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
         }
     }
 
-    if (nextStatus === 'delivered' && order.deliveryBoyId && !order.deliveryPayoutProcessed) {
-        const session = await mongoose.startSession();
-        try {
-            await session.withTransaction(async () => {
-                await processDeliveryBoyPayout(order._id, order.deliveryBoyId, session);
-            });
-        } finally {
-            await session.endSession();
-        }
-        const freshOrder = await Order.findById(order._id).populate('userId', 'name email');
-        await handleOrderDeliveryBalances(freshOrder);
-        await freshOrder.save();
-        Object.assign(order, freshOrder.toObject());
-    } else {
-        order.status = nextStatus;
-        if (nextStatus === 'delivered') {
-            order.deliveredAt = new Date();
-            order.cancelledAt = null;
-        } else if (nextStatus === 'cancelled') {
-            order.cancelledAt = new Date();
-        } else if (nextStatus === 'returned') {
-            order.cancelledAt = null;
-        } else {
-            order.deliveredAt = null;
-            order.cancelledAt = null;
-        }
+    // Legacy delivery boy payout trigger removed (Phase 9.1).
+    // Payouts are now triggered exclusively by Shipment lifecycle events,
+    // not by manual Order status updates in the admin panel.
 
-        if (nextStatus === 'processing') {
-            order.vendorItems = (order.vendorItems || []).map((vi) => {
-                const current = String(vi?.status || 'pending');
-                if (current === 'cancelled' || current === 'delivered') return vi;
-                return { ...vi.toObject(), status: 'processing' };
-            });
-        }
+    order.status = nextStatus;
+    if (nextStatus === 'delivered') {
+        order.deliveredAt = new Date();
+        order.cancelledAt = null;
+    } else if (nextStatus === 'cancelled') {
+        order.cancelledAt = new Date();
+    } else if (nextStatus === 'returned') {
+        order.cancelledAt = null;
+    } else {
+        order.deliveredAt = null;
+        order.cancelledAt = null;
+    }
+
+    if (nextStatus === 'processing') {
+        order.vendorItems = (order.vendorItems || []).map((vi) => {
+            const current = String(vi?.status || 'pending');
+            if (current === 'cancelled' || current === 'delivered') return vi;
+            return { ...vi.toObject(), status: 'processing' };
+        });
+    }
+    await order.save();
         if (nextStatus === 'shipped') {
             order.vendorItems = (order.vendorItems || []).map((vi) => {
                 const current = String(vi?.status || 'pending');
@@ -195,7 +258,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
 
         await handleOrderDeliveryBalances(order);
         await order.save();
-    }
+        
     notifyOrderUpdate(order);
 
     if (nextStatus === 'cancelled') {
@@ -262,10 +325,13 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
         );
     });
 
-    if (order.deliveryBoyId) {
+    const orderShipments = await mongoose.model('Shipment').find({ orderId: order._id, deliveryBoyId: { $exists: true, $ne: null } }).lean();
+    const deliveryBoyIds = [...new Set(orderShipments.map(s => String(s.deliveryBoyId)))];
+
+    deliveryBoyIds.forEach(boyId => {
         notificationTasks.push(
             createNotification({
-                recipientId: order.deliveryBoyId,
+                recipientId: boyId,
                 recipientType: 'delivery',
                 title: 'Assigned order updated',
                 message: `Order ${order.orderId} is now ${status}.${itemsText}`,
@@ -276,7 +342,7 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
                 },
             })
         );
-    }
+    });
 
     if (notificationTasks.length > 0) {
         await Promise.allSettled(notificationTasks);

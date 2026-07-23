@@ -1,4 +1,6 @@
+import logger from '../utils/logger.js';
 import Order from '../models/Order.model.js';
+import Shipment from '../models/Shipment.model.js';
 import DeliveryBoy from '../models/DeliveryBoy.model.js';
 import Vendor from '../models/Vendor.model.js';
 import ReturnRequest from '../models/ReturnRequest.model.js';
@@ -18,7 +20,206 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
     return R * c; // Distance in km
 };
 
-export const autoAssignDeliveryPartner = async (orderId) => {
+// ───────────────────────────────────────────────────────────────────────────────
+// Phase 5.2: Shipment-Primary Auto-Assignment
+//
+// autoAssignDeliveryPartner(shipmentId) is the NEW primary entry point for
+// new orders that have a Shipment record (created in Phase 5.1).
+//
+// Design decisions:
+//   • Shipment is primary source of truth. Order is dual-written for backward
+//     compatibility only (Phase 5.3 will remove the dual-write).
+//   • Idempotency: uses findOneAndUpdate with conditional filter so concurrent
+//     calls cannot double-assign the same Shipment.
+//   • No partial updates: Shipment write happens first; Order dual-write is
+//     best-effort (failure logged, not propagated).
+//   • Per-vendor scope: each Shipment belongs to exactly one vendor, so
+//     vendorId comes directly from Shipment.vendorId (no ambiguity).
+// ───────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Shipment-primary auto-assignment.
+ * Called by the SHIPMENT_CREATED listener and the scheduler for new orders.
+ *
+ * @param {string|ObjectId} shipmentId  - Shipment._id (primary lookup key)
+ */
+export const autoAssignDeliveryPartner = async (shipmentId) => {
+    try {
+        // ─ 1. Load Shipment ──────────────────────────────────────────────────
+        const shipment = await Shipment.findById(shipmentId);
+        if (!shipment) {
+            console.warn(`[Auto Assign] Shipment ${shipmentId} not found. Skipping.`);
+            return;
+        }
+
+        // ─ 2. Idempotency guard ───────────────────────────────────────────────
+        // 'accepted' and 'manual_override' are terminal — never re-assign.
+        if (shipment.deliveryAssignmentStatus === 'accepted' ||
+            shipment.deliveryAssignmentStatus === 'manual_override') {
+            console.log(`[Auto Assign] Shipment ${shipment.shipmentNumber} already in terminal state (${shipment.deliveryAssignmentStatus}). Skipping.`);
+            return;
+        }
+
+        // ─ 3. Load Order for context (vendor, payment method, total) ───────
+        const order = await Order.findById(shipment.orderId);
+        if (!order || order.isDeleted) {
+            console.warn(`[Auto Assign] Order ${shipment.orderId} not found for Shipment ${shipment.shipmentNumber}. Skipping.`);
+            return;
+        }
+        if (['cancelled', 'returned', 'delivered'].includes(order.status)) {
+            console.log(`[Auto Assign] Order ${order.orderId} is ${order.status}. Skipping Shipment ${shipment.shipmentNumber}.`);
+            return;
+        }
+
+        // ─ 4. Load the Shipment's specific vendor ──────────────────────────
+        // Each Shipment has its own vendorId (not the whole order's vendors).
+        const vendor = await Vendor.findById(shipment.vendorId);
+        if (!vendor) {
+            logger.error(`[Auto Assign] Vendor ${shipment.vendorId} not found for Shipment ${shipment.shipmentNumber}.`);
+            await _markShipmentFailed(shipment, order);
+            return;
+        }
+
+        const vendorLocation = vendor.address?.location;
+        const hasVendorCoords = vendorLocation?.coordinates?.length === 2;
+
+        // ─ 5. Find eligible delivery partners ─────────────────────────────
+        const MAX_COD_LIMIT = 20000;
+        const driverQuery = {
+            status: 'available',
+            isActive: true,
+            applicationStatus: 'approved',
+            _id: { $nin: shipment.rejectedDeliveryBoys || [] },
+        };
+        if (order.paymentMethod === 'cash' || order.paymentMethod === 'cod') {
+            driverQuery.cashInHand = { $lte: MAX_COD_LIMIT - (order.total || 0) };
+        }
+
+        const deliveryBoys = await DeliveryBoy.find(driverQuery).lean();
+        if (deliveryBoys.length === 0) {
+            console.log(`[Auto Assign] No available delivery partners for Shipment ${shipment.shipmentNumber}.`);
+            await _markShipmentFailed(shipment, order);
+            return;
+        }
+
+        // ─ 6. Capacity filtering ──────────────────────────────────────────
+        const driverIds = deliveryBoys.map(d => d._id);
+        const activeOrdersCounts = await Order.aggregate([
+            {
+                $match: {
+                    deliveryBoyId: { $in: driverIds },
+                    status: { $in: ['pending', 'processing', 'ready_for_pickup', 'accepted', 'assigned'] },
+                },
+            },
+            { $group: { _id: '$deliveryBoyId', count: { $sum: 1 } } },
+        ]);
+        const countsMap = activeOrdersCounts.reduce((acc, row) => {
+            acc[String(row._id)] = row.count;
+            return acc;
+        }, {});
+
+        const eligibleBoys = deliveryBoys.filter(db => {
+            const activeCount = countsMap[String(db._id)] || 0;
+            const maxLimit = typeof db.maxActiveOrders === 'number' ? db.maxActiveOrders : 3;
+            return activeCount < maxLimit;
+        });
+
+        if (eligibleBoys.length === 0) {
+            console.log(`[Auto Assign] No delivery partners have capacity for Shipment ${shipment.shipmentNumber}.`);
+            await _markShipmentFailed(shipment, order);
+            return;
+        }
+
+        // ─ 7. Rider selection (same 3-tier algorithm as legacy) ──────────
+        const { selectedRider, assignmentMethod } = await _selectRider(
+            eligibleBoys, countsMap, vendorLocation, hasVendorCoords
+        );
+
+        if (!selectedRider) {
+            console.log(`[Auto Assign] Failed to match a delivery partner for Shipment ${shipment.shipmentNumber}.`);
+            await _markShipmentFailed(shipment, order);
+            return;
+        }
+
+        // ─ 8. Compute distance ──────────────────────────────────────────
+        let distanceInKm = 0;
+        if (selectedRider.distance !== undefined) {
+            distanceInKm = assignmentMethod === 'Google Maps API'
+                ? parseFloat((selectedRider.distance / 1000).toFixed(2))
+                : parseFloat(selectedRider.distance.toFixed(2));
+        }
+
+        // ─ 9. Atomic Shipment write (primary, with idempotency guard) ──────
+        // We use findOneAndUpdate with a conditional filter so that if two
+        // concurrent calls race, only one wins.
+        const updatedShipment = await Shipment.findOneAndUpdate(
+            {
+                _id: shipment._id,
+                // Only update if still unassigned/failed (not yet accepted or manual_override)
+                deliveryAssignmentStatus: { $nin: ['accepted', 'manual_override', 'assigned'] },
+            },
+            {
+                $set: {
+                    deliveryBoyId:             selectedRider._id,
+                    deliveryAssignmentStatus:  'assigned',
+                    distance:                  distanceInKm,
+                },
+            },
+            { new: true }
+        );
+
+        if (!updatedShipment) {
+            // Another concurrent call already assigned this Shipment — this is correct behavior.
+            console.log(`[Auto Assign] Shipment ${shipment.shipmentNumber} was already assigned by a concurrent call. Skipping.`);
+            return;
+        }
+
+        console.log(`[Auto Assign] Shipment ${updatedShipment.shipmentNumber} assigned to ${selectedRider.name} via ${assignmentMethod}`);
+
+        // ─ 11. Notify delivery partner ─────────────────────────────────────
+        const itemsText      = buildOrderItemsSummary(order.items);
+        const vendorsSummary = (order.vendorItems || []).map(v => v.vendorName).join(', ');
+        const richOfferMessage =
+            `You have been offered order ${order.orderId || order._id} from [${vendorsSummary}]. ` +
+            `Please accept or reject within 5 minutes.${itemsText}`;
+
+        await createNotification({
+            recipientId:   selectedRider._id,
+            recipientType: 'delivery',
+            title:         'New order offer',
+            message:       richOfferMessage,
+            type:          'order',
+            data: {
+                orderId:     String(order.orderId || order._id),
+                shipmentId:  String(updatedShipment._id),
+                assignedAt:  new Date().toISOString(),
+            },
+        });
+
+    } catch (err) {
+        logger.error(`[Auto Assign] Error during Shipment-based auto-assignment:`, err.message);
+    }
+};
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Legacy Path: Order-primary auto-assignment
+//
+// autoAssignDeliveryPartnerLegacy(orderId) is used for:
+//   • Orders created BEFORE Phase 5.1 (no Shipment record exists)
+//   • Called by the vendor controller when no Shipment is found for the order
+//   • Called by the scheduler for timed-out legacy orders
+//
+// Do NOT call this for orders that have a Shipment — use autoAssignDeliveryPartner().
+// ───────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Legacy (Order-primary) auto-assignment.
+ * Preserved for backward compatibility with orders created before Phase 5.1.
+ * The original autoAssignDeliveryPartner logic is unchanged here.
+ *
+ * @param {string|ObjectId} orderId  - Order._id
+ */
+export const autoAssignDeliveryPartnerLegacy = async (orderId) => {
     try {
         const order = await Order.findById(orderId);
         if (!order || order.isDeleted) return;
@@ -30,7 +231,7 @@ export const autoAssignDeliveryPartner = async (orderId) => {
         // 1. Identify the vendor and get their location
         const vendorId = order.vendorItems?.[0]?.vendorId || order.items?.[0]?.vendorId;
         if (!vendorId) {
-            console.error(`[Auto Assign] Vendor ID not found for order ${order._id}`);
+            logger.error(`[Auto Assign Legacy] Vendor ID not found for order ${order._id}`);
             order.deliveryAssignmentStatus = 'failed';
             await order.save();
             return;
@@ -38,13 +239,12 @@ export const autoAssignDeliveryPartner = async (orderId) => {
 
         const vendor = await Vendor.findById(vendorId);
         if (!vendor) {
-            console.error(`[Auto Assign] Vendor not found: ${vendorId} for order ${order._id}`);
+            logger.error(`[Auto Assign Legacy] Vendor not found: ${vendorId} for order ${order._id}`);
             order.deliveryAssignmentStatus = 'failed';
             await order.save();
             return;
         }
 
-        // Validate vendor has GeoJSON coordinates
         const vendorLocation = vendor.address?.location;
         const hasVendorCoords = vendorLocation?.coordinates?.length === 2;
 
@@ -62,30 +262,28 @@ export const autoAssignDeliveryPartner = async (orderId) => {
 
         const deliveryBoys = await DeliveryBoy.find(query).lean();
         if (deliveryBoys.length === 0) {
-            console.log(`[Auto Assign] No available delivery boys found for order ${order._id}`);
+            console.log(`[Auto Assign Legacy] No available delivery boys found for order ${order._id}`);
             order.deliveryAssignmentStatus = 'failed';
             await order.save();
             return;
         }
 
-        // 3. For each candidate, find their active orders count
+        // 3. Capacity filtering
         const driverIds = deliveryBoys.map(d => d._id);
         const activeOrdersCounts = await Order.aggregate([
-            { 
-                $match: { 
-                    deliveryBoyId: { $in: driverIds }, 
-                    status: { $in: ['pending', 'processing', 'ready_for_pickup', 'accepted', 'assigned'] } 
-                } 
+            {
+                $match: {
+                    deliveryBoyId: { $in: driverIds },
+                    status: { $in: ['pending', 'processing', 'ready_for_pickup', 'accepted', 'assigned'] },
+                },
             },
-            { $group: { _id: '$deliveryBoyId', count: { $sum: 1 } } }
+            { $group: { _id: '$deliveryBoyId', count: { $sum: 1 } } },
         ]);
-
         const countsMap = activeOrdersCounts.reduce((acc, row) => {
             acc[String(row._id)] = row.count;
             return acc;
         }, {});
 
-        // Filter out couriers who are at or above capacity
         const eligibleBoys = deliveryBoys.filter(db => {
             const activeCount = countsMap[String(db._id)] || 0;
             const maxLimit = typeof db.maxActiveOrders === 'number' ? db.maxActiveOrders : 3;
@@ -93,176 +291,172 @@ export const autoAssignDeliveryPartner = async (orderId) => {
         });
 
         if (eligibleBoys.length === 0) {
-            console.log(`[Auto Assign] No delivery boys have available capacity for order ${order._id}`);
+            console.log(`[Auto Assign Legacy] No delivery boys have available capacity for order ${order._id}`);
             order.deliveryAssignmentStatus = 'failed';
             await order.save();
             return;
         }
 
-        let selectedRider = null;
-        let assignmentMethod = '';
+        const { selectedRider, assignmentMethod } = await _selectRider(
+            eligibleBoys, countsMap, vendorLocation, hasVendorCoords
+        );
 
-        // Priority 1: Google Maps Distance Matrix API
-        const useGoogleMaps = process.env.USE_GOOGLE_MAPS_ASSIGNMENT === 'true';
-        const googleApiKey = process.env.GOOGLE_MAPS_API_KEY;
-
-        if (useGoogleMaps && googleApiKey && hasVendorCoords) {
-            try {
-                // Ensure candidates have locations
-                const candidatesWithLoc = eligibleBoys.filter(b => b.currentLocation?.coordinates?.length === 2);
-                if (candidatesWithLoc.length > 0) {
-                    const origins = candidatesWithLoc.map(b => `${b.currentLocation.coordinates[1]},${b.currentLocation.coordinates[0]}`);
-                    const destination = `${vendorLocation.coordinates[1]},${vendorLocation.coordinates[0]}`;
-                    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origins.join('|')}&destinations=${destination}&key=${googleApiKey}`;
-                    
-                    const response = await fetch(url);
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.status === 'OK' && data.rows?.[0]?.elements) {
-                            const elements = data.rows[0].elements;
-                            
-                            const ranked = candidatesWithLoc.map((db, idx) => {
-                                const element = elements[idx];
-                                const activeCount = countsMap[String(db._id)] || 0;
-                                const eta = element?.status === 'OK' ? element.duration.value : 999999;
-                                const roadDistance = element?.status === 'OK' ? element.distance.value : 999999;
-
-                                return {
-                                    ...db,
-                                    eta,
-                                    activeCount,
-                                    distance: roadDistance
-                                };
-                            }).sort((a, b) => {
-                                // 1. Sort by lowest ETA
-                                if (a.eta !== b.eta) return a.eta - b.eta;
-                                // 2. Sort by lowest active order count
-                                if (a.activeCount !== b.activeCount) return a.activeCount - b.activeCount;
-                                // 3. Sort by shortest distance
-                                return a.distance - b.distance;
-                            });
-
-                            selectedRider = ranked[0];
-                            assignmentMethod = 'Google Maps API';
-                        }
-                    }
-                }
-            } catch (err) {
-                console.warn(`[Auto Assign] Google Maps matching failed. Falling back to MongoDB 2dsphere. Reason:`, err.message);
-            }
-        }
-
-        // Priority 2: MongoDB 2dsphere Fallback
-        if (!selectedRider && hasVendorCoords) {
-            try {
-                const boysNear = await DeliveryBoy.find({
-                    _id: { $in: eligibleBoys.map(eb => eb._id) },
-                    currentLocation: {
-                        $near: {
-                            $geometry: vendorLocation,
-                            $maxDistance: 10000 // 10 km
-                        }
-                    }
-                }).lean();
-
-                if (boysNear.length > 0) {
-                    const ranked = boysNear.map(db => {
-                        const activeCount = countsMap[String(db._id)] || 0;
-                        const distance = calculateDistance(
-                            vendorLocation.coordinates[1],
-                            vendorLocation.coordinates[0],
-                            db.currentLocation.coordinates[1],
-                            db.currentLocation.coordinates[0]
-                        );
-
-                        return {
-                            ...db,
-                            activeCount,
-                            distance
-                        };
-                    }).sort((a, b) => {
-                        // 1. Sort by lowest active order count
-                        if (a.activeCount !== b.activeCount) return a.activeCount - b.activeCount;
-                        // 2. Sort by nearest distance
-                        return a.distance - b.distance;
-                    });
-
-                    selectedRider = ranked[0];
-                    assignmentMethod = 'MongoDB 2dsphere fallback';
-                }
-            } catch (err) {
-                console.error(`[Auto Assign] MongoDB 2dsphere query failed:`, err.message);
-            }
-        }
-
-        // Priority 3: General Online Rider Fallback (e.g. for testing when coordinates are missing or far)
         if (!selectedRider) {
-            try {
-                console.log(`[Auto Assign Fallback] Distance matching returned no riders. Selecting first available online rider.`);
-                const ranked = eligibleBoys.map(db => {
-                    const activeCount = countsMap[String(db._id)] || 0;
-                    return {
-                        ...db,
-                        activeCount
-                    };
-                }).sort((a, b) => a.activeCount - b.activeCount);
-
-                if (ranked.length > 0) {
-                    selectedRider = ranked[0];
-                    assignmentMethod = 'General available fallback';
-                }
-            } catch (err) {
-                console.error(`[Auto Assign] General fallback failed:`, err.message);
-            }
-        }
-
-        // If no courier matched or fallback failed
-        if (!selectedRider) {
-            console.log(`[Auto Assign] Failed to match a delivery partner for order ${order._id}`);
+            console.log(`[Auto Assign Legacy] Failed to match a delivery partner for order ${order._id}`);
             order.deliveryBoyId = undefined;
             order.deliveryAssignmentStatus = 'failed';
             await order.save();
             return;
         }
 
-        // Update order assignment
         order.deliveryBoyId = selectedRider._id;
         order.deliveryAssignmentStatus = 'assigned';
 
         let distanceInKm = 0;
         if (selectedRider.distance !== undefined) {
-            distanceInKm = assignmentMethod === 'Google Maps API' ? parseFloat((selectedRider.distance / 1000).toFixed(2)) : parseFloat(selectedRider.distance.toFixed(2));
+            distanceInKm = assignmentMethod === 'Google Maps API'
+                ? parseFloat((selectedRider.distance / 1000).toFixed(2))
+                : parseFloat(selectedRider.distance.toFixed(2));
         }
         order.distance = distanceInKm;
-
         await order.save();
 
-        console.log(`[Auto Assign] Order ${order.orderId || order._id} assigned to ${selectedRider.name} via ${assignmentMethod}`);
+        console.log(`[Auto Assign Legacy] Order ${order.orderId || order._id} assigned to ${selectedRider.name} via ${assignmentMethod}`);
 
-        // Dispatch Notification
-        // Generate detailed summaries of items and vendors for the notification alert
-        const itemsText = buildOrderItemsSummary(order.items);
-        const vendorsSummary = (order.vendorItems || [])
-            .map((v) => v.vendorName)
-            .join(', ');
-        const richOfferMessage = `You have been offered order ${order.orderId || order._id} from [${vendorsSummary}]. Please accept or reject within 5 minutes.${itemsText}`;
+        const itemsText      = buildOrderItemsSummary(order.items);
+        const vendorsSummary = (order.vendorItems || []).map(v => v.vendorName).join(', ');
+        const richOfferMessage =
+            `You have been offered order ${order.orderId || order._id} from [${vendorsSummary}]. ` +
+            `Please accept or reject within 5 minutes.${itemsText}`;
 
         await createNotification({
-            recipientId: selectedRider._id,
+            recipientId:   selectedRider._id,
             recipientType: 'delivery',
-            title: 'New order offer',
-            message: richOfferMessage,
-            type: 'order',
+            title:         'New order offer',
+            message:       richOfferMessage,
+            type:          'order',
             data: {
-                orderId: String(order.orderId || order._id),
-                assignedAt: new Date().toISOString()
-            }
+                orderId:    String(order.orderId || order._id),
+                assignedAt: new Date().toISOString(),
+            },
         });
 
     } catch (err) {
-        console.error(`[Auto Assign] Error during auto-assignment:`, err.message);
+        logger.error(`[Auto Assign Legacy] Error during legacy auto-assignment:`, err.message);
     }
 };
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Shared helpers
+// ───────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Mark a Shipment and its linked Order as assignment-failed.
+ * Best-effort on Order update (failure logged, not thrown).
+ */
+async function _markShipmentFailed(shipment, order) {
+    try {
+        await Shipment.findByIdAndUpdate(
+            shipment._id,
+            { $set: { deliveryAssignmentStatus: 'failed' } }
+        );
+    } catch (err) {
+        logger.error(`[Auto Assign] Could not mark Shipment ${shipment.shipmentNumber} as failed:`, err.message);
+        // Legacy dual-write removed
+    }
+}
+
+/**
+ * 3-tier rider selection algorithm (shared by both Shipment and legacy paths).
+ * Returns { selectedRider, assignmentMethod }.
+ */
+async function _selectRider(eligibleBoys, countsMap, vendorLocation, hasVendorCoords) {
+    let selectedRider = null;
+    let assignmentMethod = '';
+
+    // Priority 1: Google Maps Distance Matrix API
+    const useGoogleMaps = process.env.USE_GOOGLE_MAPS_ASSIGNMENT === 'true';
+    const googleApiKey  = process.env.GOOGLE_MAPS_API_KEY;
+
+    if (useGoogleMaps && googleApiKey && hasVendorCoords) {
+        try {
+            const candidatesWithLoc = eligibleBoys.filter(b => b.currentLocation?.coordinates?.length === 2);
+            if (candidatesWithLoc.length > 0) {
+                const origins     = candidatesWithLoc.map(b => `${b.currentLocation.coordinates[1]},${b.currentLocation.coordinates[0]}`);
+                const destination = `${vendorLocation.coordinates[1]},${vendorLocation.coordinates[0]}`;
+                const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origins.join('|')}&destinations=${destination}&key=${googleApiKey}`;
+
+                const response = await fetch(url);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.status === 'OK' && data.rows?.[0]?.elements) {
+                        const elements = data.rows[0].elements;
+                        const ranked = candidatesWithLoc.map((db, idx) => {
+                            const element     = elements[idx];
+                            const activeCount = countsMap[String(db._id)] || 0;
+                            const eta         = element?.status === 'OK' ? element.duration.value : 999999;
+                            const roadDist    = element?.status === 'OK' ? element.distance.value  : 999999;
+                            return { ...db, eta, activeCount, distance: roadDist };
+                        }).sort((a, b) => {
+                            if (a.eta !== b.eta)           return a.eta - b.eta;
+                            if (a.activeCount !== b.activeCount) return a.activeCount - b.activeCount;
+                            return a.distance - b.distance;
+                        });
+                        selectedRider    = ranked[0];
+                        assignmentMethod = 'Google Maps API';
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn(`[Auto Assign] Google Maps matching failed. Falling back to 2dsphere.`, err.message);
+        }
+    }
+
+    // Priority 2: MongoDB 2dsphere proximity
+    if (!selectedRider && hasVendorCoords) {
+        try {
+            const boysNear = await DeliveryBoy.find({
+                _id: { $in: eligibleBoys.map(eb => eb._id) },
+                currentLocation: {
+                    $near: { $geometry: vendorLocation, $maxDistance: 10000 },
+                },
+            }).lean();
+
+            if (boysNear.length > 0) {
+                const ranked = boysNear.map(db => {
+                    const activeCount = countsMap[String(db._id)] || 0;
+                    const distance    = calculateDistance(
+                        vendorLocation.coordinates[1], vendorLocation.coordinates[0],
+                        db.currentLocation.coordinates[1], db.currentLocation.coordinates[0]
+                    );
+                    return { ...db, activeCount, distance };
+                }).sort((a, b) => {
+                    if (a.activeCount !== b.activeCount) return a.activeCount - b.activeCount;
+                    return a.distance - b.distance;
+                });
+                selectedRider    = ranked[0];
+                assignmentMethod = 'MongoDB 2dsphere fallback';
+            }
+        } catch (err) {
+            logger.error(`[Auto Assign] MongoDB 2dsphere query failed:`, err.message);
+        }
+    }
+
+    // Priority 3: General fallback (least active)
+    if (!selectedRider) {
+        console.log(`[Auto Assign Fallback] Distance matching returned no riders. Selecting first available rider.`);
+        const ranked = eligibleBoys
+            .map(db => ({ ...db, activeCount: countsMap[String(db._id)] || 0 }))
+            .sort((a, b) => a.activeCount - b.activeCount);
+        if (ranked.length > 0) {
+            selectedRider    = ranked[0];
+            assignmentMethod = 'General available fallback';
+        }
+    }
+
+    return { selectedRider, assignmentMethod };
+}
+
 
 export const autoAssignReturnPickupPartner = async (returnRequestId) => {
     try {
@@ -276,7 +470,7 @@ export const autoAssignReturnPickupPartner = async (returnRequestId) => {
         // 1. Identify the vendor and get their location
         const vendor = await Vendor.findById(returnRequest.vendorId);
         if (!vendor) {
-            console.error(`[Auto Assign Return] Vendor not found: ${returnRequest.vendorId} for return request ${returnRequest._id}`);
+            logger.error(`[Auto Assign Return] Vendor not found: ${returnRequest.vendorId} for return request ${returnRequest._id}`);
             returnRequest.deliveryAssignmentStatus = 'failed';
             await returnRequest.save();
             return;
@@ -387,7 +581,7 @@ export const autoAssignReturnPickupPartner = async (returnRequestId) => {
                     assignmentMethod = 'Proximity to Vendor location';
                 }
             } catch (err) {
-                console.error(`[Auto Assign Return] 2dsphere proximity query failed:`, err.message);
+                logger.error(`[Auto Assign Return] 2dsphere proximity query failed:`, err.message);
             }
         }
 
@@ -437,7 +631,7 @@ export const autoAssignReturnPickupPartner = async (returnRequestId) => {
         });
 
     } catch (err) {
-        console.error(`[Auto Assign Return] Error:`, err.message);
+        logger.error(`[Auto Assign Return] Error:`, err.message);
     }
 };
 
@@ -453,7 +647,7 @@ export const autoAssignExchangeReplacementPartner = async (returnRequestId) => {
         // 1. Identify the vendor and get their location
         const vendor = await Vendor.findById(returnRequest.vendorId);
         if (!vendor) {
-            console.error(`[Auto Assign Replacement] Vendor not found: ${returnRequest.vendorId}`);
+            logger.error(`[Auto Assign Replacement] Vendor not found: ${returnRequest.vendorId}`);
             returnRequest.deliveryAssignmentStatus = 'failed';
             await returnRequest.save();
             return;
@@ -563,7 +757,7 @@ export const autoAssignExchangeReplacementPartner = async (returnRequestId) => {
                     assignmentMethod = 'Proximity to Vendor location';
                 }
             } catch (err) {
-                console.error(`[Auto Assign Replacement] Proximity query failed:`, err.message);
+                logger.error(`[Auto Assign Replacement] Proximity query failed:`, err.message);
             }
         }
 
@@ -611,11 +805,14 @@ export const autoAssignExchangeReplacementPartner = async (returnRequestId) => {
         });
 
     } catch (err) {
-        console.error(`[Auto Assign Replacement] Error:`, err.message);
+        logger.error(`[Auto Assign Replacement] Error:`, err.message);
     }
 };
 
+// ───────────────────────────────────────────────────────────────────────────────
 // Polling scheduler for offer timeouts
+// ───────────────────────────────────────────────────────────────────────────────
+
 export const initAssignmentScheduler = () => {
     const TIMEOUT_INTERVAL_MS = 30000; // run every 30 seconds
 
@@ -624,31 +821,39 @@ export const initAssignmentScheduler = () => {
     setInterval(async () => {
         try {
             const timeoutSeconds = Number(process.env.DELIVERY_ASSIGNMENT_TIMEOUT || 300);
-            const timeoutLimit = new Date(Date.now() - (timeoutSeconds * 1000));
+            const timeoutLimit   = new Date(Date.now() - (timeoutSeconds * 1000));
 
-            // 1. Handle Forward Delivery timeouts
-            const expiredOrders = await Order.find({
+            // ─ 1. Handle Shipment-based forward delivery timeouts (Phase 5.2+) ──
+            //
+            // Find Shipments whose assignment offer has expired without being accepted.
+            const expiredShipments = await Shipment.find({
                 deliveryAssignmentStatus: 'assigned',
                 updatedAt: { $lt: timeoutLimit },
-                isDeleted: { $ne: true }
-            });
+            }).select('_id shipmentNumber deliveryBoyId rejectedDeliveryBoys orderId');
 
-            for (const order of expiredOrders) {
-                console.log(`[Assignment Timeout] Order ${order.orderId || order._id} offer to Delivery Boy ${order.deliveryBoyId} expired. Re-routing.`);
+            for (const shipment of expiredShipments) {
+                console.log(
+                    `[Assignment Timeout] Shipment ${shipment.shipmentNumber} offer to ` +
+                    `Delivery Boy ${shipment.deliveryBoyId} expired. Re-routing.`
+                );
 
-                order.rejectedDeliveryBoys.push(order.deliveryBoyId);
-                order.deliveryBoyId = undefined;
-                order.deliveryAssignmentStatus = 'pending';
-                await order.save();
+                // Clear assignment and add rider to rejected list (atomic)
+                await Shipment.findByIdAndUpdate(shipment._id, {
+                    $set:  { deliveryBoyId: undefined, deliveryAssignmentStatus: 'pending' },
+                    $push: { rejectedDeliveryBoys: shipment.deliveryBoyId },
+                });
 
-                autoAssignDeliveryPartner(order._id);
+                // (Dual-write to Order removed in Phase 9.3)
+
+                // Re-trigger Shipment-based assignment
+                autoAssignDeliveryPartner(shipment._id);
             }
 
-            // 2. Handle Return Pickup timeouts
+            // ─ 2. Handle Return Pickup timeouts (unchanged) ───────────────
             const expiredReturns = await ReturnRequest.find({
                 status: 'pickup_pending',
                 deliveryAssignmentStatus: 'assigned',
-                updatedAt: { $lt: timeoutLimit }
+                updatedAt: { $lt: timeoutLimit },
             });
 
             for (const ret of expiredReturns) {
@@ -663,11 +868,11 @@ export const initAssignmentScheduler = () => {
                 autoAssignReturnPickupPartner(ret._id);
             }
 
-            // 3. Handle Exchange Replacement timeouts
+            // ─ 4. Handle Exchange Replacement timeouts (unchanged) ─────────
             const expiredReplacements = await ReturnRequest.find({
                 status: 'replacement_assigned',
                 deliveryAssignmentStatus: 'assigned',
-                updatedAt: { $lt: timeoutLimit }
+                updatedAt: { $lt: timeoutLimit },
             });
 
             for (const ret of expiredReplacements) {
@@ -681,8 +886,9 @@ export const initAssignmentScheduler = () => {
 
                 autoAssignExchangeReplacementPartner(ret._id);
             }
+
         } catch (err) {
-            console.error('[Assignment Timeout Scheduler] Error:', err.message);
+            logger.error('[Assignment Timeout Scheduler] Error:', err.message);
         }
     }, TIMEOUT_INTERVAL_MS);
 };

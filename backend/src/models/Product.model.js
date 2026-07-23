@@ -51,6 +51,18 @@ const productSchema = new mongoose.Schema(
         codAllowed: { type: Boolean, default: true },
         returnable: { type: Boolean, default: true },
         cancelable: { type: Boolean, default: true },
+
+        // ─── Logistics / Shipping ─────────────────────────────────────────
+        // Required by courier providers (Shiprocket, Delhivery, etc.) for rate
+        // calculation and shipment creation. Defaults ensure backward compatibility
+        // for existing products — vendors should update these for accuracy.
+        weight: { type: Number, default: 500, min: 1 }, // grams
+        dimensions: {
+            length:  { type: Number, default: 15, min: 1 }, // cm
+            breadth: { type: Number, default: 12, min: 1 }, // cm
+            height:  { type: Number, default: 8,  min: 1 }, // cm
+        },
+
         taxIncluded: { type: Boolean, default: false },
         warrantyPeriod: { type: String },
         guaranteePeriod: { type: String },

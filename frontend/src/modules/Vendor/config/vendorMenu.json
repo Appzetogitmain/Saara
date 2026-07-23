@@ -71,13 +71,7 @@
         "route": "/vendor/support-tickets",
         "children": []
     },
-    {
-        "title":  "Shipping Management",
-        "route":  "/vendor/shipping-management",
-        "children":  [
 
-                     ]
-    },
     {
         "title":  "Customers",
         "route":  "/vendor/customers",
@@ -120,8 +114,7 @@
         "route":  "/vendor/settings",
         "children":  [
                          "Store Settings",
-                         "Payment Settings",
-                         "Shipping Settings"
+                         "Payment Settings"
                      ]
     },
     {

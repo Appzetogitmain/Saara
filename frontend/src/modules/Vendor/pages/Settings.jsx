@@ -4,7 +4,7 @@ import { FiSettings, FiCreditCard, FiTruck } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import StoreSettings from './settings/StoreSettings';
 import PaymentSettings from './settings/PaymentSettings';
-import ShippingSettings from './settings/ShippingSettings';
+
 
 const VendorSettings = () => {
   const navigate = useNavigate();
@@ -14,7 +14,7 @@ const VendorSettings = () => {
   const getActiveTabFromUrl = () => {
     const path = location.pathname;
     if (path.includes('/payment') || path.includes('/payment-settings')) return 'payment';
-    if (path.includes('/shipping') || path.includes('/shipping-settings')) return 'shipping';
+
     if (path.includes('/store')) return 'store';
     return 'store';
   };
@@ -31,15 +31,12 @@ const VendorSettings = () => {
       navigate('/vendor/settings/store');
     } else if (tabId === 'payment') {
       navigate('/vendor/settings/payment');
-    } else if (tabId === 'shipping') {
-      navigate('/vendor/settings/shipping');
     }
   };
 
   const tabs = [
     { id: 'store', label: 'Store Settings', icon: FiSettings, component: StoreSettings, route: '/vendor/settings' },
     { id: 'payment', label: 'Payment Settings', icon: FiCreditCard, component: PaymentSettings, route: '/vendor/settings/payment-settings' },
-    { id: 'shipping', label: 'Shipping Settings', icon: FiTruck, component: ShippingSettings, route: '/vendor/settings/shipping-settings' },
   ];
 
   const ActiveComponent = tabs.find((tab) => tab.id === activeTab)?.component || StoreSettings;

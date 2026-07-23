@@ -5,6 +5,7 @@ import { validateEnv } from "./config/env.js";
 import { createServer } from "http";
 import { initSocket } from "./services/socket.service.js";
 import { initAssignmentScheduler } from "./services/assignmentService.js";
+import { initLogisticsListeners } from "./events/index.js";
 
 const PORT = process.env.PORT || 5000;
 const httpServer = createServer(app);
@@ -16,7 +17,13 @@ const startServer = async () => {
   try {
     validateEnv();
     await connectDB();
+
+    // Initialize logistics event bus (must be after connectDB — listeners may query DB)
+    initLogisticsListeners();
     
+    const { initializeEventRegistry } = await import("./events/eventRegistry.js");
+    initializeEventRegistry();
+
     // Idempotent migration for existing brands
     try {
       const Brand = (await import("./models/Brand.model.js")).default;

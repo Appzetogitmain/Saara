@@ -58,6 +58,12 @@ export const createProductSchema = Joi.object({
         }).optional(),
         defaultSelection: Joi.object().optional(),
     }).optional(),
+    weight: Joi.number().min(1).required(),
+    dimensions: Joi.object({
+        length: Joi.number().min(1).required(),
+        breadth: Joi.number().min(1).required(),
+        height: Joi.number().min(1).required(),
+    }).required(),
 }).unknown(true);
 
 export const updateProductSchema = Joi.object({
@@ -116,6 +122,12 @@ export const updateProductSchema = Joi.object({
         }).optional(),
         defaultSelection: Joi.object().optional(),
     }).optional(),
+    weight: Joi.number().min(1).required(),
+    dimensions: Joi.object({
+        length: Joi.number().min(1).required(),
+        breadth: Joi.number().min(1).required(),
+        height: Joi.number().min(1).required(),
+    }).required(),
 }).unknown(true);
 
 export const productIdParamSchema = Joi.object({

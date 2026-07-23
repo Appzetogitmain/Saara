@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiFilter } from 'react-icons/fi';
+import { FiArrowLeft, FiFilter, FiPackage } from 'react-icons/fi';
 import { motion } from 'framer-motion';
+import EmptyState from '../../../shared/components/EmptyState';
+import OrderCardSkeleton from '../../../shared/components/Skeletons/OrderCardSkeleton';
 import MobileLayout from "../components/Layout/MobileLayout";
 import MobileOrderCard from '../components/Mobile/MobileOrderCard';
 import { useOrderStore } from '../../../shared/store/orderStore';
@@ -135,25 +137,28 @@ const MobileOrders = () => {
             }}
           >
               {isLoading ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-600">Loading orders...</p>
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <OrderCardSkeleton key={i} />
+                  ))}
                 </div>
               ) : filteredOrders.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl text-gray-300 mx-auto mb-4">📦</div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">No orders found</h3>
-                  <p className="text-gray-600 mb-6">
-                    {selectedStatus === 'all'
-                      ? "You haven't placed any orders yet"
-                      : `No ${selectedStatus} orders`}
-                  </p>
-                  <button
-                    onClick={() => navigate('/home')}
-                    className="gradient-green text-white px-6 py-3 rounded-xl font-semibold"
-                  >
-                    Start Shopping
-                  </button>
-                </div>
+                <EmptyState
+                  icon={FiPackage}
+                  title="No orders found"
+                  description={selectedStatus === 'all'
+                    ? "You haven't placed any orders yet"
+                    : `No ${selectedStatus} orders`}
+                  actionButton={
+                    <button
+                      onClick={() => navigate('/home')}
+                      className="gradient-green text-white px-6 py-3 rounded-xl font-semibold"
+                    >
+                      Start Shopping
+                    </button>
+                  }
+                  className="mt-6"
+                />
               ) : (
                 <div className="space-y-0">
                   {filteredOrders.map((order, index) => (

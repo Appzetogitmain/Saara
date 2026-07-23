@@ -3,11 +3,15 @@ import ApiResponse from '../../../utils/ApiResponse.js';
 import crypto from 'crypto';
 import ApiError from '../../../utils/ApiError.js';
 import Order from '../../../models/Order.model.js';
+import Shipment from '../../../models/Shipment.model.js';
 import Commission from '../../../models/Commission.model.js';
 import Settlement from '../../../models/Settlement.model.js';
 import mongoose from 'mongoose';
 import { createNotification } from '../../../services/notification.service.js';
-import { autoAssignDeliveryPartner } from '../../../services/assignmentService.js';
+import {
+    autoAssignDeliveryPartner,
+    autoAssignDeliveryPartnerLegacy,
+} from '../../../services/assignmentService.js';
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
 import { buildVendorItemsSummary } from '../../../utils/notificationProductFormatter.js';
 import { getDefaultCommissionRate } from '../../../services/settingsService.js';
@@ -40,7 +44,16 @@ export const getVendorOrders = asyncHandler(async (req, res) => {
         ? { vendorItems: { $elemMatch: { vendorId: req.user.id, status } } }
         : { 'vendorItems.vendorId': req.user.id };
 
-    const orders = await Order.find(filter).sort({ createdAt: -1 }).skip(skip).limit(numericLimit).lean();
+    const orders = await Order.find(filter)
+        .populate({
+            path: 'shipments',
+            match: { vendorId: req.user.id },
+            populate: { path: 'deliveryBoyId', select: 'name email phone vehicleType vehicleNumber status' }
+        })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(numericLimit)
+        .lean();
     const total = await Order.countDocuments(filter);
 
     const orderIds = orders.map(o => o._id);
@@ -112,7 +125,11 @@ export const getVendorOrderById = asyncHandler(async (req, res) => {
         $or: idFilter,
         'vendorItems.vendorId': req.user.id,
     })
-    .populate('deliveryBoyId', 'name email phone vehicleType vehicleNumber status')
+    .populate({
+        path: 'shipments',
+        match: { vendorId: req.user.id },
+        populate: { path: 'deliveryBoyId', select: 'name email phone vehicleType vehicleNumber status' }
+    })
     .populate('userId', 'name email');
 
     if (!order) throw new ApiError(404, 'Order not found.');
@@ -123,7 +140,7 @@ export const getVendorOrderById = asyncHandler(async (req, res) => {
     }).lean();
 
     const defaultRate = await getDefaultCommissionRate();
-    const orderObj = order.toObject();
+    const orderObj = order.toObject({ virtuals: true });
     const comm = commissionDoc;
     const filteredItems = (orderObj.items || []).filter(item => String(item.vendorId) === String(req.user.id));
     const filteredVendorItems = (orderObj.vendorItems || []).filter(vi => String(vi.vendorId) === String(req.user.id));
@@ -210,9 +227,75 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     await order.save();
     notifyOrderUpdate(order);
 
+    const shipmentForVendor = await Shipment.findOne({
+        orderId: order._id,
+        vendorId: req.user.id,
+    });
+
+    if (shipmentForVendor) {
+        shipmentForVendor.status = status === 'processing' ? 'confirmed' : status;
+        await shipmentForVendor.save();
+    }
+
     if (status === 'ready_for_pickup') {
-        // Trigger auto-assignment service in the background
-        autoAssignDeliveryPartner(order._id);
+        // Phase 5.2: Use Shipment-primary assignment for new orders (with Shipment),
+        // fall back to legacy Order-primary assignment for old orders (without Shipment).
+        //
+        // [⚠️ DUAL-WRITE] The Shipment path writes Shipment first, then dual-writes
+        // Order.deliveryBoyId for backward compatibility. The legacy path writes Order only.
+        // Both paths are fire-and-forget (non-blocking).
+
+        if (shipmentForVendor) {
+            // New order (Phase 5.1+): use Shipment-primary assignment
+            if (shipmentForVendor.providerId === 'shiprocket') {
+                // Fire and forget Shiprocket assignment
+                import('../../../providers/shiprocket.provider.js')
+                    .then(({ default: shiprocketProvider }) => {
+                        shiprocketProvider.createShipment(shipmentForVendor).then(res => {
+                            if (res.success) {
+                                shipmentForVendor.awbCode = res.awbCode;
+                                shipmentForVendor.trackingUrl = res.trackingUrl;
+                                shipmentForVendor.labelUrl = res.labelUrl;
+                                shipmentForVendor.providerOrderId = res.providerMetadata?.shiprocketOrderId;
+                                shipmentForVendor.providerMetadata = res.providerMetadata;
+                                shipmentForVendor.save().catch(e => console.error('Failed to save 3PL shipment info:', e));
+                            } else {
+                                console.error('[3PL] Shiprocket createShipment failed:', res.error);
+                                shipmentForVendor.deliveryAssignmentStatus = 'failed';
+                                shipmentForVendor.save().catch(e => console.error(e));
+                            }
+                        }).catch(err => console.error('[3PL] Shiprocket createShipment exception:', err));
+                    })
+                    .catch(err => console.error('Failed to load shiprocket provider:', err));
+            } else if (shipmentForVendor.providerId === 'delhivery') {
+                // Fire and forget Delhivery assignment
+                import('../../../providers/delhivery.provider.js')
+                    .then(({ default: delhiveryProvider }) => {
+                        delhiveryProvider.createShipment(shipmentForVendor).then(res => {
+                            if (res.success) {
+                                shipmentForVendor.awbCode = res.awbCode;
+                                shipmentForVendor.trackingUrl = res.trackingUrl;
+                                shipmentForVendor.labelUrl = res.labelUrl;
+                                shipmentForVendor.providerOrderId = res.providerMetadata?.waybill;
+                                shipmentForVendor.providerMetadata = res.providerMetadata;
+                                shipmentForVendor.save().catch(e => console.error('Failed to save 3PL shipment info:', e));
+                            } else {
+                                console.error('[3PL] Delhivery createShipment failed:', res.error);
+                                shipmentForVendor.deliveryAssignmentStatus = 'failed';
+                                shipmentForVendor.save().catch(e => console.error(e));
+                            }
+                        }).catch(err => console.error('[3PL] Delhivery createShipment exception:', err));
+                    })
+                    .catch(err => console.error('Failed to load delhivery provider:', err));
+            } else if (shipmentForVendor.providerId === 'own_fleet') {
+                autoAssignDeliveryPartner(shipmentForVendor._id);
+            } else {
+                console.warn(`[Auto Assign] Unknown provider ${shipmentForVendor.providerId} for shipment ${shipmentForVendor._id}.`);
+            }
+        } else {
+            // Legacy order (pre-Phase-5.1): use Order-primary assignment
+            autoAssignDeliveryPartnerLegacy(order._id);
+        }
     }
 
     const notificationTasks = [];
@@ -370,26 +453,33 @@ export const verifyPickup = asyncHandler(async (req, res) => {
     const order = await Order.findOne({
         $or: idFilter,
         'vendorItems.vendorId': req.user.id,
-    }).select('+pickupOtpHash +pickupOtpExpiry +pickupOtpDebug +deliveryOtpHash +deliveryOtpExpiry +deliveryOtpSentAt +deliveryOtpAttempts +deliveryOtpDebug');
+    });
 
     if (!order) throw new ApiError(404, 'Order not found.');
+
+    const shipment = await mongoose.model('Shipment').findOne({
+        orderId: order._id,
+        vendorId: req.user.id
+    }).select('+pickupOtpHash +pickupOtpExpiry +pickupOtpDebug');
+
+    if (!shipment) throw new ApiError(404, 'Shipment not found for this vendor.');
 
     const vendorItem = order.vendorItems.find((vi) => String(vi.vendorId) === String(req.user.id));
     if (!vendorItem) throw new ApiError(404, 'Vendor order item not found.');
 
-    if (vendorItem.status !== 'ready_for_pickup') {
-        throw new ApiError(409, `Pickup verification is only allowed when order is Ready for Pickup. Current status is ${vendorItem.status}.`);
+    if (!['ready_for_pickup', 'confirmed'].includes(shipment.status)) {
+        throw new ApiError(409, `Pickup verification is only allowed when shipment is Ready for Pickup. Current status is ${shipment.status}.`);
     }
 
-    if (order.deliveryAssignmentStatus !== 'accepted') {
-        throw new ApiError(409, `No active accepted delivery partner for this order. Current status is ${order.deliveryAssignmentStatus}.`);
+    if (shipment.deliveryAssignmentStatus !== 'accepted') {
+        throw new ApiError(409, `No active accepted delivery partner for this shipment. Current status is ${shipment.deliveryAssignmentStatus}.`);
     }
 
-    if (!order.pickupOtpHash || !order.pickupOtpExpiry) {
+    if (!shipment.pickupOtpHash || !shipment.pickupOtpExpiry) {
         throw new ApiError(400, 'Pickup OTP was not generated. Please re-assign or re-accept the delivery offer.');
     }
 
-    if (order.pickupOtpExpiry < new Date()) {
+    if (shipment.pickupOtpExpiry < new Date()) {
         throw new ApiError(400, 'Pickup OTP has expired. Please ask the delivery boy to resend it.');
     }
 
@@ -398,28 +488,26 @@ export const verifyPickup = asyncHandler(async (req, res) => {
     if (!secret) throw new Error('JWT_SECRET is not configured.');
     const hashedInput = crypto.createHash('sha256').update(`${normalizedOtp}:${secret}`).digest('hex');
 
-    if (order.pickupOtpHash !== hashedInput) {
+    if (shipment.pickupOtpHash !== hashedInput) {
         throw new ApiError(400, 'Invalid Pickup OTP.');
     }
 
-    // OTP Verified! Advance status to shipped
-    vendorItem.status = 'shipped';
-    
-    // Update top level status
+    // OTP Verified! Advance status to picked_up
+    shipment.status = 'picked_up';
+    shipment.pickedUpAt = new Date();
+    shipment.pickupOtpHash = undefined;
+    shipment.pickupOtpDebug = undefined;
+    await shipment.save();
+
+    // Update order vendor item status
     order.vendorItems = order.vendorItems.map((vi) =>
-        vi.vendorId.toString() === req.user.id ? { ...vi.toObject(), status: 'shipped' } : vi
+        String(vi.vendorId) === String(req.user.id) ? { ...vi.toObject(), status: 'shipped' } : vi
     );
-    
-    order.status = 'shipped';
-    
-    // Clear pickup OTP fields
-    order.pickupOtpHash = undefined;
-    order.pickupOtpExpiry = undefined;
-    order.pickupOtpDebug = undefined;
-
+    order.status = deriveTopLevelOrderStatus(order.vendorItems, order.status);
     await order.save();
+    
     notifyOrderUpdate(order);
-
+    
     // Trigger notification tasks
     const notificationTasks = [];
     const vItemsText = buildVendorItemsSummary(vendorItem.items);

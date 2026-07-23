@@ -248,12 +248,6 @@ export const updateProfile = asyncHandler(async (req, res) => {
         'storeDescription',
         'storeLogo',
         'address',
-        'shippingEnabled',
-        'freeShippingThreshold',
-        'defaultShippingRate',
-        'shippingMethods',
-        'handlingTime',
-        'processingTime',
     ];
     const updates = Object.fromEntries(Object.entries(req.body).filter(([k]) => allowed.includes(k)));
     const vendor = await Vendor.findByIdAndUpdate(req.user.id, updates, { new: true, runValidators: true }).select('-password -otp -otpExpiry +bankDetails.accountName +bankDetails.accountNumber +bankDetails.bankName +bankDetails.ifscCode +upiId +paypalEmail');

@@ -55,6 +55,7 @@ import CustomerDetailPage from "./modules/Admin/pages/customers/CustomerDetailPa
 // Delivery Management child pages
 import DeliveryBoys from "./modules/Admin/pages/delivery/DeliveryBoys";
 import CashCollection from "./modules/Admin/pages/delivery/CashCollection";
+import CourierSettlements from "./modules/Admin/pages/Deliveries/CourierSettlements";
 import AdminPayouts from "./modules/Admin/pages/delivery/Payouts";
 // Vendors child pages
 import Vendors from "./modules/Admin/pages/Vendors";
@@ -91,8 +92,8 @@ import GeneralSettings from "./modules/Admin/pages/settings/GeneralSettings";
 import PaymentShippingSettings from "./modules/Admin/pages/settings/PaymentShippingSettings";
 import OrdersCustomersSettings from "./modules/Admin/pages/settings/OrdersCustomersSettings";
 import ProductsInventorySettings from "./modules/Admin/pages/settings/ProductsInventorySettings";
-import ContentFeaturesSettings from "./modules/Admin/pages/settings/ContentFeaturesSettings";
 import NotificationsSEOSettings from "./modules/Admin/pages/settings/NotificationsSEOSettings";
+import LogisticsSettings from "./modules/AdminApp/pages/LogisticsSettings";
 // Policies child pages
 import PrivacyPolicy from "./modules/Admin/pages/policies/PrivacyPolicy";
 import RefundPolicy from "./modules/Admin/pages/policies/RefundPolicy";
@@ -187,7 +188,7 @@ import VendorWalletHistory from "./modules/Vendor/pages/WalletHistory";
 import VendorReturnRequests from "./modules/Vendor/pages/ReturnRequests";
 import VendorReturnRequestDetail from "./modules/Vendor/pages/returns/ReturnRequestDetail";
 import VendorProductReviews from "./modules/Vendor/pages/ProductReviews";
-import VendorShippingManagement from "./modules/Vendor/pages/ShippingManagement";
+
 import VendorCustomers from "./modules/Vendor/pages/Customers";
 import VendorCustomerDetail from "./modules/Vendor/pages/CustomerDetail";
 import VendorInventoryReports from "./modules/Vendor/pages/InventoryReports";
@@ -544,7 +545,9 @@ const AppRoutes = () => {
         path="/admin"
         element={
           <AdminProtectedRoute>
-            <AdminLayout />
+            <ErrorBoundary>
+              <AdminLayout />
+            </ErrorBoundary>
           </AdminProtectedRoute>
         }>
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
@@ -586,6 +589,7 @@ const AppRoutes = () => {
         <Route path="delivery/delivery-boys" element={<DeliveryBoys />} />
         <Route path="delivery/cash-collection" element={<CashCollection />} />
         <Route path="delivery/payout-requests" element={<AdminPayouts />} />
+        <Route path="delivery/courier-settlements" element={<CourierSettlements />} />
         <Route path="vendors" element={<Vendors />} />
         <Route path="vendors/manage-vendors" element={<ManageVendors />} />
         <Route
@@ -644,6 +648,7 @@ const AppRoutes = () => {
         <Route path="settings/products-inventory" element={<Settings />} />
         <Route path="settings/content-features" element={<Settings />} />
         <Route path="settings/notifications-seo" element={<Settings />} />
+        <Route path="settings/logistics" element={<LogisticsSettings />} />
         <Route path="policies" element={<PrivacyPolicy />} />
         <Route path="policies/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="policies/refund-policy" element={<RefundPolicy />} />
@@ -667,7 +672,9 @@ const AppRoutes = () => {
         path="/delivery"
         element={
           <DeliveryProtectedRoute>
-            <DeliveryLayout />
+            <ErrorBoundary>
+              <DeliveryLayout />
+            </ErrorBoundary>
           </DeliveryProtectedRoute>
         }>
         <Route index element={<Navigate to="/delivery/dashboard" replace />} />
@@ -692,7 +699,9 @@ const AppRoutes = () => {
         path="/vendor"
         element={
           <VendorProtectedRoute>
-            <VendorLayout />
+            <ErrorBoundary>
+              <VendorLayout />
+            </ErrorBoundary>
           </VendorProtectedRoute>
         }>
         <Route index element={<Navigate to="/vendor/dashboard" replace />} />
@@ -733,10 +742,7 @@ const AppRoutes = () => {
           element={<VendorReturnRequestDetail />}
         />
         <Route path="product-reviews" element={<VendorProductReviews />} />
-        <Route
-          path="shipping-management"
-          element={<VendorShippingManagement />}
-        />
+
         <Route path="pickup-locations" element={<VendorPickupLocations />} />
         <Route path="customers/:id" element={<VendorCustomerDetail />} />
         <Route path="customers" element={<VendorCustomers />} />

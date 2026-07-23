@@ -6,7 +6,7 @@ import {
     restoreReturnedStock,
     generateReturnPickupOtp
 } from './exchange.service.js';
-import { autoAssignReturnPickupPartner, autoAssignExchangeReplacementPartner } from './assignmentService.js';
+import EventDispatcher from './eventDispatcher.service.js';
 
 /**
  * Helper to push an entry to statusHistory array
@@ -191,7 +191,7 @@ export const transition = async (requestId, expectedStatus, nextStatus, actor, n
 
 export const handlePostSaveApproval = (requestId) => {
     try {
-        autoAssignReturnPickupPartner(requestId);
+        EventDispatcher.dispatch('RETURN_APPROVED', { returnRequestId: requestId });
     } catch (err) {
         console.error(`[POST_SAVE_TRIGGER] Failed to auto assign return pickup for request ${requestId}:`, err);
     }
@@ -199,7 +199,7 @@ export const handlePostSaveApproval = (requestId) => {
 
 export const handlePostSaveReplacementReady = (requestId) => {
     try {
-        autoAssignExchangeReplacementPartner(requestId);
+        EventDispatcher.dispatch('REPLACEMENT_READY', { returnRequestId: requestId });
     } catch (err) {
         console.error(`[POST_SAVE_TRIGGER] Failed to auto assign replacement delivery for request ${requestId}:`, err);
     }

@@ -20,6 +20,8 @@ import AnimatedSelect from '../components/AnimatedSelect';
 import { formatCurrency, formatDateTime } from '../utils/adminHelpers';
 import { getPlaceholderImage } from '../../../shared/utils/helpers';
 import { useReturnStore } from '../../../shared/store/returnStore';
+import { reassignReversePickup } from '../services/adminService';
+import toast from 'react-hot-toast';
 import {
   getStatusConfig,
   getTimelineConfig,
@@ -36,6 +38,24 @@ const ReturnRequestDetail = () => {
   const [returnRequest, setReturnRequest] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [status, setStatus] = useState('');
+  const [overrideProviderId, setOverrideProviderId] = useState('');
+  const [isReassigning, setIsReassigning] = useState(false);
+
+  const handleReassign = async () => {
+    try {
+      setIsReassigning(true);
+      const res = await reassignReversePickup(id, overrideProviderId || undefined, 'Admin manual override');
+      const engineResult = res.data?.data || res.data;
+      toast.success(`Successfully reassigned to ${engineResult.providerId}`);
+      // Refresh the page data
+      const freshReq = await fetchReturnRequestById(id);
+      setReturnRequest(freshReq);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to reassign reverse pickup');
+    } finally {
+      setIsReassigning(false);
+    }
+  };
 
   const getOtpStatusText = (verified, expiresAt) => {
     if (verified) return 'Verified ✅';
@@ -484,26 +504,119 @@ const ReturnRequestDetail = () => {
             </div>
           </div>
 
-          {/* Operational Details */}
+          {/* Reverse Logistics Details */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
             <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
               <FiPackage className="text-primary-600 text-base" />
-              Operational & Rider Details
+              Reverse Logistics
             </h2>
             <div className="space-y-3 text-xs text-gray-600">
-              {returnRequest.deliveryBoyId ? (
-                <div>
-                  <p className="font-semibold text-gray-800">Assigned Driver</p>
-                  <p className="mt-1 font-medium bg-gray-50 p-2 rounded border border-gray-150">
-                    🧑 {returnRequest.deliveryBoyId.name}<br/>
-                    📞 {returnRequest.deliveryBoyId.phone}<br/>
-                    ✉️ {returnRequest.deliveryBoyId.email}
-                  </p>
-                </div>
+              {/* If we have a Reverse Shipment from Phase 5+ */}
+              {returnRequest.reverseShipment ? (
+                <>
+                  {returnRequest.reverseShipment.status === 'failed' ? (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <p className="font-semibold text-red-600 uppercase flex items-center gap-1"><FiAlertCircle /> Reverse Pickup Failed</p>
+                        <p className="font-medium bg-red-50 text-red-800 p-2 rounded border border-red-200">
+                          {returnRequest.reverseShipment.errorNotes || 'Unknown API failure.'}
+                        </p>
+                      </div>
+                      
+                      <div className="bg-orange-50 border border-orange-100 p-3 rounded-lg space-y-2">
+                        <p className="text-[10px] text-orange-800 font-bold uppercase tracking-wider">Manual Reassignment</p>
+                        <select
+                          className="w-full text-xs p-2 rounded border border-orange-200 bg-white focus:outline-none focus:ring-1 focus:ring-orange-400"
+                          value={overrideProviderId}
+                          onChange={(e) => setOverrideProviderId(e.target.value)}
+                        >
+                          <option value="">Auto-select best provider</option>
+                          <option value="shiprocket">Force Shiprocket</option>
+                          <option value="delhivery">Force Delhivery</option>
+                        </select>
+                        <button
+                          onClick={handleReassign}
+                          disabled={isReassigning}
+                          className="w-full py-2 bg-orange-600 hover:bg-orange-700 text-white rounded font-bold transition-colors disabled:opacity-50"
+                        >
+                          {isReassigning ? 'Reassigning...' : 'Retry Assignment'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : returnRequest.reverseShipment.providerId === 'own_fleet' ? (
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <p className="font-semibold text-gray-800">Own Fleet Assigned</p>
+                        <Badge variant="info" className="text-[10px] uppercase">
+                          {returnRequest.reverseShipment.status.replace(/_/g, ' ')}
+                        </Badge>
+                      </div>
+                      {returnRequest.reverseShipment.deliveryBoyId ? (
+                        <p className="mt-1 font-medium bg-gray-50 p-2 rounded border border-gray-150">
+                          🧑 {returnRequest.reverseShipment.deliveryBoyId.name}<br/>
+                          📞 {returnRequest.reverseShipment.deliveryBoyId.phone}<br/>
+                        </p>
+                      ) : (
+                        <p className="text-gray-400 italic bg-gray-50 p-2 rounded text-center">Finding nearest rider...</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <p className="font-semibold text-gray-800 capitalize">
+                          {returnRequest.reverseShipment.providerId} Scheduled
+                        </p>
+                        <Badge variant="success" className="text-[10px] uppercase">
+                          {returnRequest.reverseShipment.status.replace(/_/g, ' ')}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 bg-gray-50 p-2 rounded border border-gray-150 space-y-1">
+                        <p className="flex justify-between items-center">
+                          <span className="text-gray-500">AWB Number:</span>
+                          <span className="font-semibold text-gray-800">{returnRequest.reverseShipment.awbCode || 'N/A'}</span>
+                        </p>
+                        <p className="flex justify-between items-center">
+                          <span className="text-gray-500">Tracking:</span>
+                          {returnRequest.reverseShipment.trackingUrl ? (
+                            <a 
+                              href={returnRequest.reverseShipment.trackingUrl}
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              Track Package
+                            </a>
+                          ) : (
+                            <span className="text-gray-400 italic">Not available</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
-                <p className="text-gray-400 italic bg-gray-50 p-2 rounded text-center">No rider assigned yet.</p>
+                /* Legacy Fallback or Not Yet Created */
+                <>
+                  {returnRequest.status === 'pending' || returnRequest.status === 'rejected' ? (
+                    <p className="text-gray-500 italic bg-gray-50 p-2 rounded text-center border border-gray-150">
+                      Reverse shipment has not been created yet.
+                    </p>
+                  ) : returnRequest.deliveryBoyId ? (
+                    <div>
+                      <p className="font-semibold text-gray-800">Assigned Driver (Legacy)</p>
+                      <p className="mt-1 font-medium bg-gray-50 p-2 rounded border border-gray-150">
+                        🧑 {returnRequest.deliveryBoyId.name}<br/>
+                        📞 {returnRequest.deliveryBoyId.phone}<br/>
+                        ✉️ {returnRequest.deliveryBoyId.email}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 italic bg-gray-50 p-2 rounded text-center">No rider assigned.</p>
+                  )}
+                </>
               )}
-              <div className="border-t border-gray-100 pt-2 space-y-2">
+              
+              <div className="border-t border-gray-100 pt-2 mt-3 space-y-2">
                 <p className="font-semibold text-gray-800 mb-1">Security OTP Statuses</p>
                 <div className="flex justify-between items-center py-0.5 border-b border-gray-50 last:border-0">
                   <span className="text-gray-500">Return Pickup OTP:</span>

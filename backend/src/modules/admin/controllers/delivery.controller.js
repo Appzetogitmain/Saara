@@ -1,6 +1,6 @@
 import DeliveryBoy from '../../../models/DeliveryBoy.model.js';
 import { Order } from '../../../models/Order.model.js';
-import { ApiError } from '../../../utils/ApiError.js';
+import ApiError from '../../../utils/ApiError.js';
 import { ApiResponse } from '../../../utils/ApiResponse.js';
 import { asyncHandler } from '../../../utils/asyncHandler.js';
 import { sendEmail } from '../../../services/email.service.js';
@@ -74,33 +74,32 @@ export const getAllDeliveryBoys = asyncHandler(async (req, res) => {
 
     // Aggregate stats for each delivery boy
     const boysWithStats = await Promise.all(deliveryBoys.map(async (boy) => {
-        const stats = await Order.aggregate([
-            { $match: { deliveryBoyId: boy._id } },
-            {
-                $group: {
-                    _id: null,
-                    totalDeliveries: { $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] } },
-                    pendingDeliveries: { $sum: { $cond: [{ $in: ['$status', ['pending', 'processing', 'shipped']] }, 1, 0] } },
-                    cashInHand: {
-                        $sum: {
-                            $cond: [
-                                {
-                                    $and: [
-                                        { $eq: ['$status', 'delivered'] },
-                                        { $in: ['$paymentMethod', ['cod', 'cash']] },
-                                        { $ne: ['$isCashSettled', true] }
-                                    ]
-                                },
-                                '$total',
-                                0
-                            ]
-                        }
-                    }
-                }
+        const shipments = await mongoose.model('Shipment').find({ deliveryBoyId: boy._id }).select('status isCashSettled orderId').lean();
+        
+        let totalDeliveries = 0;
+        let pendingDeliveries = 0;
+        const pendingCashOrderIds = new Set();
+        
+        shipments.forEach(s => {
+            if (s.status === 'delivered') totalDeliveries++;
+            else if (['pending', 'processing', 'shipped'].includes(s.status)) pendingDeliveries++;
+            
+            if (s.status === 'delivered' && !s.isCashSettled) {
+                pendingCashOrderIds.add(s.orderId.toString());
             }
-        ]);
-
-        const boyStats = stats.length > 0 ? stats[0] : { totalDeliveries: 0, pendingDeliveries: 0, cashInHand: 0 };
+        });
+        
+        let cashInHand = 0;
+        if (pendingCashOrderIds.size > 0) {
+            const orders = await Order.find({
+                _id: { $in: Array.from(pendingCashOrderIds) },
+                paymentMethod: { $in: ['cod', 'cash'] }
+            }).select('total').lean();
+            
+            cashInHand = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+        }
+        
+        const boyStats = { totalDeliveries, pendingDeliveries, cashInHand };
         return {
             ...boy._doc,
             id: boy._id,
@@ -147,35 +146,54 @@ export const getDeliveryBoyById = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Delivery boy not found');
     }
 
-    const orders = await Order.find({ deliveryBoyId: boy._id }).sort({ createdAt: -1 }).limit(50);
+    // Fetch recent shipments instead of legacy orders
+    const shipments = await mongoose.model('Shipment').find({ deliveryBoyId: boy._id })
+        .populate('orderId', 'orderId total paymentMethod createdAt')
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
 
-    const stats = await Order.aggregate([
+    const stats = await mongoose.model('Shipment').aggregate([
         { $match: { deliveryBoyId: boy._id } },
         {
             $group: {
                 _id: null,
                 totalDeliveries: { $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, 1, 0] } },
-                totalEarnings: { $sum: { $cond: [{ $eq: ['$status', 'delivered'] }, '$shipping', 0] } },
-                cashInHand: {
-                    $sum: {
-                        $cond: [
-                            {
-                                $and: [
-                                    { $eq: ['$status', 'delivered'] },
-                                    { $in: ['$paymentMethod', ['cod', 'cash']] },
-                                    { $ne: ['$isCashSettled', true] }
-                                ]
-                            },
-                            '$total',
-                            0
-                        ]
-                    }
-                }
+                pendingDeliveries: { $sum: { $cond: [{ $in: ['$status', ['pending', 'processing', 'shipped']] }, 1, 0] } },
             }
         }
     ]);
 
-    const boyStats = stats.length > 0 ? stats[0] : { totalDeliveries: 0, totalEarnings: 0, cashInHand: 0 };
+    const boyStats = stats.length > 0 ? stats[0] : { totalDeliveries: 0, pendingDeliveries: 0 };
+
+    // Calculate cash in hand by querying unique Orders tied to un-settled COD shipments
+    const pendingCashShipments = await mongoose.model('Shipment').find({
+        deliveryBoyId: boy._id,
+        status: 'delivered',
+        isCashSettled: { $ne: true }
+    }).select('orderId').lean();
+
+    let cashInHand = 0;
+    if (pendingCashShipments.length > 0) {
+        const orderIds = [...new Set(pendingCashShipments.map(s => s.orderId.toString()))];
+        const cashOrders = await Order.find({
+            _id: { $in: orderIds },
+            paymentMethod: { $in: ['cod', 'cash'] }
+        }).select('total').lean();
+        cashInHand = cashOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+    }
+    boyStats.cashInHand = cashInHand;
+
+    // Transform shipments into a format the frontend expects (legacy Order format)
+    // since the frontend hasn't been updated to read shipments here yet.
+    const orders = shipments.map(s => ({
+        _id: s.orderId ? s.orderId._id : s._id,
+        orderId: s.orderId ? s.orderId.orderId : s.shipmentNumber,
+        status: s.status,
+        total: s.orderId ? s.orderId.total : s.customerShippingCharge,
+        paymentMethod: s.orderId ? s.orderId.paymentMethod : 'prepaid',
+        createdAt: s.createdAt,
+    }));
 
     res.status(200).json(
         new ApiResponse(200, {
@@ -377,13 +395,12 @@ export const deleteDeliveryBoy = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Delivery boy not found');
     }
 
-    const activeAssignments = await Order.countDocuments({
+    const activeDeliveries = await mongoose.model('Shipment').countDocuments({
         deliveryBoyId: boy._id,
-        status: { $in: ['pending', 'processing', 'shipped'] },
-        isDeleted: { $ne: true },
+        status: { $in: ['pending', 'processing', 'ready_for_pickup', 'shipped'] },
     });
 
-    if (activeAssignments > 0) {
+    if (activeDeliveries > 0) {
         throw new ApiError(409, 'Cannot delete delivery boy with active assigned orders');
     }
 
@@ -420,21 +437,27 @@ export const settleCash = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'Delivery boy not found');
     }
 
-    const baseFilter = {
-        deliveryBoyId: req.params.id,
-        status: 'delivered',
-        paymentMethod: { $in: ['cod', 'cash'] },
-        isCashSettled: { $ne: true },
-        isDeleted: { $ne: true },
-    };
-
     const session = await mongoose.startSession();
     let settledAmount = 0;
     let modifiedCount = 0;
 
     try {
         await session.withTransaction(async () => {
-            const pendingOrders = await Order.find(baseFilter).session(session).select('_id total').lean();
+            // Find unsettled shipments for this boy
+            const pendingShipments = await mongoose.model('Shipment').find({
+                deliveryBoyId: req.params.id,
+                status: 'delivered',
+                isCashSettled: { $ne: true }
+            }).select('orderId').session(session).lean();
+            
+            if (pendingShipments.length === 0) return;
+            
+            const uniqueOrderIds = [...new Set(pendingShipments.map(s => s.orderId.toString()))];
+            
+            const pendingOrders = await Order.find({
+                _id: { $in: uniqueOrderIds },
+                paymentMethod: { $in: ['cod', 'cash'] }
+            }).session(session).select('_id total').lean();
 
             if (pendingOrders.length === 0) {
                 return;
@@ -449,7 +472,7 @@ export const settleCash = asyncHandler(async (req, res) => {
                     deliveryBoyId: req.params.id,
                     amount: settledAmount,
                     collectedByAdmin: req.user.id,
-                    orders: orderIds,
+                    orders: orderIds, // Legacy field, kept for history
                     paymentMode,
                     receiptPhoto,
                     notes: notes || `Settlement for ${orderIds.length} orders`
@@ -459,7 +482,7 @@ export const settleCash = asyncHandler(async (req, res) => {
 
             // 2. Mark orders as settled
             const result = await Order.updateMany(
-                { _id: { $in: orderIds }, isCashSettled: { $ne: true } },
+                { _id: { $in: orderIds } },
                 {
                     $set: {
                         isCashSettled:    true,
@@ -471,10 +494,21 @@ export const settleCash = asyncHandler(async (req, res) => {
                 { session }
             );
             modifiedCount = result.modifiedCount;
-
             if (modifiedCount !== orderIds.length) {
                 throw new Error('Some orders in this session have already been settled.');
             }
+
+            // 3. Mark shipments as settled
+            await mongoose.model('Shipment').updateMany(
+                { orderId: { $in: orderIds }, deliveryBoyId: req.params.id },
+                {
+                    $set: {
+                        isCashSettled: true,
+                        cashSettlementId: settlement._id
+                    }
+                },
+                { session }
+            );
 
             // 3. Update rider balances
             const freshBoy = await DeliveryBoy.findById(req.params.id).session(session);

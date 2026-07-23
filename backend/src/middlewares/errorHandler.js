@@ -1,4 +1,5 @@
 import ApiError from '../utils/ApiError.js';
+import logger from '../utils/logger.js';
 
 // Global error handler — must be last middleware in Express
 const errorHandler = (err, req, res, next) => {
@@ -38,7 +39,20 @@ const errorHandler = (err, req, res, next) => {
         ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
     };
 
-    res.status(error.statusCode || 500).json(response);
+    // Log the error using centralized logger
+    const statusCode = error.statusCode || 500;
+    if (statusCode >= 500) {
+        logger.error(`${statusCode} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`, {
+            stack: error.stack,
+            body: req.body,
+            query: req.query,
+            user: req.user ? req.user.id : null
+        });
+    } else {
+        logger.warn(`${statusCode} - ${error.message} - ${req.originalUrl} - ${req.method} - ${req.ip}`);
+    }
+
+    res.status(statusCode).json(response);
 };
 
 export default errorHandler;

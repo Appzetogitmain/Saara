@@ -24,6 +24,7 @@ const seedDelivery = async () => {
       existing.isActive = true;
       existing.isAvailable = true;
       existing.status = 'available';
+      existing.applicationStatus = 'approved';
       existing.vehicleType = existing.vehicleType || 'Bike';
       existing.vehicleNumber = existing.vehicleNumber || 'DL-01-AB-1234';
       await existing.save();
@@ -37,6 +38,7 @@ const seedDelivery = async () => {
         isActive: true,
         isAvailable: true,
         status: 'available',
+        applicationStatus: 'approved',
         vehicleType: 'Bike',
         vehicleNumber: 'DL-01-AB-1234',
       });

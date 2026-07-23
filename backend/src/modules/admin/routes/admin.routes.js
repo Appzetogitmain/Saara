@@ -7,6 +7,7 @@ import * as customerController from '../controllers/customer.controller.js';
 import * as deliveryController from '../controllers/delivery.controller.js';
 import * as adminPayoutController from '../controllers/payout.controller.js';
 import * as returnController from '../controllers/return.controller.js';
+import * as courierRemittanceController from '../controllers/courierRemittance.controller.js';
 import * as supportController from '../controllers/support.controller.js';
 import * as reviewController from '../controllers/review.controller.js';
 import * as analyticsController from '../controllers/analytics.controller.js';
@@ -19,6 +20,7 @@ import * as policyController from '../controllers/policy.controller.js';
 import * as reelController from '../controllers/reel.controller.js';
 import * as affiliateController from '../controllers/affiliate.controller.js';
 import * as escrowController from '../controllers/escrow.controller.js';
+import logisticsRoutes from './logistics.routes.js';
 import AppConfig from '../../../models/AppConfig.model.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
 import asyncHandler from '../../../utils/asyncHandler.js';
@@ -175,9 +177,14 @@ router.post('/delivery-boys/:id/adjustment', ...adminAuth, validate(deliveryBoyI
 router.get('/delivery/payout-requests', ...adminAuth, adminPayoutController.getWithdrawalRequests);
 router.patch('/delivery/payout-requests/:id/status', ...adminAuth, audit('PROCESS_DELIVERY_PAYOUT', 'DeliveryWithdrawal'), adminPayoutController.updateWithdrawalStatus);
 
+// Courier Remittances
+router.get('/courier-remittances/pending', ...adminAuth, courierRemittanceController.getPendingCourierCod);
+router.post('/courier-remittances/settle', ...adminAuth, courierRemittanceController.settleCourierCod);
+
 // ─── Return Requests ──────────────────────────────────────────────────────────
 router.get('/return-requests', ...adminAuth, returnController.getAllReturnRequests);
 router.get('/return-requests/:id', ...adminAuth, returnController.getReturnRequestById);
+router.post('/return-requests/:id/reassign', ...adminAuth, returnController.reassignReversePickup);
 router.patch('/return-requests/:id/status', ...adminAuth, returnController.updateReturnRequestStatus);
 
 // ─── Support Tickets ──────────────────────────────────────────────────────────
@@ -308,5 +315,8 @@ router.patch('/affiliates/:id/payouts/:payoutId', ...adminAuth, audit('PROCESS_A
 router.get('/escrow/summary',                  ...adminAuth, escrowController.getEscrowSummary);
 router.get('/escrow/withdrawals',              ...adminAuth, escrowController.getWithdrawalRequests);
 router.patch('/escrow/withdrawals/:id/status', ...adminAuth, audit('PROCESS_VENDOR_WITHDRAWAL', 'Withdrawal'), escrowController.updateWithdrawalStatus);
+
+// ─── Logistics Management ────────────────────────────────────────────────────
+router.use('/logistics', ...adminAuth, logisticsRoutes);
 
 export default router;

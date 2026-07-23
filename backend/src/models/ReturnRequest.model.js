@@ -138,8 +138,13 @@ const returnRequestSchema = new mongoose.Schema(
             {
                 status: { type: String, required: true },
                 changedAt: { type: Date, default: Date.now },
-                performedByRole: { type: String, enum: ['admin', 'vendor', 'delivery_partner', 'user'], required: true },
-                performedById: { type: mongoose.Schema.Types.ObjectId, required: true },
+                performedByRole: { type: String, enum: ['admin', 'vendor', 'delivery_partner', 'user', 'system'], required: true },
+                performedById: { 
+                    type: mongoose.Schema.Types.ObjectId, 
+                    required: function() {
+                        return this.performedByRole !== 'system';
+                    }
+                },
                 performedByName: { type: String, required: true },
                 notes: { type: String }
             }

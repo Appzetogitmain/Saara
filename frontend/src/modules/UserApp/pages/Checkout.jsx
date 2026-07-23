@@ -51,6 +51,7 @@ const MobileCheckout = () => {
   const [shippingOption, setShippingOption] = useState("standard");
   const [estimatedShipping, setEstimatedShipping] = useState(null);
   const [isEstimatingShipping, setIsEstimatingShipping] = useState(false);
+  const [shippingQuotes, setShippingQuotes] = useState(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -283,10 +284,12 @@ const MobileCheckout = () => {
           setEstimatedShipping(
             Number.isFinite(nextShipping) ? nextShipping : null,
           );
+          setShippingQuotes(payload?.quotesByVendor || null);
         }
       } catch {
         if (active) {
           setEstimatedShipping(null);
+          setShippingQuotes(null);
         }
       } finally {
         if (active) {
@@ -461,6 +464,7 @@ const MobileCheckout = () => {
             ? appliedCoupon.code || couponCode.trim().toUpperCase()
             : undefined,
           shippingOption,
+          shippingQuotes,
           useWallet,
         });
 

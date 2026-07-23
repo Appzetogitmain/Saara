@@ -48,7 +48,6 @@ const iconMap = {
   "Pickup Locations": FiMapPin,
   Promotions: FiTag,
   Notifications: FiBell,
-  "Shipping Management": FiTruck,
   Customers: FiUsers,
   "Support Tickets": FiMessageSquare,
   "Inventory Reports": FiBarChart2,
@@ -79,7 +78,6 @@ const getChildRoute = (parentRoute, childName) => {
     "/vendor/settings": {
       "Store Settings": "/vendor/settings/store",
       "Payment Settings": "/vendor/settings/payment",
-      "Shipping Settings": "/vendor/settings/shipping",
     },
   };
 

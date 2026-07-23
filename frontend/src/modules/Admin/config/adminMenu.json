@@ -67,7 +67,8 @@
     "children": [
       "Delivery Boys",
       "Cash Collection",
-      "Payout Requests"
+      "Payout Requests",
+      "Courier Settlements"
     ]
   },
   {
@@ -135,7 +136,8 @@
     "route": "/admin/settings",
     "children": [
       "General",
-      "Payment & Shipping"
+      "Payment & Shipping",
+      "Logistics & Delivery"
     ]
   },
   {

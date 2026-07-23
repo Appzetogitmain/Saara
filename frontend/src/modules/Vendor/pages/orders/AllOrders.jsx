@@ -11,6 +11,7 @@ import ExportButton from "../../../Admin/components/ExportButton";
 import Badge from "../../../../shared/components/Badge";
 import AnimatedSelect from "../../../Admin/components/AnimatedSelect";
 import { formatPrice } from '../../../../shared/utils/helpers';
+import EmptyState from '../../../../shared/components/EmptyState';
 import { useVendorAuthStore } from '../../store/vendorAuthStore';
 import { getAllVendorOrders, updateVendorOrderStatus } from '../../services/vendorService';
 import { getSocket, joinRoom, leaveRoom } from '../../../../shared/utils/socket';
@@ -296,15 +297,14 @@ const AllOrders = () => {
             onRowClick={(row) => navigate(`/vendor/orders/${row.orderId ?? row._id}`)}
           />
         ) : (
-          <div className="text-center py-12">
-            <FiShoppingBag className="text-4xl text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500 mb-2">No orders found</p>
-            <p className="text-sm text-gray-400">
-              {searchQuery || selectedStatus !== 'all'
-                ? 'Try adjusting your filters'
-                : 'Orders containing your products will appear here'}
-            </p>
-          </div>
+          <EmptyState
+            icon={FiShoppingBag}
+            title="No orders found"
+            description={searchQuery || selectedStatus !== 'all'
+              ? 'Try adjusting your filters'
+              : 'Orders containing your products will appear here'}
+            className="my-6"
+          />
         )}
       </div>
     </motion.div>

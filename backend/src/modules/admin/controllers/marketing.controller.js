@@ -1,5 +1,5 @@
 import asyncHandler from '../../../utils/asyncHandler.js';
-import { ApiError } from '../../../utils/ApiError.js';
+import ApiError from '../../../utils/ApiError.js';
 import { ApiResponse } from '../../../utils/ApiResponse.js';
 import Coupon from '../../../models/Coupon.model.js';
 import Banner from '../../../models/Banner.model.js';

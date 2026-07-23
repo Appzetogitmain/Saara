@@ -51,6 +51,7 @@ const getPriceMeta = (item) => {
 const SwipeableCartItem = ({ item, index }) => {
     const [swipeOffset, setSwipeOffset] = useState(0);
     const [isDeleted, setIsDeleted] = useState(false);
+    const [isRemoving, setIsRemoving] = useState(false);
     const [hasAnimated, setHasAnimated] = useState(false);
     const [selectedSize, setSelectedSize] = useState(String(item?.variant?.size || "XL"));
     const deletedItemRef = useRef(null);
@@ -228,14 +229,23 @@ const SwipeableCartItem = ({ item, index }) => {
                 <div className="border-t border-gray-200 px-4 py-3 flex justify-end relative z-10">
                     <button
                         type="button"
-                        onClick={(e) => {
+                        disabled={isRemoving}
+                        onClick={async (e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            removeItem(item.id, item.variant);
+                            if (isRemoving) return;
+                            setIsRemoving(true);
+                            try {
+                                await removeItem(item.id, item.variant);
+                            } finally {
+                                // We normally wouldn't unset this if the item unmounts,
+                                // but just in case it fails, re-enable it.
+                                setIsRemoving(false);
+                            }
                         }}
-                        className="text-[12px] font-semibold text-sky-600 hover:text-sky-700 transition-colors"
+                        className={`text-[12px] font-semibold transition-colors ${isRemoving ? 'text-gray-400 cursor-not-allowed' : 'text-sky-600 hover:text-sky-700'}`}
                     >
-                        Remove
+                        {isRemoving ? 'Removing...' : 'Remove'}
                     </button>
                 </div>
             </div>
