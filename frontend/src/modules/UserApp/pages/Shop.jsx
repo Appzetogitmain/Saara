@@ -516,12 +516,12 @@ const Shop = () => {
 
           {/* Active Filter Tags info bar */}
           {hasActiveFilters && (
-            <div className="px-4 py-2 bg-gray-100/70 border-b border-gray-200 flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] font-bold text-gray-400 uppercase mr-1">Active:</span>
+            <div className="px-4 py-2.5 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mr-1">Active:</span>
               {activeFiltersList.map(tag => (
                 <span
                   key={`${tag.key}-${tag.value}`}
-                  className="inline-flex items-center gap-1 bg-white border border-gray-200 text-[10px] font-bold text-gray-700 px-2 py-0.5 rounded-md shadow-sm"
+                  className="inline-flex items-center gap-1 bg-slate-800 border border-slate-700 text-[10px] font-bold text-slate-200 px-2.5 py-1 rounded-full shadow-sm"
                 >
                   <span>{tag.label}</span>
                   <button
@@ -535,7 +535,7 @@ const Shop = () => {
                         handleFilterChange(tag.key, '');
                       }
                     }}
-                    className="p-0.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-red-500"
+                    className="p-0.5 hover:bg-slate-700 rounded-full text-slate-400 hover:text-rose-400 transition-colors"
                   >
                     <FiX />
                   </button>
@@ -543,7 +543,7 @@ const Shop = () => {
               ))}
               <button
                 onClick={handleClearAllFilters}
-                className="text-[10px] font-bold text-red-500 hover:text-red-750 underline ml-auto"
+                className="text-[10px] font-bold text-rose-400 hover:text-rose-300 underline ml-auto"
               >
                 Clear All
               </button>
@@ -551,9 +551,9 @@ const Shop = () => {
           )}
 
           {/* 5. Desktop/Tablet Tool Bar */}
-          <div className="px-4 py-3.5 bg-white border-b border-gray-150 flex items-center justify-between z-20">
-            <span className="text-xs lg:text-sm font-extrabold text-gray-700">
-              Showing <span className="text-primary-600">{totalProducts.toLocaleString()}</span> products
+          <div className="px-4 py-3.5 bg-white border-b border-slate-200 flex items-center justify-between z-20">
+            <span className="text-xs lg:text-sm font-extrabold text-gray-800">
+              Showing <span className="text-primary-600 font-black">{totalProducts.toLocaleString()}</span> products
             </span>
 
             <div className="flex items-center gap-3">
@@ -561,7 +561,7 @@ const Shop = () => {
               <div className="relative">
                 <button
                   onClick={() => setShowSortModal(!showSortModal)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-250 text-xs font-bold text-gray-700 hover:bg-gray-50"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-gray-800 hover:border-primary-500/50 hover:bg-slate-50 transition-all"
                 >
                   <span>Sort By: {[
                     { key: 'newest', label: 'Newest' },
@@ -582,7 +582,7 @@ const Shop = () => {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden"
+                        className="absolute right-0 mt-2 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden"
                       >
                         {[
                           { key: 'newest', label: 'Newest' },
@@ -601,7 +601,7 @@ const Shop = () => {
                               setSearchParams(newParams);
                               setShowSortModal(false);
                             }}
-                            className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-colors ${selectedSort === opt.key ? 'bg-primary-50 text-primary-600' : 'text-gray-700 hover:bg-gray-50'}`}
+                            className={`w-full text-left px-4 py-2.5 text-xs font-bold transition-colors ${selectedSort === opt.key ? 'bg-primary-50 text-primary-600' : 'text-gray-700 hover:bg-slate-50'}`}
                           >
                             {opt.label}
                           </button>
@@ -615,7 +615,7 @@ const Shop = () => {
               {/* View Toggle */}
               <button
                 onClick={handleViewModeToggle}
-                className="p-2 border border-gray-250 rounded-xl hover:bg-gray-50 text-gray-600 hidden md:block"
+                className="p-2 border border-slate-200 rounded-xl hover:bg-slate-50 text-gray-700 hidden md:block transition-colors"
                 title={viewMode === 'grid' ? 'Switch to List' : 'Switch to Grid'}
               >
                 {viewMode === 'grid' ? <FiList className="text-sm" /> : <FiGrid className="text-sm" />}
@@ -624,7 +624,7 @@ const Shop = () => {
               {/* Filter Button */}
               <button
                 onClick={() => setShowFilters(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-primary-100 bg-primary-50/50 hover:bg-primary-50 text-primary-700 text-xs font-bold"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-primary-500/30 bg-primary-50 hover:bg-primary-100 text-primary-700 text-xs font-bold transition-all shadow-sm"
               >
                 <FiFilter />
                 <span>Filter</span>
