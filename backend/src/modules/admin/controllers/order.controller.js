@@ -198,7 +198,6 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     }
 
     const previousStatus = currentDynamicStatus;
-    const nextStatus = String(status || '').toLowerCase();
 
     const allowedTransitions = {
         pending:          ['processing', 'cancelled'],

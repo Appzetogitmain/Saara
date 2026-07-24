@@ -15,6 +15,7 @@ import {
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
 import { buildVendorItemsSummary } from '../../../utils/notificationProductFormatter.js';
 import { getDefaultCommissionRate } from '../../../services/settingsService.js';
+import { processCancellationRefund } from '../../../services/cancellationRefundService.js';
 
 const deriveTopLevelOrderStatus = (vendorItems = [], fallback = 'pending') => {
     const statuses = (vendorItems || [])
