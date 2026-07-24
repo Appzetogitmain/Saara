@@ -362,6 +362,20 @@ const OrderDetail = () => {
                                 {currentStatus.toUpperCase()}
                             </Badge>
                         </div>
+                        {currentStatus === 'cancelled' && (
+                            <div className="p-4 bg-rose-50 border-t border-rose-200 text-xs text-rose-800 space-y-1">
+                                <p className="font-bold text-sm">❌ Package Cancelled by Customer</p>
+                                {vendorItem?.cancellationReason && (
+                                    <p><span className="font-semibold">Reason:</span> {vendorItem.cancellationReason}</p>
+                                )}
+                                {vendorItem?.cancellationComment && (
+                                    <p><span className="font-semibold">Comment:</span> {vendorItem.cancellationComment}</p>
+                                )}
+                                {vendorItem?.cancelledAt && (
+                                    <p className="text-[10px] text-rose-500 pt-0.5">{new Date(vendorItem.cancelledAt).toLocaleString()}</p>
+                                )}
+                            </div>
+                        )}
                         {currentStatus === 'delivered' && (
                             <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
                                 <span className="text-gray-600 text-sm">Delivered On</span>

@@ -48,7 +48,19 @@ const vendorItemGroupSchema = new mongoose.Schema({
     commissionRate: { type: Number, default: 0 },
     commissionAmount: { type: Number, default: 0 },
     vendorEarnings: { type: Number, default: 0 },
-    isOnHoldBalanceAdded: { type: Boolean, default: false }
+    isOnHoldBalanceAdded: { type: Boolean, default: false },
+    cancelledAt: Date,
+    cancelledBy: { type: String, enum: ['customer', 'vendor', 'admin', 'system'] },
+    cancellationReason: String,
+    cancellationComment: String,
+    refundedAmount: { type: Number, default: 0 },
+    refundBreakdown: {
+        productAmount: { type: Number, default: 0 },
+        taxRefund: { type: Number, default: 0 },
+        shippingRefund: { type: Number, default: 0 },
+        discountAdjustment: { type: Number, default: 0 },
+        finalRefund: { type: Number, default: 0 }
+    }
 });
 
 
@@ -86,6 +98,8 @@ const orderSchema = new mongoose.Schema(
                 'shipped',
                 'delivered',
                 'cancelled',
+                'partially_cancelled',
+                'partially_delivered',
                 'returned',
             ],
             default: 'pending',

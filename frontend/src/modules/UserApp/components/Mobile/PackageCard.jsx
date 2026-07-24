@@ -5,8 +5,10 @@ import { formatPrice } from '../../../../shared/utils/helpers';
 import { formatVariantLabel, getVariantSignature } from '../../../../shared/utils/variant';
 import LazyImage from '../../../../shared/components/LazyImage';
 
-const PackageCard = ({ shipment, index, totalPackages, items, getItemReturnStatus, isMultiPackage }) => {
+const PackageCard = ({ shipment, index, totalPackages, items, getItemReturnStatus, isMultiPackage, vendorGroup, onCancelPackage }) => {
   const [expanded, setExpanded] = useState(false);
+
+  const packageStatus = vendorGroup?.status || shipment?.status || 'pending';
 
   // Status mappings
   const getStatusConfig = (status) => {
@@ -28,9 +30,10 @@ const PackageCard = ({ shipment, index, totalPackages, items, getItemReturnStatu
     }
   };
 
-  const statusConfig = getStatusConfig(shipment?.status);
+  const statusConfig = getStatusConfig(packageStatus);
   const deliveryBoy = shipment?.deliveryBoyId;
   const showOTP = shipment?.deliveryOtpDebug && ['shipped', 'out_for_delivery'].includes(shipment?.status);
+  const isCancellable = ['pending', 'processing', 'ready_for_pickup', 'payment_pending', 'confirmed'].includes(packageStatus?.toLowerCase());
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden mb-4 transition-all duration-300">
@@ -44,9 +47,9 @@ const PackageCard = ({ shipment, index, totalPackages, items, getItemReturnStatu
             <h3 className="font-extrabold text-gray-900 text-sm">
               {isMultiPackage ? `Package ${index + 1} of ${totalPackages}` : 'Your Package'}
             </h3>
-            {shipment?.providerId && (
+            {(vendorGroup?.vendorName || shipment?.providerId) && (
               <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-                Via {shipment.providerId === 'shiprocket' ? 'Shiprocket 3PL' : 'Local Delivery'}
+                {vendorGroup?.vendorName ? `Store: ${vendorGroup.vendorName}` : `Via ${shipment?.providerId === 'shiprocket' ? 'Shiprocket 3PL' : 'Local Delivery'}`}
               </p>
             )}
           </div>
@@ -104,9 +107,38 @@ const PackageCard = ({ shipment, index, totalPackages, items, getItemReturnStatu
         ))}
       </div>
 
+      {/* Cancel Product Button for Cancellable Package Status */}
+      {isCancellable && onCancelPackage && (
+        <div className="px-4 py-2.5 bg-rose-50/40 border-t border-rose-100/60 flex justify-end">
+          <button
+            onClick={() => onCancelPackage(vendorGroup, shipment)}
+            className="px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-sm transition-all duration-200 flex items-center gap-1"
+          >
+            Cancel Product
+          </button>
+        </div>
+      )}
+
+      {/* Cancelled Banner with Refund Metadata */}
+      {packageStatus?.toLowerCase() === 'cancelled' && (
+        <div className="px-4 py-2.5 bg-rose-50 border-t border-rose-100 flex items-center justify-between text-xs flex-wrap gap-2">
+          <div className="flex items-center gap-1.5 text-rose-700 font-bold">
+            <span>❌ Package Cancelled</span>
+            {vendorGroup?.cancellationReason && (
+              <span className="text-[10px] text-rose-500 font-normal">({vendorGroup.cancellationReason})</span>
+            )}
+          </div>
+          {vendorGroup?.refundedAmount > 0 && (
+            <span className="font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 text-[11px]">
+              ₹{vendorGroup.refundedAmount} Credited to Wallet
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Primary Tracking Info (Always Visible if Shipped) */}
       {shipment?.status === 'shipped' && (
-        <div className="px-4 pb-3 flex justify-between items-center">
+        <div className="px-4 pb-3 flex justify-between items-center border-t border-gray-100 pt-2">
            <div className="flex items-center gap-2 text-sm text-gray-700">
              <FiTruck className="text-primary-600" />
              <span className="font-medium">ETA: {shipment.estimatedDeliveryDate ? new Date(shipment.estimatedDeliveryDate).toLocaleDateString() : 'Pending'}</span>
