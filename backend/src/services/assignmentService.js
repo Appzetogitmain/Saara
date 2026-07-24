@@ -5,6 +5,7 @@ import DeliveryBoy from '../models/DeliveryBoy.model.js';
 import Vendor from '../models/Vendor.model.js';
 import ReturnRequest from '../models/ReturnRequest.model.js';
 import { createNotification } from './notification.service.js';
+import { notifyOrderUpdate } from './socket.service.js';
 import { buildOrderItemsSummary, buildReturnItemsSummary } from '../utils/notificationProductFormatter.js';
 
 const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -195,6 +196,8 @@ export const autoAssignDeliveryPartner = async (shipmentId) => {
                 assignedAt:  new Date().toISOString(),
             },
         });
+
+        notifyOrderUpdate(order);
 
     } catch (err) {
         logger.error(`[Auto Assign] Error during Shipment-based auto-assignment:`, err.message);

@@ -60,8 +60,8 @@ const DeliveryOrderDetail = () => {
         joinRoom(`order_${id}`);
 
         const handleOrderUpdate = (updatedOrder) => {
-          const updatedId = updatedOrder.orderId || updatedOrder._id;
-          if (String(updatedId) === String(id) && mounted) {
+          const isMatch = String(updatedOrder._id) === String(id) || String(updatedOrder.orderId) === String(id);
+          if (isMatch && mounted) {
             loadOrder(true);
           }
         };

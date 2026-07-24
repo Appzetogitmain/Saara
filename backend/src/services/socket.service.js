@@ -102,12 +102,14 @@ export const notifyOrderUpdate = async (order) => {
     try {
         if (!order) return;
         const payload = order.toObject ? order.toObject() : order;
-        const orderId = payload._id || payload.orderId;
-        const userId = payload.userId?._id || payload.userId;
-        const deliveryBoyId = payload.deliveryBoyId?._id || payload.deliveryBoyId;
+        const mongoId = String(payload._id || '');
+        const humanId = String(payload.orderId || '');
+        const userId = String(payload.userId?._id || payload.userId || '');
+        const deliveryBoyId = String(payload.deliveryBoyId?._id || payload.deliveryBoyId || '');
 
-        // Emit to the specific order room
-        emitToRoom(`order_${orderId}`, 'order_updated', payload);
+        // Emit to the specific order rooms (both MongoDB _id and human-readable orderId)
+        if (mongoId) emitToRoom(`order_${mongoId}`, 'order_updated', payload);
+        if (humanId && humanId !== mongoId) emitToRoom(`order_${humanId}`, 'order_updated', payload);
 
         // Emit to user room
         if (userId) {

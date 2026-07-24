@@ -190,8 +190,10 @@ const MobileOrderDetail = () => {
         joinRoom(`order_${orderId}`);
 
         const handleOrderUpdate = (updatedOrder) => {
-          const updatedId = updatedOrder.orderId || updatedOrder._id;
-          if (String(updatedId) === String(orderId) && mounted) {
+          const isMatch =
+            String(updatedOrder._id) === String(orderId) ||
+            String(updatedOrder.orderId) === String(orderId);
+          if (isMatch && mounted) {
             fetchOrderById(orderId);
           }
         };
