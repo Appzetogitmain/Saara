@@ -38,6 +38,11 @@ async function _runEscrowRelease() {
 
         console.log(`[Escrow Cron] Found ${commissions.length} commission records held in escrow.`);
 
+        let skippedCod = 0;
+        let skippedReturn = 0;
+        let skippedNotEligible = 0;
+        let releasedCount = 0;
+
         for (const comm of commissions) {
             const session = await mongoose.startSession();
             // Collect data for post-transaction notifications (EXTERNAL API RULE)
@@ -52,13 +57,17 @@ async function _runEscrowRelease() {
                         { new: true, session }
                     );
                     if (!lockedComm) {
-                        console.warn(`[Escrow Cron] Commission ${comm._id} already claimed — skipping.`);
+                        if (process.env.DEBUG_ESCROW === 'true') {
+                            console.warn(`[Escrow Cron] Commission ${comm._id} already claimed — skipping.`);
+                        }
                         return; // exit withTransaction safely
                     }
 
                     const order = comm.orderId;
                     if (!order || order.isDeleted) {
-                        console.log(`[Escrow Cron] Skip: Order not found or deleted for commission ${comm._id}`);
+                        if (process.env.DEBUG_ESCROW === 'true') {
+                            console.log(`[Escrow Cron] Skip: Order not found or deleted for commission ${comm._id}`);
+                        }
                         // Mark failed to prevent infinite retry
                         await Commission.findByIdAndUpdate(comm._id, { escrowStatus: 'failed', notes: 'Order not found at escrow release time' }, { session });
                         return;
@@ -67,7 +76,10 @@ async function _runEscrowRelease() {
                     // Check COD/Cash order cash-settlement condition
                     const isCodOrCash = ['cod', 'cash'].includes(order.paymentMethod);
                     if (isCodOrCash && !order.isCashSettled) {
-                        console.log(`[Escrow Cron] Skip: COD/Cash order ${order.orderId} is not cash-settled yet.`);
+                        skippedCod++;
+                        if (process.env.DEBUG_ESCROW === 'true') {
+                            console.log(`[Escrow Cron] Skip: COD/Cash order ${order.orderId} is not cash-settled yet.`);
+                        }
                         // Revert claim lock back to 'held' so it can be retried
                         await Commission.findByIdAndUpdate(comm._id, { escrowStatus: 'held' }, { session });
                         return;
@@ -80,6 +92,7 @@ async function _runEscrowRelease() {
                         : (order.status === 'delivered' && order.deliveredAt && order.deliveredAt <= sevenDaysAgo);
 
                     if (!isEligible) {
+                        skippedNotEligible++;
                         // Revert claim lock back to 'held'
                         await Commission.findByIdAndUpdate(comm._id, { escrowStatus: 'held' }, { session });
                         return;
@@ -95,7 +108,10 @@ async function _runEscrowRelease() {
                     }).session(session);
 
                     if (activeReturn) {
-                        console.log(`[Escrow Cron] Commission ${comm._id} (Order ${order.orderId}, Vendor ${comm.vendorId}) skipped: Active Return/Exchange in progress.`);
+                        skippedReturn++;
+                        if (process.env.DEBUG_ESCROW === 'true') {
+                            console.log(`[Escrow Cron] Commission ${comm._id} (Order ${order.orderId}, Vendor ${comm.vendorId}) skipped: Active Return/Exchange in progress.`);
+                        }
                         // Revert claim lock back to 'held'
                         await Commission.findByIdAndUpdate(comm._id, { escrowStatus: 'held' }, { session });
                         return;
@@ -224,6 +240,7 @@ async function _runEscrowRelease() {
                     });
 
                     // Collect data for post-transaction notifications
+                    releasedCount++;
                     notificationData = {
                         vendorId:    String(vendor._id),
                         vendorName:  vendor.storeName || String(vendor._id),
@@ -266,6 +283,8 @@ async function _runEscrowRelease() {
                 }
             }
         }
+
+        console.log(`[Escrow Cron] Scanner complete. Released: ${releasedCount}, Skipped COD (unsettled): ${skippedCod}, Skipped Active Return: ${skippedReturn}, Holding period pending: ${skippedNotEligible}`);
     } catch (err) {
         console.error('[Escrow Cron] Scanning error:', err);
     }

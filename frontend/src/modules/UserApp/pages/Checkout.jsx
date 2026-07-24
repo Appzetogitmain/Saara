@@ -456,7 +456,7 @@ const MobileCheckout = () => {
         }));
 
         // Call payment/initialize for all payment methods (COD included)
-        const { data: initData } = await api.post("/user/payment/initialize", {
+        const initData = await api.post("/user/payment/initialize", {
           items: itemsPayload,
           shippingAddress: normalizedShipping,
           paymentMethod,
