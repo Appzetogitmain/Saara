@@ -59,9 +59,11 @@ const VendorLayout = () => {
     };
 
     socket.on('new_notification', handleNewNotification);
+    socket.on('notification', handleNewNotification);
 
     return () => {
       socket.off('new_notification', handleNewNotification);
+      socket.off('notification', handleNewNotification);
       leaveRoom(`vendor_${vendorId}`);
     };
   }, [token, vendor, addNotification]);

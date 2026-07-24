@@ -476,7 +476,10 @@ export const initializePayment = asyncHandler(async (req, res) => {
                         title: 'New Order Received!',
                         message: `You have received a new order ${order.orderId} totalling ₹${vGroup.subtotal}.${vItemsText}`,
                         type: 'order',
-                        data: { orderId: String(order._id) },
+                        data: {
+                            orderId: String(order.orderId),
+                            orderMongoId: String(order._id),
+                        },
                     }).catch(err => console.error('[COD Vendor Notification] Failed:', err.message))
                 );
             });
@@ -781,7 +784,10 @@ export const initializePayment = asyncHandler(async (req, res) => {
                 title: 'New Order Received!',
                 message: `You have received a new order ${order.orderId} totalling ₹${vGroup.subtotal}.${vItemsText}`,
                 type: 'order',
-                data: { orderId: String(order._id) },
+                data: {
+                    orderId: String(order.orderId),
+                    orderMongoId: String(order._id),
+                },
             }).catch(err => console.error('[Wallet Vendor Notification] Failed:', err.message));
         });
 

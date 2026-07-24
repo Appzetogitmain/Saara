@@ -794,7 +794,8 @@ export const placeOrder = asyncHandler(async (req, res) => {
                 message: `You have received a new order ${order.orderId} totalling ₹${vGroup.subtotal}.${vItemsText}`,
                 type: 'order',
                 data: {
-                    orderId: String(order.orderId || order._id),
+                    orderId: String(order.orderId),
+                    orderMongoId: String(order._id),
                 },
             }).catch((err) => console.error('[Vendor Order Notification] Failed to create:', err.message));
 

@@ -53,7 +53,7 @@ const VendorNotificationWindow = ({ isOpen, onClose, position = "right" }) => {
     if (notification.data?.returnRequestId) {
       return `/vendor/return-requests/${notification.data.returnRequestId}`;
     }
-    const orderId = notification.orderId || notification.data?.orderId;
+    const orderId = notification.orderId || notification.data?.orderId || notification.data?.orderMongoId;
     if (orderId) {
       return "/vendor/orders/all-orders";
     }
@@ -167,9 +167,9 @@ const VendorNotificationWindow = ({ isOpen, onClose, position = "right" }) => {
                             <span className="text-xs text-gray-500">
                               {formatDateTime(notification.createdAt)}
                             </span>
-                            {(notification.orderId || notification.data?.orderId) && (
+                            {(notification.orderId || notification.data?.orderId || notification.data?.orderMongoId) && (
                               <span className="text-xs font-medium text-primary-600">
-                                {notification.orderId || notification.data?.orderId}
+                                {notification.orderId || notification.data?.orderId || notification.data?.orderMongoId}
                               </span>
                             )}
                           </div>

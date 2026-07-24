@@ -259,38 +259,59 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
     if (!stockFailed) {
         try {
             // T1.2: Fixed recipient → recipientId (notification.service.js requires 'recipientId')
-            await createNotification({
-                recipientId:   order.userId,
-                recipientType: 'user',
-                title:         'Order Confirmed',
-                message:       `Your order #${order.orderId} has been confirmed successfully!`,
-                type:          'order',
-                data:          { orderId: String(order._id) },
-            });
+            if (order.userId) {
+                try {
+                    await createNotification({
+                        recipientId:   order.userId,
+                        recipientType: 'user',
+                        title:         'Order Confirmed',
+                        message:       `Your order #${order.orderId} has been confirmed successfully!`,
+                        type:          'order',
+                        data:          { orderId: String(order._id) },
+                    });
+                } catch (e) {
+                    logger.error('[USER_NOTIF_ERROR]', { message: e.message });
+                }
+            }
 
             // Notify each admin individually with their recipientId
-            const admins = await Admin.find({ isActive: true }).select('_id').lean();
-            await Promise.allSettled(admins.map(adm =>
-                createNotification({
-                    recipientId:   adm._id,
-                    recipientType: 'admin',
-                    title:         'New Order Placed',
-                    message:       `A new order #${order.orderId} of total ₹${order.total} has been placed.`,
-                    type:          'order',
-                    data:          { orderId: String(order._id) },
-                })
-            ));
+            try {
+                const admins = await Admin.find({ isActive: true }).select('_id').lean();
+                await Promise.allSettled(admins.map(adm =>
+                    createNotification({
+                        recipientId:   adm._id,
+                        recipientType: 'admin',
+                        title:         'New Order Placed',
+                        message:       `A new order #${order.orderId} of total ₹${order.total} has been placed.`,
+                        type:          'order',
+                        data:          { orderId: String(order._id) },
+                    })
+                ));
+            } catch (e) {
+                logger.error('[ADMIN_NOTIF_ERROR]', { message: e.message });
+            }
 
-            const vendorIds = [...new Set(order.items.map(i => String(i.vendorId)).filter(Boolean))];
-            for (const vId of vendorIds) {
-                await createNotification({
-                    recipientId:   vId,
-                    recipientType: 'vendor',
-                    title:         'New Order Received',
-                    message:       `You have received a new order #${order.orderId}.`,
-                    type:          'order',
-                    data:          { orderId: String(order._id) },
-                });
+            try {
+                const vendorIds = [...new Set(
+                    (order.vendorItems && order.vendorItems.length > 0)
+                        ? order.vendorItems.map(v => String(v.vendorId)).filter(Boolean)
+                        : order.items.map(i => String(i.vendorId)).filter(Boolean)
+                )];
+                await Promise.allSettled(vendorIds.map(vId =>
+                    createNotification({
+                        recipientId:   vId,
+                        recipientType: 'vendor',
+                        title:         'New Order Received',
+                        message:       `You have received a new order #${order.orderId}.`,
+                        type:          'order',
+                        data:          {
+                            orderId: String(order.orderId),
+                            orderMongoId: String(order._id),
+                        },
+                    })
+                ));
+            } catch (e) {
+                logger.error('[VENDOR_NOTIF_ERROR]', { message: e.message });
             }
         } catch (notifErr) {
             logger.error('[NOTIFICATION_ERROR] Post-payment notification failed:', { message: notifErr.message });
