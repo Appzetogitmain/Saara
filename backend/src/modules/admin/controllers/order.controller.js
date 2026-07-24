@@ -18,6 +18,7 @@ import Refund from '../../../models/Refund.model.js';
 import AuditLog from '../../../models/AuditLog.model.js';
 import { creditWallet } from '../../../services/wallet.service.js';
 import { cancelShipmentDeliveryAssignment } from '../../../services/assignmentService.js';
+import { processCancellationRefund } from '../../../services/cancellationRefundService.js';
 
 // GET /api/admin/orders
 export const getAllOrders = asyncHandler(async (req, res) => {
@@ -168,6 +169,19 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     }).populate('userId', 'name email');
 
     if (!order) throw new ApiError(404, 'Order not found.');
+
+    const nextStatus = String(status || '').toLowerCase();
+    if (nextStatus === 'cancelled') {
+        const result = await processCancellationRefund({
+            orderId: order._id,
+            cancelledBy: 'admin',
+            reason: req.body.reason || 'Cancelled by admin',
+            comment: req.body.comment || '',
+        });
+
+        notifyOrderUpdate(result.order || order);
+        return res.status(200).json(new ApiResponse(200, result.order || order, `Order cancelled by admin and refund of ₹${result.refundAmount || 0} processed.`));
+    }
 
     let currentDynamicStatus = String(order.status || '').toLowerCase();
     
