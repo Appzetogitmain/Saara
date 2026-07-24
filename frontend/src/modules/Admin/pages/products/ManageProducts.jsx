@@ -47,12 +47,13 @@ const ManageProducts = () => {
 
       do {
         const response = await getAllProducts({ page: currentPage, limit: 100 });
-        const pageProducts = Array.isArray(response.data)
-          ? response.data
-          : (response.data?.products || []);
+        const payload = response?.products ? response : (response?.data || response || {});
+        const pageProducts = Array.isArray(payload)
+          ? payload
+          : (Array.isArray(payload.products) ? payload.products : []);
         products.push(...pageProducts);
 
-        totalPages = Number(response.data?.pages || 1);
+        totalPages = Number(payload.pages || 1);
         currentPage += 1;
       } while (currentPage <= totalPages);
 

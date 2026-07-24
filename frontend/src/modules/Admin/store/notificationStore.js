@@ -17,7 +17,10 @@ export const useNotificationStore = create((set, get) => ({
         set({ isLoading: true });
         try {
             const response = await getAdminNotifications({ page, limit: 10 });
-            const { notifications, unreadCount, pages } = response.data;
+            const payload = response?.notifications ? response : (response?.data || response || {});
+            const notifications = Array.isArray(payload.notifications) ? payload.notifications : [];
+            const unreadCount = Number(payload.unreadCount !== undefined ? payload.unreadCount : get().unreadCount);
+            const pages = Number(payload.pages || 1);
 
             set((state) => ({
                 notifications: page === 1 ? notifications : [...state.notifications, ...notifications],
