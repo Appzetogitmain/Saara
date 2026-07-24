@@ -2,6 +2,7 @@ import asyncHandler from '../../../utils/asyncHandler.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
 import ApiError from '../../../utils/ApiError.js';
 import Order from '../../../models/Order.model.js';
+import Shipment from '../../../models/Shipment.model.js';
 import Payment from '../../../models/Payment.model.js';
 import PaymentAttempt from '../../../models/PaymentAttempt.model.js';
 import Commission from '../../../models/Commission.model.js';
@@ -12,6 +13,8 @@ import ReturnRequest from '../../../models/ReturnRequest.model.js';
 import mongoose from 'mongoose';
 import { createRazorpayOrder, verifyPaymentSignature } from '../../../services/payment.service.js';
 import { getWallet, debitWallet } from '../../../services/wallet.service.js';
+import LogisticsEventBus from '../../../events/logisticsEventBus.js';
+import LOGISTICS_EVENTS from '../../../events/logisticsEvents.js';
 import { processCapturedPayment } from '../../../services/paymentProcessor.js';
 import { getDefaultCommissionRate, isPaymentMethodEnabled } from '../../../services/settingsService.js';
 import Admin from '../../../models/Admin.model.js';
@@ -19,6 +22,7 @@ import { createNotification } from '../../../services/notification.service.js';
 import { sendOrderConfirmationEmail } from '../../../services/email.service.js';
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
 import { buildOrderItemsSummary, buildVendorItemsSummary } from '../../../utils/notificationProductFormatter.js';
+import ShippingQuote from '../../../models/ShippingQuote.model.js';
 
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
 import { calculateVendorShippingForGroups } from '../../../services/vendorShipping.service.js';
@@ -34,6 +38,7 @@ export const initializePayment = asyncHandler(async (req, res) => {
         shippingAddress,
         paymentMethod,
         shippingOption,
+        shippingQuotes,
         idempotencyKey,
     } = req.body;
 
@@ -144,7 +149,7 @@ export const initializePayment = asyncHandler(async (req, res) => {
 
     // --- Shipping calculation ---
     const vendorDocs = await Vendor.find({ _id: { $in: Object.keys(vendorMap) } })
-        .select('_id commissionRate shippingEnabled defaultShippingRate freeShippingThreshold storeName name')
+        .select('_id commissionRate storeName name')
         .lean();
     const vendorDocsMap = Object.fromEntries(vendorDocs.map(v => [String(v._id), v]));
 
@@ -154,9 +159,6 @@ export const initializePayment = asyncHandler(async (req, res) => {
         return {
             vendorId: v.vendorId,
             subtotal: vSubtotal,
-            shippingEnabled: doc.shippingEnabled !== false,
-            defaultShippingRate: doc.defaultShippingRate,
-            freeShippingThreshold: doc.freeShippingThreshold,
         };
     });
 
@@ -209,7 +211,6 @@ export const initializePayment = asyncHandler(async (req, res) => {
                 baseAmount: item.baseAmount,
                 taxAmount: item.taxAmount,
                 shippingCharge: item.shippingCharge,
-                shippingTax: item.shippingTax,
                 commissionRate: item.commissionRate,
                 commissionAmount: item.commissionAmount,
                 vendorEarnings: item.vendorEarnings,
@@ -233,10 +234,21 @@ export const initializePayment = asyncHandler(async (req, res) => {
         };
     });
 
+    // ─── Resolve Valid Shipping Quotes ─────────────────────────────────────────
+    let validQuotes = {};
+    if (shippingQuotes && typeof shippingQuotes === 'object') {
+        const quoteIds = Object.values(shippingQuotes).map(q => q?.quoteId).filter(Boolean);
+        if (quoteIds.length > 0) {
+            const dbQuotes = await ShippingQuote.find({ quoteId: { $in: quoteIds } }).lean();
+            validQuotes = Object.fromEntries(dbQuotes.map(q => [q.quoteId, q]));
+        }
+    }
+
     // ─── COD: Create order immediately with stock deduction ───────────────────
     if (normalizedPaymentMethod === 'cod') {
         const session = await mongoose.startSession();
         let order;
+        let createdShipments = [];
         try {
             await session.withTransaction(async () => {
                 const orderId = generateOrderId();
@@ -261,7 +273,6 @@ export const initializePayment = asyncHandler(async (req, res) => {
                         baseAmount: item.baseAmount,
                         taxAmount: item.taxAmount,
                         shippingCharge: item.shippingCharge,
-                        shippingTax: item.shippingTax,
                         commissionRate: item.commissionRate,
                         commissionAmount: item.commissionAmount,
                         vendorEarnings: item.vendorEarnings,
@@ -344,9 +355,80 @@ export const initializePayment = asyncHandler(async (req, res) => {
                 if (appliedCoupon) {
                     await Coupon.updateOne({ _id: appliedCoupon._id }, { $inc: { usedCount: 1 } }, { session });
                 }
+
+                // Phase 5.1 Parity: Create Shipments for COD order
+                const shipmentDocs = vendorItems.map((vGroup) => {
+                    let providerId = 'own_fleet';
+                    let quoteId = null;
+                    let estCost = 0;
+                    let notes = 'Shipment created at order placement (COD fallback)';
+
+                    const vQuoteReq = shippingQuotes ? shippingQuotes[String(vGroup.vendorId)] : null;
+                    if (vQuoteReq && vQuoteReq.quoteId && validQuotes[vQuoteReq.quoteId]) {
+                        const dbQuote = validQuotes[vQuoteReq.quoteId];
+                        providerId = dbQuote.providerId || 'own_fleet';
+                        quoteId = dbQuote._id;
+                        estCost = dbQuote.estimatedCost || 0;
+                        notes = `Shipment created with provider ${providerId} via quote ${dbQuote.quoteId}`;
+                    }
+
+                    return {
+                        orderId:                order._id,
+                        vendorId:               vGroup.vendorId,
+                        vendorName:             vGroup.vendorName,
+                        providerId:             providerId,
+                        shippingQuoteId:        quoteId,
+                        selectedBy:             'AUTO',
+                        providerLocked:         false,
+                        customerShippingCharge: Number(vGroup.shipping) || 0,
+                        estimatedDeliveryCost:  estCost,
+                        status:                 'pending',
+                        statusHistory: [{
+                            status:    'pending',
+                            updatedAt: new Date(),
+                            updatedBy: 'system',
+                            notes:     notes,
+                        }],
+                        packageWeight: vGroup.items.reduce(
+                            (sum, item) => sum + (500 * (item.quantity || 1)), 0
+                        ) || 500,
+                        escrowStatus: 'held',
+                        deliveryAssignmentStatus: 'pending',
+                        rejectedDeliveryBoys: [],
+                    };
+                });
+
+                for (const doc of shipmentDocs) {
+                    const shipment = new Shipment(doc);
+                    await shipment.save({ session });
+                    createdShipments.push(shipment);
+                }
+
+                // Mark quotes as used
+                if (validQuotes && Object.keys(validQuotes).length > 0) {
+                    const quoteIdsToUpdate = Object.values(validQuotes).map(q => q._id);
+                    await ShippingQuote.updateMany(
+                        { _id: { $in: quoteIdsToUpdate } },
+                        { $set: { usedForOrder: true, orderId: order._id } },
+                        { session }
+                    );
+                }
             });
         } finally {
             await session.endSession();
+        }
+
+        // Emit SHIPMENT_CREATED events
+        for (const shipment of createdShipments) {
+            LogisticsEventBus.emitEvent(LOGISTICS_EVENTS.SHIPMENT_CREATED, {
+                shipmentId:  String(shipment._id),
+                shipmentNumber: shipment.shipmentNumber,
+                orderId:     String(order._id),
+                orderNumber: order.orderId,
+                vendorId:    String(shipment.vendorId),
+                providerId:  shipment.providerId,
+                selectedBy:  shipment.selectedBy,
+            });
         }
 
         // Trigger notifications and email asynchronously (non-blocking)
@@ -421,6 +503,7 @@ export const initializePayment = asyncHandler(async (req, res) => {
     let order, payment, attempt;
     let rzpOrder = null;
     let walletAmountUsed = 0;
+    let createdShipments = [];
     try {
         await session.withTransaction(async () => {
             const orderId = generateOrderId();
@@ -455,7 +538,6 @@ export const initializePayment = asyncHandler(async (req, res) => {
                     baseAmount: item.baseAmount,
                     taxAmount: item.taxAmount,
                     shippingCharge: item.shippingCharge,
-                    shippingTax: item.shippingTax,
                     commissionRate: item.commissionRate,
                     commissionAmount: item.commissionAmount,
                     vendorEarnings: item.vendorEarnings,
@@ -587,12 +669,83 @@ export const initializePayment = asyncHandler(async (req, res) => {
                     attemptNumber: 1,
                 }], { session }))[0];
             }
+
+            // Phase 5.1 Parity: Create Shipments for prepaid order
+            const shipmentDocs = vendorItems.map((vGroup) => {
+                let providerId = 'own_fleet';
+                let quoteId = null;
+                let estCost = 0;
+                let notes = 'Shipment created at order placement (Prepaid fallback)';
+
+                const vQuoteReq = shippingQuotes ? shippingQuotes[String(vGroup.vendorId)] : null;
+                if (vQuoteReq && vQuoteReq.quoteId && validQuotes[vQuoteReq.quoteId]) {
+                    const dbQuote = validQuotes[vQuoteReq.quoteId];
+                    providerId = dbQuote.providerId || 'own_fleet';
+                    quoteId = dbQuote._id;
+                    estCost = dbQuote.estimatedCost || 0;
+                    notes = `Shipment created with provider ${providerId} via quote ${dbQuote.quoteId}`;
+                }
+
+                return {
+                    orderId:                order._id,
+                    vendorId:               vGroup.vendorId,
+                    vendorName:             vGroup.vendorName,
+                    providerId:             providerId,
+                    shippingQuoteId:        quoteId,
+                    selectedBy:             'AUTO',
+                    providerLocked:         false,
+                    customerShippingCharge: Number(vGroup.shipping) || 0,
+                    estimatedDeliveryCost:  estCost,
+                    status:                 'pending',
+                    statusHistory: [{
+                        status:    'pending',
+                        updatedAt: new Date(),
+                        updatedBy: 'system',
+                        notes:     notes,
+                    }],
+                    packageWeight: vGroup.items.reduce(
+                        (sum, item) => sum + (500 * (item.quantity || 1)), 0
+                    ) || 500,
+                    escrowStatus: 'held',
+                    deliveryAssignmentStatus: 'pending',
+                    rejectedDeliveryBoys: [],
+                };
+            });
+
+            for (const doc of shipmentDocs) {
+                const shipment = new Shipment(doc);
+                await shipment.save({ session });
+                createdShipments.push(shipment);
+            }
+
+            // Mark quotes as used
+            if (validQuotes && Object.keys(validQuotes).length > 0) {
+                const quoteIdsToUpdate = Object.values(validQuotes).map(q => q._id);
+                await ShippingQuote.updateMany(
+                    { _id: { $in: quoteIdsToUpdate } },
+                    { $set: { usedForOrder: true, orderId: order._id } },
+                    { session }
+                );
+            }
         });
     } finally {
         await session.endSession();
     }
 
     if (walletAmountUsed === total) {
+        // Emit SHIPMENT_CREATED events if fully paid by wallet
+        for (const shipment of createdShipments) {
+            LogisticsEventBus.emitEvent(LOGISTICS_EVENTS.SHIPMENT_CREATED, {
+                shipmentId:  String(shipment._id),
+                shipmentNumber: shipment.shipmentNumber,
+                orderId:     String(order._id),
+                orderNumber: order.orderId,
+                vendorId:    String(shipment.vendorId),
+                providerId:  shipment.providerId,
+                selectedBy:  shipment.selectedBy,
+            });
+        }
+
         // Fully paid by wallet - trigger async side effects
         createNotification({
             recipientId: userId,

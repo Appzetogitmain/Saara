@@ -42,7 +42,7 @@ const areVariantsEqual = (v1, v2) => {
 export const getCart = asyncHandler(async (req, res) => {
     let cart = await Cart.findOne({ userId: req.user.id }).populate({
         path: 'items.productId',
-        select: 'name image price stock stockQuantity variants isActive'
+        select: 'name image price stock stockQuantity variants isActive taxRate taxIncluded'
     });
 
     if (!cart) {
@@ -95,7 +95,7 @@ export const addToCart = asyncHandler(async (req, res) => {
     // Return populated cart
     const populatedCart = await Cart.findById(cart._id).populate({
         path: 'items.productId',
-        select: 'name image price stock stockQuantity variants isActive'
+        select: 'name image price stock stockQuantity variants isActive taxRate taxIncluded'
     });
 
     res.status(200).json(new ApiResponse(200, populatedCart, 'Item added to cart.'));
@@ -125,7 +125,7 @@ export const updateCartItem = asyncHandler(async (req, res) => {
     
     const populatedCart = await Cart.findById(cart._id).populate({
         path: 'items.productId',
-        select: 'name image price stock stockQuantity variants isActive'
+        select: 'name image price stock stockQuantity variants isActive taxRate taxIncluded'
     });
 
     res.status(200).json(new ApiResponse(200, populatedCart, 'Cart updated.'));
@@ -141,7 +141,7 @@ export const removeFromCart = asyncHandler(async (req, res) => {
 
     const populatedCart = await Cart.findById(cart._id).populate({
         path: 'items.productId',
-        select: 'name image price stock stockQuantity variants isActive'
+        select: 'name image price stock stockQuantity variants isActive taxRate taxIncluded'
     });
 
     res.status(200).json(new ApiResponse(200, populatedCart, 'Item removed.'));
@@ -186,7 +186,7 @@ export const mergeCart = asyncHandler(async (req, res) => {
     
     const cart = await Cart.findOne({ userId: req.user.id }).populate({
         path: 'items.productId',
-        select: 'name image price stock stockQuantity variants isActive'
+        select: 'name image price stock stockQuantity variants isActive taxRate taxIncluded'
     });
 
     res.status(200).json(new ApiResponse(200, cart, 'Cart merged.'));

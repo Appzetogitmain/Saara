@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiFilter } from 'react-icons/fi';
+import { FiArrowLeft, FiFilter, FiPackage } from 'react-icons/fi';
 import { motion } from 'framer-motion';
+import EmptyState from '../../../shared/components/EmptyState';
+import OrderCardSkeleton from '../../../shared/components/Skeletons/OrderCardSkeleton';
 import MobileLayout from "../components/Layout/MobileLayout";
 import MobileOrderCard from '../components/Mobile/MobileOrderCard';
 import { useOrderStore } from '../../../shared/store/orderStore';
@@ -103,7 +105,7 @@ const MobileOrders = () => {
 
           {/* Filter Options */}
           {showFilter && (
-            <div className="bg-white border border-gray-100 rounded-3xl p-4 shadow-sm mb-6 flex gap-2 overflow-x-auto scrollbar-hide">
+            <div className="bg-white border border-slate-200/80 rounded-3xl p-4 shadow-sm mb-6 flex gap-2 overflow-x-auto scrollbar-hide">
               {statusOptions.map((option) => (
                 <button
                   key={option.value}
@@ -112,8 +114,8 @@ const MobileOrders = () => {
                   }}
                   className={`px-4 py-2 rounded-xl font-bold text-xs uppercase tracking-wider transition-all whitespace-nowrap ${
                     selectedStatus === option.value
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-gray-100'
+                      ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md shadow-primary-500/20'
+                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
                   }`}
                 >
                   {option.label}
@@ -135,25 +137,28 @@ const MobileOrders = () => {
             }}
           >
               {isLoading ? (
-                <div className="text-center py-12">
-                  <p className="text-gray-600">Loading orders...</p>
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, i) => (
+                    <OrderCardSkeleton key={i} />
+                  ))}
                 </div>
               ) : filteredOrders.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl text-gray-300 mx-auto mb-4">📦</div>
-                  <h3 className="text-xl font-bold text-gray-800 mb-2">No orders found</h3>
-                  <p className="text-gray-600 mb-6">
-                    {selectedStatus === 'all'
-                      ? "You haven't placed any orders yet"
-                      : `No ${selectedStatus} orders`}
-                  </p>
-                  <button
-                    onClick={() => navigate('/home')}
-                    className="gradient-green text-white px-6 py-3 rounded-xl font-semibold"
-                  >
-                    Start Shopping
-                  </button>
-                </div>
+                <EmptyState
+                  icon={FiPackage}
+                  title="No orders found"
+                  description={selectedStatus === 'all'
+                    ? "You haven't placed any orders yet"
+                    : `No ${selectedStatus} orders`}
+                  actionButton={
+                    <button
+                      onClick={() => navigate('/home')}
+                      className="bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white px-6 py-3 rounded-2xl font-bold shadow-md shadow-primary-500/20 active:scale-95 transition-all"
+                    >
+                      Start Shopping
+                    </button>
+                  }
+                  className="mt-6"
+                />
               ) : (
                 <div className="space-y-0">
                   {filteredOrders.map((order, index) => (

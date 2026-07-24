@@ -50,7 +50,7 @@ const Settings = () => {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 max-w-full overflow-x-hidden">
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 max-w-full overflow-x-hidden">
         <div className="border-b border-gray-200 overflow-x-hidden">
           <div className="flex overflow-x-auto scrollbar-hide -mx-1 px-1">
             {tabs.map((tab) => {
@@ -61,7 +61,7 @@ const Settings = () => {
                   onClick={() => handleTabChange(tab.id)}
                   className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b-2 transition-colors whitespace-nowrap text-xs sm:text-sm ${
                     activeTab === tab.id
-                      ? 'border-primary-600 text-primary-600 font-semibold'
+                      ? 'border-primary-600 text-primary-600 font-extrabold'
                       : 'border-transparent text-gray-600 hover:text-gray-800'
                   }`}
                 >

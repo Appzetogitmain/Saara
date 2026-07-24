@@ -27,7 +27,7 @@ const OrderDetail = () => {
     const [pickupOtp, setPickupOtp] = useState('');
     const [verifyingOtp, setVerifyingOtp] = useState(false);
 
-    const handleVerifyPickup = async (e) => {
+    const handleVerifyPickup = async (e, shipmentIdOrOrderId) => {
         e.preventDefault();
         const normalized = String(pickupOtp || '').trim();
         if (!/^\d{6}$/.test(normalized)) {
@@ -37,7 +37,7 @@ const OrderDetail = () => {
 
         setVerifyingOtp(true);
         try {
-            await verifyVendorPickup(order.orderId ?? order._id, normalized);
+            await verifyVendorPickup(shipmentIdOrOrderId || order.orderId || order._id, normalized);
             toast.success('Handoff verified successfully!');
             const res = await getVendorOrderById(id);
             const data = res?.data ?? res;
@@ -378,6 +378,112 @@ const OrderDetail = () => {
                             </div>
                         )}
                     </div>
+
+                    {/* Shipments & Fulfillment */}
+                    {order.shipments && order.shipments.length > 0 && (
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="p-4 border-b border-gray-200 bg-gray-50/50 flex items-center justify-between">
+                                <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+                                    <span className="inline-block p-1.5 bg-primary-50 text-primary-600 rounded-lg">🚚</span>
+                                    Fulfillment & Shipments
+                                </h2>
+                                <Badge variant="info">{order.shipments.length} Package{order.shipments.length > 1 ? 's' : ''}</Badge>
+                            </div>
+                            <div className="divide-y divide-gray-100">
+                                {order.shipments.map((shipment, index) => {
+                                    const deliveryBoy = shipment.deliveryBoyId;
+                                    const assignmentStatus = shipment.deliveryAssignmentStatus;
+                                    return (
+                                        <div key={shipment._id || index} className="p-4 hover:bg-gray-50/30 transition-colors">
+                                            <div className="flex flex-col sm:flex-row justify-between gap-4">
+                                                {/* Meta Info */}
+                                                <div>
+                                                    <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                                        Package {index + 1}
+                                                        <Badge variant={shipment.status} className="text-[10px] py-0.5 px-2">
+                                                            {shipment.status}
+                                                        </Badge>
+                                                    </h3>
+                                                    <p className="text-[11px] text-gray-500 font-mono mt-1 mb-2">ID: {shipment.shipmentNumber || shipment._id}</p>
+                                                    
+                                                    {shipment.providerId && (
+                                                        <p className="text-xs text-gray-600 font-medium capitalize">
+                                                            Provider: <span className="font-bold text-gray-800">{shipment.providerId.replace('_', ' ')}</span>
+                                                        </p>
+                                                    )}
+                                                    {shipment.awbCode && (
+                                                        <p className="text-xs text-gray-600 font-medium">
+                                                            AWB: <span className="font-bold text-gray-800 font-mono">{shipment.awbCode}</span>
+                                                        </p>
+                                                    )}
+                                                </div>
+
+                                                {/* Delivery Partner */}
+                                                {deliveryBoy && (
+                                                    <div className="sm:text-right">
+                                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-1">Assigned Partner</p>
+                                                        <p className="text-sm font-bold text-gray-800">{deliveryBoy.name}</p>
+                                                        {deliveryBoy.phone && (
+                                                            <a href={`tel:${deliveryBoy.phone}`} className="text-xs text-primary-600 hover:underline">
+                                                                {deliveryBoy.phone}
+                                                            </a>
+                                                        )}
+                                                        <div className="mt-1">
+                                                            {assignmentStatus === 'accepted' ? (
+                                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                                                    Rider Accepted
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-50 text-yellow-700">
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+                                                                    Pending Accept
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Pickup OTP */}
+                                            {currentStatus === 'ready_for_pickup' && assignmentStatus === 'accepted' && (
+                                                <div className="mt-4 p-4 bg-primary-50/50 border border-primary-100 rounded-xl">
+                                                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                                                        <div>
+                                                            <h3 className="font-bold text-primary-800 text-sm flex items-center gap-1.5 mb-1">
+                                                                🔐 Verify Pickup
+                                                            </h3>
+                                                            <p className="text-xs text-primary-700">
+                                                                Ask the rider for their 6-digit OTP code to verify hand over.
+                                                            </p>
+                                                        </div>
+                                                        <form onSubmit={(e) => { e.preventDefault(); handleVerifyPickup(e, order.orderId || order._id); }} className="flex gap-2 w-full sm:w-auto">
+                                                            <input
+                                                                type="text"
+                                                                inputMode="numeric"
+                                                                maxLength={6}
+                                                                value={pickupOtp}
+                                                                onChange={(e) => setPickupOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                                                placeholder="6-digit OTP"
+                                                                className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-sm text-center font-mono font-bold tracking-widest focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                                                            />
+                                                            <button
+                                                                type="submit"
+                                                                disabled={verifyingOtp || pickupOtp.length !== 6}
+                                                                className="px-4 py-2 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-xl text-xs font-bold shadow-md shadow-primary-500/20 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
+                                                            >
+                                                                {verifyingOtp ? 'Verifying...' : 'Verify'}
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Sidebar */}
@@ -400,85 +506,7 @@ const OrderDetail = () => {
                         </div>
                     </div>
 
-                    {/* Delivery Partner Details */}
-                    {order.deliveryBoyId && (
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-fadeIn">
-                            <h2 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                                <span className="inline-block p-1 bg-green-50 text-green-600 rounded">🚚</span>
-                                Delivery Partner
-                            </h2>
-                            <div className="space-y-3 text-sm">
-                                <div>
-                                    <p className="text-xs text-gray-500">Name</p>
-                                    <p className="font-medium text-gray-800">{order.deliveryBoyId.name}</p>
-                                </div>
-                                {order.deliveryBoyId.phone && (
-                                    <div>
-                                        <p className="text-xs text-gray-500">Phone</p>
-                                        <a href={`tel:${order.deliveryBoyId.phone}`} className="font-medium text-blue-600 hover:underline">
-                                            {order.deliveryBoyId.phone}
-                                        </a>
-                                    </div>
-                                )}
-                                {order.deliveryBoyId.vehicleNumber && (
-                                    <div>
-                                        <p className="text-xs text-gray-500">Vehicle Details</p>
-                                        <p className="font-medium text-gray-800">
-                                            {order.deliveryBoyId.vehicleType || 'Vehicle'}: {order.deliveryBoyId.vehicleNumber}
-                                        </p>
-                                    </div>
-                                )}
-                                <div>
-                                    <p className="text-xs text-gray-500">Status</p>
-                                    {currentStatus === 'delivered' ? (
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                            Delivered
-                                        </span>
-                                    ) : order.deliveryAssignmentStatus === 'accepted' ? (
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                                            Accepted (On the way)
-                                        </span>
-                                    ) : (
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
-                                            Assigned (Pending Accept)
-                                        </span>
-                                    )}
-                                </div>
-
-                                {currentStatus === 'ready_for_pickup' && order.deliveryAssignmentStatus === 'accepted' && (
-                                    <div className="mt-4 pt-4 border-t border-gray-150">
-                                        <h3 className="font-semibold text-gray-800 text-xs mb-1 flex items-center gap-1">
-                                            🔐 Verify Rider Pickup OTP
-                                        </h3>
-                                        <p className="text-[11px] text-gray-500 mb-2 leading-tight">
-                                            Ask the delivery rider for their 6-digit Pickup OTP code to verify hand over:
-                                        </p>
-                                        <form onSubmit={handleVerifyPickup} className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                inputMode="numeric"
-                                                maxLength={6}
-                                                value={pickupOtp}
-                                                onChange={(e) => setPickupOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                                                placeholder="6-digit OTP"
-                                                className="flex-1 min-w-0 px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:border-primary-500"
-                                            />
-                                            <button
-                                                type="submit"
-                                                disabled={verifyingOtp || pickupOtp.length !== 6}
-                                                className="px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs font-bold hover:bg-primary-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
-                                            >
-                                                {verifyingOtp ? 'Verifying...' : 'Verify'}
-                                            </button>
-                                        </form>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    {/* Legacy Delivery Partner Details - Hidden since it moved to main content */}
 
                     {/* Shipping Address */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">

@@ -9,6 +9,7 @@ import {
   FiArrowLeft,
   FiShoppingBag,
   FiX,
+  FiAlertCircle,
 } from "react-icons/fi";
 import { motion } from "framer-motion";
 import MobileLayout from "../components/Layout/MobileLayout";
@@ -23,9 +24,12 @@ import {
 import toast from "react-hot-toast";
 import PageTransition from "../../../shared/components/PageTransition";
 import Badge from "../../../shared/components/Badge";
+import PageSkeleton from "../../../shared/components/Skeletons/PageSkeleton";
+import EmptyState from "../../../shared/components/EmptyState";
 import LazyImage from "../../../shared/components/LazyImage";
 import VariantSelector from "../../../shared/components/Product/VariantSelector";
 import api from "../../../shared/utils/api";
+import PackageCard from "../components/Mobile/PackageCard";
 const RETURN_REASONS = [
   "Wrong Size",
   "Wrong Color",
@@ -243,9 +247,7 @@ const MobileOrderDetail = () => {
     return (
       <PageTransition>
         <MobileLayout showBottomNav={false} showCartBar={false}>
-          <div className="flex items-center justify-center min-h-[60vh] px-4">
-            <p className="text-gray-600">Loading order...</p>
-          </div>
+          <PageSkeleton />
         </MobileLayout>
       </PageTransition>
     );
@@ -256,17 +258,19 @@ const MobileOrderDetail = () => {
       <PageTransition>
         <MobileLayout showBottomNav={false} showCartBar={false}>
           <div className="flex items-center justify-center min-h-[60vh] px-4">
-            <div className="text-center">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">
-                Order Not Found
-              </h2>
-              <button
-                onClick={() => navigate("/orders")}
-                className="gradient-green text-white px-6 py-3 rounded-xl font-semibold"
-              >
-                Back to Orders
-              </button>
-            </div>
+            <EmptyState 
+              icon={FiAlertCircle}
+              title="Order Not Found"
+              description="We couldn't find the order you're looking for. It might have been removed or doesn't exist."
+              actionButton={
+                <button
+                  onClick={() => navigate("/orders")}
+                  className="gradient-green text-white px-6 py-3 rounded-xl font-semibold"
+                >
+                  Back to Orders
+                </button>
+              }
+            />
           </div>
         </MobileLayout>
       </PageTransition>
@@ -637,174 +641,46 @@ const MobileOrderDetail = () => {
               </div>
               <Badge variant={order.status}>{order.status.toUpperCase()}</Badge>
             </div>
-          </div>
-
-          <div className="px-4 py-4 space-y-4">
-            {/* Order Items */}
-            <div className="glass-card rounded-2xl p-4">
-              <h2 className="text-base font-bold text-gray-800 mb-4">
-                Order Items
-              </h2>
-              {order.vendorItems && order.vendorItems.length > 0 ? (
-                <div className="space-y-4">
-                  {order.vendorItems.map((vendorGroup) => (
-                    <div key={vendorGroup.vendorId} className="space-y-2">
-                      {/* Vendor Header */}
-                      <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-primary-50 to-primary-100 rounded-lg border border-primary-200/50">
-                        <div className="w-5 h-5 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center flex-shrink-0">
-                          <FiShoppingBag className="text-white text-[10px]" />
-                        </div>
-                        <span className="text-sm font-bold text-primary-700 flex-1">
-                          {vendorGroup.vendorName}
-                        </span>
-                        <span className="text-xs font-semibold text-primary-600 bg-white px-2 py-0.5 rounded-md">
-                          {formatPrice(vendorGroup.subtotal)}
-                        </span>
-                      </div>
-                      {/* Vendor Items */}
-                      <div className="space-y-2 pl-2">
-                        {vendorGroup.items.map((item, itemIndex) => (
-                          <div
-                            key={`${item.id}-${itemIndex}-${getVariantSignature(item?.variant || {})}`}
-                            className="flex items-center gap-3"
-                          >
-                            <Link
-                              to={`/product/${item.productId || item.id}?variantSize=${encodeURIComponent(item?.variant?.size || "")}&variantColor=${encodeURIComponent(item?.variant?.color || "")}`}
-                              className="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 active:scale-95 transition-transform"
-                            >
-                              <LazyImage
-                                src={item.image}
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </Link>
-                            <div className="flex-1 min-w-0">
-                              <Link
-                                to={`/product/${item.productId || item.id}?variantSize=${encodeURIComponent(item?.variant?.size || "")}&variantColor=${encodeURIComponent(item?.variant?.color || "")}`}
-                                className="hover:underline"
-                              >
-                                <h3 className="font-semibold text-gray-800 text-sm mb-1">
-                                  {item.name}
-                                </h3>
-                              </Link>
-                              <p className="text-xs text-gray-600">
-                                {formatPrice(item.price)} x {item.quantity}
-                              </p>
-                              {formatVariantLabel(item?.variant) && (
-                                <p className="text-[11px] text-gray-500">
-                                  {formatVariantLabel(item?.variant)}
-                                </p>
-                              )}
-                              {(() => {
-                                const ret = getItemReturnStatus(item);
-                                if (!ret) return null;
-                                if (ret.status === "completed") {
-                                  return (
-                                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-[9px] font-bold uppercase tracking-wider border border-rose-100">
-                                      {ret.requestType === "exchange"
-                                        ? "Exchanged"
-                                        : "Returned"}
-                                    </span>
-                                  );
-                                } else if (ret.status !== "rejected") {
-                                  return (
-                                    <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-55/10 text-amber-600 text-[9px] font-bold uppercase tracking-wider border border-amber-100 font-semibold">
-                                      Return Pending
-                                    </span>
-                                  );
-                                }
-                                return null;
-                              })()}
-                            </div>
-                            <p className="font-bold text-gray-800 text-sm">
-                              {formatPrice(item.price * item.quantity)}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+          <div className="px-4 py-4 space-y-4 animate-fadeIn">
+            {/* Delivery OTP Card */}
+            {order.deliveryOtpDebug && (
+              <div className="glass-card rounded-2xl p-4 bg-primary-50 border border-primary-200 shadow-sm text-center">
+                <h2 className="text-sm font-bold text-primary-800 mb-1">🔐 YOUR DELIVERY OTP</h2>
+                <p className="text-xs text-primary-600 mb-2">Provide this code to the delivery partner to receive your order:</p>
+                <div className="inline-block bg-white px-6 py-2 rounded-xl border border-primary-300 font-mono text-3xl tracking-widest font-extrabold text-primary-900 shadow-inner">
+                  {order.deliveryOtpDebug}
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {orderItems.map((item, itemIndex) => (
-                    <div
-                      key={`${item.id}-${itemIndex}-${getVariantSignature(item?.variant || {})}`}
-                      className="flex items-center gap-3"
-                    >
-                      <Link
-                        to={`/product/${item.productId || item.id}?variantSize=${encodeURIComponent(item?.variant?.size || "")}&variantColor=${encodeURIComponent(item?.variant?.color || "")}`}
-                        className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0 active:scale-95 transition-transform"
-                      >
-                        <LazyImage
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover"
-                        />
-                      </Link>
-                      <div className="flex-1 min-w-0">
-                        <Link
-                          to={`/product/${item.productId || item.id}?variantSize=${encodeURIComponent(item?.variant?.size || "")}&variantColor=${encodeURIComponent(item?.variant?.color || "")}`}
-                          className="hover:underline"
-                        >
-                          <h3 className="font-semibold text-gray-800 text-sm mb-1">
-                            {item.name}
-                          </h3>
-                        </Link>
-                        <p className="text-xs text-gray-600">
-                          {formatPrice(item.price)} x {item.quantity}
-                        </p>
-                        {formatVariantLabel(item?.variant) && (
-                          <p className="text-[11px] text-gray-500">
-                            {formatVariantLabel(item?.variant)}
-                          </p>
-                        )}
-                        {(() => {
-                          const ret = getItemReturnStatus(item);
-                          if (!ret) return null;
-                          if (ret.status === "completed") {
-                            return (
-                              <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-[9px] font-bold uppercase tracking-wider border border-rose-100">
-                                {ret.requestType === "exchange"
-                                  ? "Exchanged"
-                                  : "Returned"}
-                              </span>
-                            );
-                          } else if (ret.status !== "rejected") {
-                            return (
-                              <span className="inline-block mt-1 px-1.5 py-0.5 rounded bg-amber-55/10 text-amber-600 text-[9px] font-bold uppercase tracking-wider border border-amber-100 font-semibold">
-                                Return Pending
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                      <p className="font-bold text-gray-800 text-sm">
-                        {formatPrice(item.price * item.quantity)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Delivery OTP Code for testing / delivery verification */}
-            {order.status === "shipped" && (
-              <div className="glass-card rounded-2xl p-4 bg-green-50 border border-green-200">
-                <h2 className="text-base font-bold text-green-800 mb-1 flex items-center gap-1.5">
-                  🔑 Delivery Verification OTP
-                </h2>
-                <p className="text-xs text-green-700 mb-3">
-                  Please provide this 6-digit OTP code to the delivery boy to
-                  confirm successful delivery.
-                </p>
-                <p className="text-3xl font-extrabold text-green-800 tracking-widest text-center py-2 bg-white rounded-xl border border-green-300 font-mono">
-                  {order.deliveryOtpDebug || "Check Email"}
-                </p>
               </div>
             )}
+            {/* Shipment / Package Cards */}
+            {order.shipments && order.shipments.length > 0 && (
+              <div className="space-y-4">
+                {order.shipments.map((shipment, index) => {
+                  // Find corresponding items for this shipment
+                  let items = [];
+                  if (order.vendorItems && order.vendorItems.length > 0) {
+                    const vendorGroup = order.vendorItems.find(
+                      (vg) => String(vg.vendorId) === String(shipment.vendorId)
+                    );
+                    items = vendorGroup ? vendorGroup.items : [];
+                  } else {
+                    items = orderItems;
+                  }
 
+                  return (
+                    <PackageCard
+                      key={shipment._id || index}
+                      shipment={shipment}
+                      index={index}
+                      totalPackages={order.shipments.length}
+                      items={items}
+                      getItemReturnStatus={getItemReturnStatus}
+                      isMultiPackage={order.shipments.length > 1}
+                    />
+                  );
+                })}
+              </div>
+            )}
             {/* Return Tracking Panel */}
             {Array.isArray(order.returnRequests) &&
               order.returnRequests.length > 0 && (
@@ -1685,7 +1561,7 @@ const MobileOrderDetail = () => {
               <button
                 onClick={handleRequestReturn}
                 disabled={isSubmittingReturn}
-                className="w-full py-3 gradient-green text-white rounded-xl font-semibold disabled:opacity-70"
+                className="w-full py-3.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-2xl font-bold shadow-lg shadow-primary-500/20 active:scale-95 transition-all disabled:opacity-70"
               >
                 {isSubmittingReturn
                   ? "Submitting..."
@@ -1696,6 +1572,7 @@ const MobileOrderDetail = () => {
             </motion.div>
           </motion.div>
         )}
+        </div>
       </MobileLayout>
     </PageTransition>
   );

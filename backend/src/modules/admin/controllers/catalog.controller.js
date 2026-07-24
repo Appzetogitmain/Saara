@@ -399,16 +399,37 @@ export const createProduct = asyncHandler(async (req, res) => {
 // PUT /api/admin/products/:id
 export const updateProduct = asyncHandler(async (req, res) => {
     const payload = { ...req.body };
-    if (payload.brandId) {
-        const product = await Product.findById(req.params.id).select('vendorId');
-        if (!product) throw new ApiError(404, 'Product not found.');
-        const targetVendorId = payload.vendorId || product.vendorId;
+    
+    // Always fetch the existing product to check ownership
+    const existingProduct = await Product.findById(req.params.id);
+    if (!existingProduct) throw new ApiError(404, 'Product not found.');
+    
+    // Determine the effective vendorId (either being set, or existing)
+    const targetVendorId = payload.vendorId || existingProduct.vendorId;
 
+    if (payload.brandId) {
         const brand = await Brand.findById(payload.brandId);
         if (!brand) throw new ApiError(404, 'Brand not found.');
         if (!brand.isActive) throw new ApiError(400, 'Selected brand is inactive.');
         if (brand.visibility === 'private' && String(brand.ownerVendorId) !== String(targetVendorId)) {
             throw new ApiError(400, 'Selected brand is private and belongs to another vendor.');
+        }
+    }
+
+    // --- VENDOR PRODUCT RESTRICTIONS ---
+    // If this product belongs to a vendor (either existing or being assigned), 
+    // the Admin is NOT allowed to edit financial/inventory fields or its name.
+    if (existingProduct.vendorId) {
+        delete payload.name;
+        delete payload.price;
+        delete payload.originalPrice;
+        delete payload.stockQuantity;
+        delete payload.taxRate;
+        delete payload.taxIncluded;
+        delete payload.hsnCode;
+        if (payload.variants) {
+            delete payload.variants.prices;
+            delete payload.variants.stockMap;
         }
     }
 

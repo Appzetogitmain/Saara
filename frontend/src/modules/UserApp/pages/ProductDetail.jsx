@@ -885,28 +885,28 @@ const MobileProductDetail = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <div className="text-base font-bold text-teal-800 tracking-tight lg:text-2xl">
+                    <div className="flex items-center gap-2.5">
+                      <div className="text-2xl font-extrabold text-gray-900 tracking-tight lg:text-3xl">
                         {formatPrice(currentPrice)}
                       </div>
                       {product.originalPrice && product.originalPrice > currentPrice && (
                         <>
-                          <div className="text-xs text-gray-400 line-through font-medium lg:text-sm">
+                          <div className="text-xs text-slate-400 line-through font-medium lg:text-sm">
                             {formatPrice(product.originalPrice)}
                           </div>
-                          <div className="text-xs font-bold text-red-500 lg:text-sm">
+                          <div className="text-xs font-extrabold text-emerald-600 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-md shadow-sm">
                             {Math.round(
                               ((product.originalPrice - currentPrice) /
                                 product.originalPrice) *
                               100
-                            )}%
+                            )}% OFF
                           </div>
                         </>
                       )}
                     </div>
 
                     <div className="flex items-center gap-2 pt-1">
-                      <span className="text-sm text-gray-500 font-medium">Brand:</span>
+                      <span className="text-sm text-slate-500 font-medium">Brand:</span>
                       <span className="text-sm font-bold text-gray-900 leading-none">
                         {brand?.name || product.brandName || "Gucci"}
                       </span>
@@ -931,31 +931,31 @@ const MobileProductDetail = () => {
                         <div className="flex items-center gap-4">
                           <button
                             onClick={() => handleQuantityChange(-1)}
-                            className="w-8 h-8 border border-gray-100 rounded-full flex items-center justify-center text-gray-400 text-base shadow-sm"
+                            className="w-8 h-8 border border-slate-200 rounded-full flex items-center justify-center text-slate-500 text-base shadow-sm hover:bg-slate-50 transition-colors"
                           >
                             <FiMinus />
                           </button>
                           <span className="text-lg font-bold text-slate-800">{quantity}</span>
                           <button
                             onClick={() => handleQuantityChange(1)}
-                            className="w-8 h-8 border border-gray-100 rounded-full flex items-center justify-center text-gray-800 text-base shadow-sm"
+                            className="w-8 h-8 border border-slate-200 rounded-full flex items-center justify-center text-slate-800 text-base shadow-sm hover:bg-slate-50 transition-colors"
                           >
                             <FiPlus />
                           </button>
                         </div>
-                        <span className="text-gray-400 text-[11px] text-right leading-tight max-w-[72px]">({selectedAvailableStock} available)</span>
+                        <span className="text-slate-400 text-[11px] text-right leading-tight max-w-[72px]">({selectedAvailableStock} available)</span>
                     </div>
                   </div>
 
                   {/* Inline Buy/Cart Actions for Desktop only */}
-                  <div className="hidden lg:flex items-center gap-4 pt-4 border-t border-gray-100">
+                  <div className="hidden lg:flex items-center gap-4 pt-4 border-t border-slate-100">
                     <button
                       onClick={isInCart ? toggleCart : handleAddToCart}
                       disabled={product.stock === "out_of_stock"}
-                      className={`flex-1 h-12 rounded-xl font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 shadow-sm border border-transparent ${
+                      className={`flex-1 h-12 rounded-2xl font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 shadow-md ${
                         product.stock === "out_of_stock"
-                          ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          : "bg-[#024d3e] text-white hover:bg-[#01352a]"
+                          ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                          : "bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white shadow-primary-500/20"
                       }`}
                     >
                       <FiShoppingBag className="text-base" />
@@ -964,10 +964,10 @@ const MobileProductDetail = () => {
                     <button
                       onClick={handleBuyNow}
                       disabled={product.stock === "out_of_stock"}
-                      className={`flex-1 h-12 rounded-xl font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 shadow-md ${
+                      className={`flex-1 h-12 rounded-2xl font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all hover:scale-[1.02] active:scale-95 shadow-md ${
                         product.stock === "out_of_stock"
-                          ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-                          : "bg-[#ff5a5f] text-white hover:bg-[#e04f53]"
+                          ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+                          : "bg-slate-900 hover:bg-slate-950 text-white"
                       }`}
                     >
                       Buy Now
@@ -1272,14 +1272,14 @@ const MobileProductDetail = () => {
       </PageTransition>
 
       {/* Fixed Action Bar (Flipkart Style) - Outside PageTransition to avoid transform conflicts */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-2 z-[9999] shadow-[0_-8px_20px_rgba(0,0,0,0.12)] lg:hidden">
-        <div className="flex items-center gap-2 w-full max-w-7xl mx-auto px-2">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200/80 p-2.5 z-[9999] shadow-[0_-8px_20px_rgba(0,0,0,0.12)] lg:hidden">
+        <div className="flex items-center gap-2.5 w-full max-w-7xl mx-auto px-1">
           <button
             onClick={isInCart ? toggleCart : handleAddToCart}
             disabled={product.stock === "out_of_stock"}
-            className={`flex-1 h-12 rounded-lg font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all active:scale-95 ${product.stock === "out_of_stock"
-              ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-              : "bg-[#024d3e] text-white shadow-sm"
+            className={`flex-1 h-12 rounded-xl font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all active:scale-95 ${product.stock === "out_of_stock"
+              ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+              : "bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md shadow-primary-500/20"
               }`}
           >
             {isInCart ? "Go to Cart" : "Add to Cart"}
@@ -1287,9 +1287,9 @@ const MobileProductDetail = () => {
           <button
             onClick={handleBuyNow}
             disabled={product.stock === "out_of_stock"}
-            className={`flex-1 h-12 rounded-lg font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md ${product.stock === "out_of_stock"
-              ? "bg-gray-100 text-gray-300 cursor-not-allowed"
-              : "bg-[#ff5a5f] text-white"
+            className={`flex-1 h-12 rounded-xl font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md ${product.stock === "out_of_stock"
+              ? "bg-slate-100 text-slate-300 cursor-not-allowed"
+              : "bg-slate-900 text-white"
               }`}
           >
             Buy Now

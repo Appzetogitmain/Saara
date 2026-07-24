@@ -21,7 +21,7 @@ import { useDeliveryAuthStore } from '../store/deliveryStore';
 const DeliveryOrderDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { fetchOrderById, acceptOrder, rejectOrder, completeOrder, resendDeliveryOtp, isLoadingOrder, isUpdatingOrderStatus } = useDeliveryAuthStore();
+  const { fetchOrderById, acceptOrder, rejectOrder, completeOrder, resendDeliveryOtp, updateOrderStatus, isLoadingOrder, isUpdatingOrderStatus } = useDeliveryAuthStore();
   const [order, setOrder] = useState(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -476,7 +476,7 @@ const DeliveryOrderDetail = () => {
               </button>
             </div>
           )}
-          {order.status === 'pending' && order.deliveryAssignmentStatus === 'accepted' && (
+          {['pending', 'processing', 'ready_for_pickup', 'confirmed'].includes(order.status) && order.deliveryAssignmentStatus === 'accepted' && (
             <div className="space-y-3">
               <div className="bg-blue-50 text-blue-700 border border-blue-200 p-4 rounded-2xl text-center font-semibold text-sm">
                 🚚 Offer Accepted. Please go to the store to pick up the items.
@@ -491,6 +491,26 @@ const DeliveryOrderDetail = () => {
                   {order.pickupOtpDebug || 'Check Inbox'}
                 </p>
               </div>
+            </div>
+          )}
+          {order.status === 'picked_up' && (
+            <div className="space-y-3">
+              <button
+                onClick={async () => {
+                  try {
+                    const updated = await updateOrderStatus(order.id, 'shipped');
+                    setOrder(updated);
+                    toast.success('Started delivery!');
+                  } catch (e) {
+                    toast.error(e?.response?.data?.message || 'Failed to start delivery');
+                  }
+                }}
+                disabled={isUpdatingOrderStatus}
+                className="w-full gradient-green text-white py-4 rounded-xl font-semibold text-base flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <FiNavigation />
+                {isUpdatingOrderStatus ? 'Starting...' : 'Start Delivery'}
+              </button>
             </div>
           )}
           {order.status === 'in-transit' && (

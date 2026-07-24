@@ -53,6 +53,12 @@ const AddProduct = () => {
     cancelable: true,
     taxIncluded: false,
     taxRate: 18,
+    weight: "",
+    dimensions: {
+      length: "",
+      breadth: "",
+      height: "",
+    },
     description: "",
     tags: [],
     variants: {
@@ -400,6 +406,12 @@ const AddProduct = () => {
       categoryId: finalCategoryId,
       subcategoryId: formData.subcategoryId ? formData.subcategoryId : null,
       brandId: formData.brandId ?? null,
+      weight: parseFloat(formData.weight) || undefined,
+      dimensions: {
+        length: parseFloat(formData.dimensions.length) || undefined,
+        breadth: parseFloat(formData.dimensions.breadth) || undefined,
+        height: parseFloat(formData.dimensions.height) || undefined,
+      },
       faqs: (formData.faqs || [])
         .map((faq) => ({
           question: String(faq?.question || "").trim(),
@@ -964,6 +976,93 @@ const AddProduct = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Logistics & Shipping Info */}
+        <div>
+          <h2 className="text-base font-bold text-gray-800 mb-2">
+            Logistics & Shipping <span className="text-red-500">*</span>
+          </h2>
+          <p className="text-xs text-gray-500 mb-3">
+            Required for accurate courier rates (Shiprocket, Delhivery, etc).
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Weight (g) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={formData.weight}
+                onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="e.g. 500"
+              />
+              <p className="text-[10px] text-gray-500 mt-1">Package weight in grams.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Length (cm) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={formData.dimensions?.length}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    dimensions: { ...formData.dimensions, length: e.target.value },
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="e.g. 15"
+              />
+              <p className="text-[10px] text-gray-500 mt-1">Package length.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Breadth (cm) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={formData.dimensions?.breadth}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    dimensions: { ...formData.dimensions, breadth: e.target.value },
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="e.g. 12"
+              />
+              <p className="text-[10px] text-gray-500 mt-1">Package breadth/width.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">
+                Height (cm) <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                min="1"
+                required
+                value={formData.dimensions?.height}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    dimensions: { ...formData.dimensions, height: e.target.value },
+                  })
+                }
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                placeholder="e.g. 8"
+              />
+              <p className="text-[10px] text-gray-500 mt-1">Package height.</p>
+            </div>
           </div>
         </div>
 

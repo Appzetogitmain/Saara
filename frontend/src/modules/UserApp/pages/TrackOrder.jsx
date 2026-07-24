@@ -149,8 +149,6 @@ const MobileTrackOrder = () => {
     return steps;
   };
 
-  const steps = getTrackingSteps();
-
   return (
     <PageTransition>
       <MobileLayout showBottomNav={false} showCartBar={true}>
@@ -172,46 +170,89 @@ const MobileTrackOrder = () => {
               </div>
             </div>
 
-            <div className="px-4 py-4 space-y-4">
+            <div className="px-4 py-4 space-y-4 animate-fadeIn">
               {/* Tracking Timeline */}
-              <div className="glass-card rounded-2xl p-4">
-                <h2 className="text-base font-bold text-gray-800 mb-4">Order Status</h2>
+              {order.shipments && order.shipments.length > 0 && (
                 <div className="space-y-4">
-                  {steps.map((step, index) => {
-                    const Icon = step.icon;
+                  {order.shipments.map((shipment, index) => {
+                    const shipmentSteps = getTrackingSteps(shipment.status, shipment);
+                    const vendorGroup = order.vendorItems?.find(v => String(v.vendorId) === String(shipment.vendorId));
                     return (
-                      <div key={index} className="flex items-start gap-4">
-                        <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${step.completed
-                          ? 'gradient-green text-white'
-                          : 'bg-gray-200 text-gray-500'
-                          }`}>
-                          <Icon className="text-lg" />
+                      <div key={shipment._id || index} className="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm">
+                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
+                          <div className="w-8 h-8 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center">
+                            <FiPackage />
+                          </div>
+                          <div>
+                            <h2 className="text-sm font-extrabold text-gray-900">
+                              {order.shipments.length > 1 ? `Package ${index + 1} of ${order.shipments.length}` : 'Order Status'}
+                            </h2>
+                            {vendorGroup && (
+                              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+                                Dispatched by {vendorGroup.vendorName}
+                              </p>
+                            )}
+                          </div>
+                          <Badge variant={shipment.status} className="ml-auto">
+                            {shipment.status.toUpperCase()}
+                          </Badge>
                         </div>
-                        <div className="flex-1">
-                          <h3 className={`font-semibold text-sm mb-1 ${step.completed ? 'text-gray-800' : 'text-gray-500'
-                            }`}>
-                            {step.label}
-                          </h3>
-                          <p className="text-xs text-gray-500">{formatDate(step.date)}</p>
+                        <div className="space-y-4">
+                          {shipmentSteps.map((step, sIdx) => {
+                            const Icon = step.icon;
+                            return (
+                              <div key={sIdx} className="flex items-start gap-4">
+                                <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${step.completed
+                                  ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white shadow-md shadow-primary-500/20'
+                                  : 'bg-slate-100 text-slate-400'
+                                  }`}>
+                                  <Icon className="text-sm" />
+                                </div>
+                                <div className="flex-1 pb-4 relative">
+                                  {sIdx < shipmentSteps.length - 1 && (
+                                    <div className={`absolute left-[-23px] top-8 bottom-0 w-[2px] rounded-full ${step.completed ? 'bg-primary-300' : 'bg-slate-100'}`} />
+                                  )}
+                                  <h3 className={`font-bold text-sm mb-0.5 transition-colors ${step.completed ? 'text-gray-900' : 'text-slate-400'
+                                    }`}>
+                                    {step.label}
+                                  </h3>
+                                  <p className="text-xs text-gray-500 font-medium">{formatDate(step.date)}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
+                        {/* Shipment OTP Validation inline */}
+                        {shipment.deliveryOtpDebug && ['shipped', 'out_for_delivery'].includes(shipment.status) && (
+                          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl">
+                            <p className="text-[10px] text-green-800 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
+                              🔑 Delivery OTP
+                            </p>
+                            <p className="text-[11px] text-green-700 leading-tight mb-2">
+                              Provide this code to the delivery partner.
+                            </p>
+                            <p className="text-xl font-extrabold text-green-800 tracking-widest text-center py-1.5 bg-white rounded-lg border border-green-300 font-mono">
+                              {shipment.deliveryOtpDebug || 'Email Sent'}
+                            </p>
+                          </div>
+                        )}
+                        {/* AWB Tracking line inline */}
+                        {shipment.awbCode && (
+                           <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                             <div>
+                               <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">Tracking AWB</p>
+                               <p className="text-sm font-mono font-bold text-gray-800">{shipment.awbCode}</p>
+                             </div>
+                             {shipment.trackingUrl && (
+                               <a href={shipment.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-primary-600 bg-primary-50 px-3 py-1.5 rounded-lg border border-primary-100">
+                                 Track Package
+                               </a>
+                             )}
+                           </div>
+                        )}
                       </div>
                     );
                   })}
-                </div>
-              </div>
-
-              {/* Delivery OTP Code for testing / delivery verification */}
-              {order.status === 'shipped' && (
-                <div className="glass-card rounded-2xl p-4 bg-green-50 border border-green-200">
-                  <h2 className="text-base font-bold text-green-800 mb-1 flex items-center gap-1.5">
-                    🔑 Delivery Verification OTP
-                  </h2>
-                  <p className="text-xs text-green-700 mb-3">
-                    Please provide this 6-digit OTP code to the delivery boy to confirm successful delivery.
-                  </p>
-                  <p className="text-3xl font-extrabold text-green-800 tracking-widest text-center py-2 bg-white rounded-xl border border-green-300">
-                    {order.deliveryOtpDebug || 'Check Email'}
-                  </p>
                 </div>
               )}
 

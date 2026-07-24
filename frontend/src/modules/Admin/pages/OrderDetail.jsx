@@ -256,7 +256,7 @@ const OrderDetail = () => {
 
           {/* Customer & Shipping Combined Card */}
           <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-            <div className={`grid grid-cols-1 md:${order.deliveryBoyId ? 'grid-cols-3' : 'grid-cols-2'} gap-4`}>
+            <div className={`grid grid-cols-1 md:grid-cols-2 gap-4`}>
               {/* Customer Info */}
               <div>
                 <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
@@ -284,9 +284,9 @@ const OrderDetail = () => {
                 </div>
               </div>
 
-              {/* Shipping Address */}
+              {/* Shipping Details */}
               {order.shippingAddress && (
-                <div className={order.deliveryBoyId ? 'border-t md:border-t-0 md:border-r border-gray-100 md:pr-4' : ''}>
+                <div className="border-t md:border-t-0 md:border-l border-gray-100 md:pl-4">
                   <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
                     <FiMapPin className="text-primary-600 text-base" />
                     Shipping Address
@@ -311,91 +311,87 @@ const OrderDetail = () => {
                   </div>
                 </div>
               )}
-
-              {/* Delivery Partner */}
-              {order.deliveryBoyId && (
-                <div className="border-t md:border-t-0 md:border-l border-gray-100 md:pl-4">
-                  <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
-                    <span className="inline-block p-1 bg-green-50 text-green-600 rounded">🚚</span>
-                    Delivery Partner
-                  </h2>
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-xs text-gray-500">Name</p>
-                      <p className="font-semibold text-sm text-gray-800">{order.deliveryBoyId.name}</p>
-                    </div>
-                    {order.deliveryBoyId.phone && (
-                      <div>
-                        <p className="text-xs text-gray-500 flex items-center gap-1">
-                          <FiPhone className="text-xs" />
-                          Phone
-                        </p>
-                        <a href={`tel:${order.deliveryBoyId.phone}`} className="font-semibold text-xs text-blue-600 hover:underline">
-                          {order.deliveryBoyId.phone}
-                        </a>
-                      </div>
-                    )}
-                    {order.deliveryBoyId.vehicleNumber && (
-                      <div>
-                        <p className="text-xs text-gray-500">Vehicle Details</p>
-                        <p className="font-semibold text-xs text-gray-800">
-                          {order.deliveryBoyId.vehicleType || 'Vehicle'}: {order.deliveryBoyId.vehicleNumber}
-                        </p>
-                      </div>
-                    )}
-                    <div>
-                      {order.deliveryAssignmentStatus === 'accepted' ? (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                          Accepted (On the way)
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">
-                          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
-                          Assigned (Pending Accept)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
+          {/* Shipments Overview (Multi-Vendor/Multi-Shipment) */}
+          {order.shipments && order.shipments.length > 0 && (
+            <div className="bg-white rounded-lg p-0 shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+                <h2 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                  <FiPackage className="text-primary-600 text-base" />
+                  Shipments Overview ({order.shipments.length})
+                </h2>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {order.shipments.map((shipment, index) => {
+                  const deliveryBoy = shipment.deliveryBoyId;
+                  const vendorGroup = order.vendorItems?.find(v => String(v.vendorId) === String(shipment.vendorId));
+                  return (
+                    <div key={shipment._id || index} className="p-4 hover:bg-gray-50/50 transition-colors">
+                      <div className="flex flex-col md:flex-row gap-4 md:items-start justify-between">
+                        {/* Shipment Info */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-gray-800">Package {index + 1}</span>
+                            <Badge variant={shipment.status} className="text-[10px] uppercase py-0.5 px-1.5">
+                              {shipment.status}
+                            </Badge>
+                          </div>
+                          {vendorGroup && (
+                            <p className="text-xs text-gray-500 font-medium">
+                              Vendor: <span className="text-gray-800">{vendorGroup.vendorName}</span>
+                            </p>
+                          )}
+                          <p className="text-[11px] text-gray-400 font-mono mt-1">
+                            {shipment.shipmentNumber || shipment._id}
+                          </p>
+                        </div>
 
-          {/* Tracking & Delivery Compact */}
-          {(order.trackingNumber || order.estimatedDelivery || order.deliveredDate || order.deliveredAt) && (
-            <div className="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
-              <h2 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-1.5">
-                <FiTruck className="text-primary-600 text-base" />
-                Tracking & Delivery
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {order.trackingNumber && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Tracking Number</p>
-                    <p className="font-semibold text-xs text-gray-800 font-mono">{order.trackingNumber}</p>
-                  </div>
-                )}
-                {order.estimatedDelivery && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-1">
-                      <FiClock className="text-xs" />
-                      Est. Delivery
-                    </p>
-                    <p className="font-semibold text-xs text-gray-800">{formatDateTime(order.estimatedDelivery)}</p>
-                  </div>
-                )}
-                {order.status === 'delivered' && (
-                  <div>
-                    <p className="text-xs text-gray-500 mb-0.5 flex items-center gap-1">
-                      <FiPackage className="text-xs" />
-                      Delivered On
-                    </p>
-                    <p className="font-semibold text-xs text-gray-800">
-                      {order.deliveredAt ? formatDateTime(order.deliveredAt) : '—'}
-                    </p>
-                  </div>
-                )}
+                        {/* Tracking / Provider */}
+                        <div className="space-y-1 md:text-right">
+                           <p className="text-xs text-gray-500">Provider: <span className="font-semibold text-gray-700 capitalize">{shipment.providerId?.replace('_', ' ') || 'Unknown'}</span></p>
+                           {shipment.awbCode && (
+                             <p className="text-xs text-gray-500">AWB: <span className="font-mono text-gray-800 font-bold">{shipment.awbCode}</span></p>
+                           )}
+                           {shipment.trackingUrl && (
+                             <a href={shipment.trackingUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-primary-600 hover:underline">
+                               Track Shipment &rarr;
+                             </a>
+                           )}
+                        </div>
+                      </div>
+
+                      {/* Delivery Partner Inline Details */}
+                      {deliveryBoy && (
+                        <div className="mt-4 p-3 bg-blue-50/50 border border-blue-100 rounded-lg flex flex-wrap gap-4 items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                              <span className="text-xs">🚚</span>
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold text-gray-800">{deliveryBoy.name}</p>
+                              {deliveryBoy.phone && <p className="text-[10px] text-gray-500">{deliveryBoy.phone}</p>}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                             <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Assignment</p>
+                             {shipment.deliveryAssignmentStatus === 'accepted' ? (
+                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700">
+                                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                 Accepted
+                               </span>
+                             ) : (
+                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-yellow-100 text-yellow-700">
+                                 <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+                                 {shipment.deliveryAssignmentStatus || 'Pending'}
+                               </span>
+                             )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

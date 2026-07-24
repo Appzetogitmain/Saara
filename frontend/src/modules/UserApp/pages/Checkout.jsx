@@ -51,6 +51,7 @@ const MobileCheckout = () => {
   const [shippingOption, setShippingOption] = useState("standard");
   const [estimatedShipping, setEstimatedShipping] = useState(null);
   const [isEstimatingShipping, setIsEstimatingShipping] = useState(false);
+  const [shippingQuotes, setShippingQuotes] = useState(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -283,10 +284,12 @@ const MobileCheckout = () => {
           setEstimatedShipping(
             Number.isFinite(nextShipping) ? nextShipping : null,
           );
+          setShippingQuotes(payload?.quotesByVendor || null);
         }
       } catch {
         if (active) {
           setEstimatedShipping(null);
+          setShippingQuotes(null);
         }
       } finally {
         if (active) {
@@ -461,6 +464,7 @@ const MobileCheckout = () => {
             ? appliedCoupon.code || couponCode.trim().toUpperCase()
             : undefined,
           shippingOption,
+          shippingQuotes,
           useWallet,
         });
 
@@ -1219,7 +1223,7 @@ const AddressFormModal = ({ onSubmit, onCancel }) => {
           <div className="flex gap-3 pt-4">
             <button
               type="submit"
-              className="flex-1 gradient-green text-white py-3 rounded-xl font-semibold hover:shadow-glow-green transition-all"
+              className="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white py-3 rounded-xl font-bold shadow-md shadow-primary-500/20 active:scale-95 transition-all"
             >
               Add Address
             </button>

@@ -77,6 +77,7 @@ const getChildRoute = (parentRoute, childName) => {
       "Delivery Boys": "/admin/delivery/delivery-boys",
       "Cash Collection": "/admin/delivery/cash-collection",
       "Payout Requests": "/admin/delivery/payout-requests",
+      "Courier Settlements": "/admin/delivery/courier-settlements",
     },
     "/admin/marketing": {
       "Home Sliders": "/admin/marketing/home-sliders",
@@ -112,6 +113,7 @@ const getChildRoute = (parentRoute, childName) => {
     "/admin/settings": {
       General: "/admin/settings/general",
       "Payment & Shipping": "/admin/settings/payment-shipping",
+      "Logistics & Delivery": "/admin/settings/logistics",
     },
     "/admin/policies": {
       "Privacy Policy": "/admin/policies/privacy-policy",
@@ -264,10 +266,10 @@ const AdminSidebar = ({ isOpen, onClose, isCollapsed }) => {
         {/* Main Menu Item */}
         <div
           className={`
-            flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer
+            flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 cursor-pointer
             ${active
-              ? "bg-primary-600 text-white shadow-sm"
-              : "text-gray-300 hover:bg-slate-700"
+              ? "bg-gradient-to-r from-primary-600 to-primary-700 text-white font-bold shadow-md shadow-primary-500/20 active:scale-95"
+              : "text-slate-300 hover:bg-slate-700/60 font-medium"
             }
           `}
           onClick={() => {
@@ -288,7 +290,7 @@ const AdminSidebar = ({ isOpen, onClose, isCollapsed }) => {
             }
           }}>
           <Icon
-            className={`text-xl flex-shrink-0 ${active ? "text-white" : "text-gray-400"
+            className={`text-xl flex-shrink-0 ${active ? "text-white" : "text-slate-400"
               }`}
           />
           <span className="font-medium flex-1 text-sm">{item.title}</span>
@@ -296,7 +298,7 @@ const AdminSidebar = ({ isOpen, onClose, isCollapsed }) => {
             <motion.div
               animate={{ rotate: isExpanded ? 180 : 0 }}
               transition={{ duration: 0.2 }}>
-              <FiChevronDown className="text-gray-400 text-sm" />
+              <FiChevronDown className="text-slate-400 text-sm" />
             </motion.div>
           )}
         </div>
@@ -310,7 +312,7 @@ const AdminSidebar = ({ isOpen, onClose, isCollapsed }) => {
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="overflow-hidden">
-              <div className="ml-4 mt-1 pl-4 border-l-2 border-slate-600 space-y-1">
+              <div className="ml-4 mt-1 pl-4 border-l-2 border-slate-700 space-y-1">
                 {item.children.map((child, index) => {
                   const childRoute = getChildRoute(item.route, child);
                   const isChildActive =
@@ -325,10 +327,10 @@ const AdminSidebar = ({ isOpen, onClose, isCollapsed }) => {
                         handleMenuItemClick(childRoute, item.title)
                       }
                       className={`
-                        px-3 py-2 text-xs rounded-lg transition-colors cursor-pointer
+                        px-3 py-2 text-xs rounded-xl transition-all cursor-pointer
                         ${isChildActive
-                          ? "bg-primary-500/20 text-white font-medium"
-                          : "text-gray-400 hover:bg-slate-700"
+                          ? "bg-primary-500/20 text-white font-bold border-l-2 border-primary-500"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 font-medium"
                         }
                       `}>
                       {child}

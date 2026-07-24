@@ -7,9 +7,9 @@ import Product from '../models/Product.model.js';
 import Commission from '../models/Commission.model.js';
 import Coupon from '../models/Coupon.model.js';
 import Refund from '../models/Refund.model.js';
-import ReturnRequest from '../models/ReturnRequest.model.js';
 import Vendor from '../models/Vendor.model.js';
 import Admin from '../models/Admin.model.js';
+import logger from '../utils/logger.js';
 import { initiateRefund } from './payment.service.js';
 import { creditWallet } from './wallet.service.js';
 import { calculateOrderFinancials } from './financial.service.js';
@@ -212,7 +212,7 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
                         orderId: String(order._id), amount: rzpRefundAmount, timestamp: new Date().toISOString()
                     });
                 } catch (refundErr) {
-                    console.error('[REFUND_ERROR] Razorpay auto-refund failed:', refundErr.message);
+                    logger.error('[REFUND_ERROR] Razorpay auto-refund failed:', { message: refundErr.message });
                 }
             }
 
@@ -243,7 +243,7 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
                         orderId: String(order._id), amount: walletRefundAmount, timestamp: new Date().toISOString()
                     });
                 } catch (walletErr) {
-                    console.error('[REFUND_ERROR] Wallet auto-refund failed:', walletErr.message);
+                    logger.error('[REFUND_ERROR] Wallet auto-refund failed:', { message: walletErr.message });
                 }
             }
         } else {
@@ -293,7 +293,7 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
                 });
             }
         } catch (notifErr) {
-            console.error('[NOTIFICATION_ERROR] Post-payment notification failed:', notifErr.message);
+            logger.error('[NOTIFICATION_ERROR] Post-payment notification failed:', { message: notifErr.message });
         }
 
         order.status = 'processing';
@@ -302,13 +302,13 @@ export async function processCapturedPayment({ razorpayOrderId, razorpayPaymentI
         try {
             await sendOrderConfirmationEmail(order, order.shippingAddress?.email);
         } catch (emailErr) {
-            console.error('[EMAIL_ERROR] Order confirmation email failed:', emailErr.message);
+            logger.error('[EMAIL_ERROR] Order confirmation email failed:', { message: emailErr.message });
         }
 
         try {
             await notifyOrderUpdate(order);
         } catch (socketErr) {
-            console.error('[SOCKET_ERROR] Socket update failed:', socketErr.message);
+            logger.error('[SOCKET_ERROR] Socket update failed:', { message: socketErr.message });
         }
     }
 }

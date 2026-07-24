@@ -121,9 +121,8 @@ export const calculateOrderFinancials = ({
                 commissionBase = discountedItemSubtotal;
             }
 
-            // C. Shipping Charge and Shipping Tax (at 18%) allocation
+            // C. Shipping Charge allocation
             let itemShipping = 0;
-            let itemShippingTax = 0;
             if (vendorShipping > 0 && v.subtotal > 0) {
                 if (index === v.items.length - 1) {
                     itemShipping = parseFloat((vendorShipping - itemShippingSum).toFixed(2));
@@ -131,7 +130,6 @@ export const calculateOrderFinancials = ({
                     itemShipping = parseFloat(((vendorShipping * item.sub) / v.subtotal).toFixed(2));
                     itemShippingSum = parseFloat((itemShippingSum + itemShipping).toFixed(2));
                 }
-                itemShippingTax = 0;
             }
 
             // D. Item Commission & Vendor Earnings
@@ -139,8 +137,8 @@ export const calculateOrderFinancials = ({
             const itemVendorEarnings = parseFloat((commissionBase - itemCommission + itemTax).toFixed(2));
 
             // E. Final Line Total Paid by Customer
-            const totalTaxAmount = parseFloat((itemTax + itemShippingTax).toFixed(2));
-            const finalLineTotal = parseFloat((discountedItemSubtotal + (item.taxIncluded ? 0 : itemTax) + itemShipping + itemShippingTax).toFixed(2));
+            const totalTaxAmount = parseFloat((itemTax).toFixed(2));
+            const finalLineTotal = parseFloat((discountedItemSubtotal + (item.taxIncluded ? 0 : itemTax) + itemShipping).toFixed(2));
 
             itemsWithDiscount.push({
                 productId: item.productId,
@@ -156,7 +154,6 @@ export const calculateOrderFinancials = ({
                 baseAmount: commissionBase,
                 taxAmount: totalTaxAmount,
                 shippingCharge: itemShipping,
-                shippingTax: itemShippingTax,
                 commissionRate: commissionRate,
                 commissionAmount: itemCommission,
                 vendorEarnings: itemVendorEarnings,

@@ -19,7 +19,6 @@ const orderItemSchema = new mongoose.Schema({
     baseAmount: { type: Number },
     taxAmount: { type: Number },
     shippingCharge: { type: Number },
-    shippingTax: { type: Number },
     commissionRate: { type: Number },
     commissionAmount: { type: Number },
     vendorEarnings: { type: Number },
@@ -112,24 +111,6 @@ const orderSchema = new mongoose.Schema(
         idempotencyKey: { type: String, sparse: true },
         idempotencyScope: { type: String, sparse: true },
         trackingNumber: { type: String, unique: true, sparse: true },
-        deliveryBoyId: { type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryBoy', index: true },
-        deliveryAssignmentStatus: {
-            type: String,
-            enum: ['pending', 'assigned', 'accepted', 'manual_override', 'failed'],
-            default: 'pending',
-            index: true,
-        },
-        rejectedDeliveryBoys: [{ type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryBoy' }],
-        deliveryOtpHash: { type: String, select: false },
-        deliveryOtpExpiry: { type: Date, select: false },
-        deliveryOtpSentAt: { type: Date, select: false },
-        deliveryOtpDebug: { type: String, select: false },
-        deliveryOtpVerifiedAt: Date,
-        deliveryOtpAttempts: { type: Number, default: 0, select: false },
-        pickupOtpHash: { type: String, select: false },
-        pickupOtpExpiry: { type: Date, select: false },
-        pickupOtpSentAt: { type: Date, select: false },
-        pickupOtpDebug: { type: String, select: false },
         estimatedDelivery: Date,
         processingAt: Date,
         readyForPickupAt: Date,
@@ -187,9 +168,23 @@ orderSchema.index(
 orderSchema.index({ isDeleted: 1, createdAt: -1 });
 orderSchema.index({ isDeleted: 1, status: 1, createdAt: -1 });
 orderSchema.index({ 'vendorItems.vendorId': 1, createdAt: -1 });
+orderSchema.index({ userId: 1, createdAt: -1 });
 orderSchema.index({ status: 1, escrowStatus: 1, deliveredAt: 1 });
-// T4.4: COD settlement query: admin settleCash filters by all 4 fields \u2014 compound index prevents full scan
-orderSchema.index({ deliveryBoyId: 1, status: 1, isCashSettled: 1 });
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ isDeleted: 1 });
+
+// ─── Virtual: Shipments ─────────────────────────────────────────────────
+// Allows: order.populate('shipments') to fetch all Shipment documents for this order.
+// This is a virtual — no field is added to the Order document, no data migration needed.
+// Used by Phase 5+ logistics services to resolve delivery state from Shipment.
+orderSchema.virtual('shipments', {
+    ref:          'Shipment',
+    localField:   '_id',
+    foreignField: 'orderId',
+});
+
+// Note: Order.escrowStatus enum already includes 'processing' (confirmed in codebase).
+// The D1 bug identified in the architecture audit was already resolved in this file.
 
 orderSchema.pre('save', function (next) {
     if (this.isModified('status')) {
@@ -201,21 +196,6 @@ orderSchema.pre('save', function (next) {
         } else if (this.status === 'shipped') {
             if (!this.shippedAt) {
                 this.shippedAt = now;
-            }
-            if (!this.deliveryOtpHash) {
-                const otp = String(Math.floor(100000 + Math.random() * 900000));
-                const secret = process.env.JWT_SECRET || 'fallback-secret-key';
-                const hash = crypto.createHash('sha256').update(`${otp}:${secret}`).digest('hex');
-                
-                this.deliveryOtpHash = hash;
-                const isProduction = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
-                this.deliveryOtpExpiry = new Date(Date.now() + (isProduction ? 10 * 60 * 1000 : 24 * 60 * 60 * 1000)); // 10 minutes in prod, 24 hours in dev
-                this.deliveryOtpSentAt = now;
-                this.deliveryOtpAttempts = 0;
-                
-                if (!isProduction) {
-                    this.deliveryOtpDebug = otp;
-                }
             }
         } else if (this.status === 'delivered' && !this.deliveredAt) {
             this.deliveredAt = now;

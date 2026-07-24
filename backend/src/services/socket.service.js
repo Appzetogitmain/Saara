@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { verifyAccessToken } from '../config/jwt.js';
+import logger from '../utils/logger.js';
 
 let io;
 
@@ -79,7 +80,7 @@ export const initSocket = (server) => {
         });
 
         socket.on('disconnect', () => {
-            // cleanup handled automatically by socket.io
+            logger.info(`Socket disconnected: ${socket.id}`);
         });
     });
 
@@ -129,7 +130,7 @@ export const notifyOrderUpdate = async (order) => {
             });
         }
     } catch (err) {
-        console.error('Error emitting order status update:', err);
+        logger.error('[SOCKET_ERROR] Error emitting order status update:', { message: err.message, orderId: order?._id });
     }
 };
 
@@ -167,6 +168,6 @@ export const notifyReturnUpdate = async (request) => {
         // Emit to admin room
         emitToRoom('admin_room', 'return_updated', payload);
     } catch (err) {
-        console.error('Error emitting return status update:', err);
+        logger.error('[SOCKET_ERROR] Error emitting return status update:', { message: err.message, returnRequestId: request?._id });
     }
 };

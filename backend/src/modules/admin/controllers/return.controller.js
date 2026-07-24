@@ -13,7 +13,7 @@ import crypto from 'crypto';
 import { createNotification } from '../../../services/notification.service.js';
 import { initiateRefund } from '../../../services/payment.service.js';
 import { buildReturnItemsSummary, buildExchangeSummary } from '../../../utils/notificationProductFormatter.js';
-import { ApiError } from '../../../utils/ApiError.js';
+import ApiError from '../../../utils/ApiError.js';
 import { ApiResponse } from '../../../utils/ApiResponse.js';
 import { asyncHandler } from '../../../utils/asyncHandler.js';
 import { notifyOrderUpdate, notifyReturnUpdate } from '../../../services/socket.service.js';
@@ -160,6 +160,26 @@ export const getReturnRequestById = asyncHandler(async (req, res) => {
 
     // Normalize
     const normalized = normalizeReturnRequest(request);
+
+    // Fetch reverse shipment with minimal DB overhead
+    const Shipment = (await import('../../../models/Shipment.model.js')).default;
+    const shipment = await Shipment.findOne({
+        returnRequestId: request._id,
+        type: 'reverse'
+    }).lean().select('shipmentNumber providerId awbCode trackingUrl status errorNotes deliveryBoyId').populate('deliveryBoyId', 'name phone');
+
+    if (shipment) {
+        normalized.reverseShipment = {
+            shipmentId: shipment._id,
+            shipmentNumber: shipment.shipmentNumber,
+            providerId: shipment.providerId,
+            awbCode: shipment.awbCode,
+            trackingUrl: shipment.trackingUrl,
+            status: shipment.status,
+            errorNotes: shipment.errorNotes,
+            deliveryBoyId: shipment.deliveryBoyId
+        };
+    }
 
     res.status(200).json(
         new ApiResponse(200, normalized, 'Return request details fetched successfully')
@@ -673,4 +693,51 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
 
     const normalized = normalizeReturnRequest(updatedRequest);
     res.status(200).json(new ApiResponse(200, normalized, 'Return request status updated successfully'));
+});
+
+/**
+ * @desc    Manually reassign/retry reverse pickup for a failed return shipment
+ * @route   POST /api/admin/return-requests/:id/reassign
+ * @access  Private (Admin)
+ */
+export const reassignReversePickup = asyncHandler(async (req, res) => {
+    const { overrideProviderId, reason } = req.body;
+
+    const request = await ReturnRequest.findById(req.params.id);
+    if (!request) {
+        throw new ApiError(404, 'Return request not found');
+    }
+
+    // Capture old state for audit
+    const Shipment = (await import('../../../models/Shipment.model.js')).default;
+    const oldShipment = await Shipment.findOne({ returnRequestId: request._id, type: 'reverse' }).lean();
+    
+    const reverseEngine = (await import('../../../services/reverseEngine.service.js')).default;
+    
+    const adminId = req.user?._id || req.user?.id || new mongoose.Types.ObjectId();
+    const adminName = req.user?.name || 'Admin';
+
+    // Call engine (idempotency is handled securely inside the engine)
+    const engineResult = await reverseEngine.processReturn(request._id, {
+        overrideProviderId,
+        manualAdminId: adminId
+    });
+
+    if (!engineResult.success) {
+        throw new ApiError(500, `Reassignment failed: ${engineResult.error || engineResult.reason}`);
+    }
+
+    // Add audit log to ReturnRequest
+    request.statusHistory.push({
+        status: request.status,
+        changedAt: new Date(),
+        notes: `[Manual Reassignment] Provider changed from ${oldShipment?.providerId || 'None'} to ${engineResult.providerId}. Status changed from ${oldShipment?.status || 'None'} to pickup_scheduled. Reason: ${reason || 'N/A'}`,
+        performedById: adminId,
+        performedByName: adminName,
+        performedByRole: 'admin'
+    });
+    
+    await request.save();
+
+    res.status(200).json(new ApiResponse(200, engineResult, 'Reverse pickup reassigned successfully'));
 });

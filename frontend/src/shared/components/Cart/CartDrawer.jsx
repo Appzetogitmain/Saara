@@ -293,30 +293,30 @@ const CartDrawer = () => {
 
             {/* Footer */}
             {items.length > 0 && (
-              <div className="sticky bottom-0 z-30 border-t border-gray-200 px-4 py-2 bg-white">
-                <div className="flex flex-col gap-1">
+              <div className="sticky bottom-0 z-30 border-t border-slate-200/80 px-4 py-3 bg-white/95 backdrop-blur-md">
+                <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[16px] font-semibold text-gray-900">
+                      <p className="text-lg font-black text-gray-900 leading-tight">
                         {formatPrice(amountPayable)}
                       </p>
                       <Link
                         to={checkoutLink}
                         onClick={toggleCart}
-                        className="mt-0 inline-block text-[13px] font-medium text-sky-600">
+                        className="text-xs font-bold text-primary-600 hover:text-primary-700">
                         View details
                       </Link>
                     </div>
                     <Link
                       to={checkoutLink}
                       onClick={toggleCart}
-                      className="block min-w-[196px] rounded-[10px] bg-[#232323] px-5 py-2.5 text-center text-[15px] font-semibold text-white">
-                      Proceed to Payment
+                      className="flex-1 rounded-2xl bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 px-5 py-3 text-center text-sm font-bold text-white shadow-lg shadow-primary-500/20 active:scale-95 transition-all">
+                      Proceed to Checkout
                     </Link>
                   </div>
                   <button
                     onClick={clearCart}
-                    className="w-full py-1.5 text-sm text-gray-600 hover:text-red-600 font-medium transition-colors">
+                    className="w-full py-1 text-xs text-slate-400 hover:text-rose-500 font-semibold transition-colors">
                     Clear Cart
                   </button>
                 </div>

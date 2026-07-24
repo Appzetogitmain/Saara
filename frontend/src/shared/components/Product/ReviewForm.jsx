@@ -227,7 +227,7 @@ const ReviewForm = ({ productId, onSubmit, initialReview }) => {
         {/* Submit Button */}
         <button
           type="submit"
-          className="w-full sm:w-auto px-8 py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-xl font-bold text-sm shadow-sm transition-all"
+          className="w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-xl font-bold text-sm shadow-md shadow-primary-500/20 active:scale-95 transition-all"
         >
           {initialReview ? 'Update Review' : 'Submit Review'}
         </button>

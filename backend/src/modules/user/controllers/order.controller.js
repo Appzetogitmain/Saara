@@ -2,6 +2,7 @@ import asyncHandler from '../../../utils/asyncHandler.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
 import ApiError from '../../../utils/ApiError.js';
 import Order from '../../../models/Order.model.js';
+import Shipment from '../../../models/Shipment.model.js';
 import Product from '../../../models/Product.model.js';
 import Coupon from '../../../models/Coupon.model.js';
 import Commission from '../../../models/Commission.model.js';
@@ -10,6 +11,7 @@ import Admin from '../../../models/Admin.model.js';
 import Payment from '../../../models/Payment.model.js';
 import PaymentAttempt from '../../../models/PaymentAttempt.model.js';
 import Refund from '../../../models/Refund.model.js';
+import ShippingQuote from '../../../models/ShippingQuote.model.js';
 import { creditWallet } from '../../../services/wallet.service.js';
 import { generateOrderId } from '../../../utils/generateOrderId.js';
 import { generateTrackingNumber } from '../../../utils/generateTrackingNumber.js';
@@ -24,7 +26,8 @@ import { notifyOrderUpdate, notifyReturnUpdate, emitToRoom } from '../../../serv
 import { calculateOrderFinancials } from '../../../services/financial.service.js';
 import { initiateRefund } from '../../../services/payment.service.js';
 import { getDefaultCommissionRate, isPaymentMethodEnabled } from '../../../services/settingsService.js';
-
+import logisticsEventBus from '../../../events/logisticsEventBus.js';
+import LOGISTICS_EVENTS from '../../../events/logisticsEvents.js';
 
 const normalizeVariantPart = (value) => String(value || '').trim().toLowerCase();
 const normalizeAxisName = (value) =>
@@ -208,7 +211,7 @@ const resolveOrderItemVariantKey = (product, orderItem) => {
 
 // POST /api/user/orders
 export const placeOrder = asyncHandler(async (req, res) => {
-    const { items, shippingAddress, paymentMethod, couponCode, shippingOption } = req.body;
+    const { items, shippingAddress, paymentMethod, couponCode, shippingOption, shippingQuotes } = req.body;
     const normalizedPaymentMethod = paymentMethod === 'cash' ? 'cod' : paymentMethod;
 
     // Validate that payment method is enabled
@@ -254,7 +257,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
     for (const item of items) {
         const product = await Product.findById(item.productId).populate(
             'vendorId',
-            'commissionRate storeName shippingEnabled defaultShippingRate freeShippingThreshold'
+            'commissionRate storeName'
         );
         if (!product) throw new ApiError(404, `Product not found: ${item.productId}`);
         if (!product.vendorId) {
@@ -307,9 +310,6 @@ export const placeOrder = asyncHandler(async (req, res) => {
                 vendorId: product.vendorId._id,
                 vendorName: product.vendorId.storeName,
                 commissionRate: product.vendorId.commissionRate !== undefined && product.vendorId.commissionRate !== null ? product.vendorId.commissionRate : defaultRate,
-                shippingEnabled: product.vendorId.shippingEnabled !== false,
-                defaultShippingRate: product.vendorId.defaultShippingRate,
-                freeShippingThreshold: product.vendorId.freeShippingThreshold,
                 items: [],
                 subtotal: 0,
             };
@@ -343,9 +343,6 @@ export const placeOrder = asyncHandler(async (req, res) => {
     const vendorShippingInput = Object.values(vendorMap).map((vendorGroup) => ({
         vendorId: vendorGroup.vendorId,
         subtotal: vendorGroup.subtotal,
-        shippingEnabled: vendorGroup.shippingEnabled,
-        defaultShippingRate: vendorGroup.defaultShippingRate,
-        freeShippingThreshold: vendorGroup.freeShippingThreshold,
     }));
     const { totalShipping: shipping, shippingByVendor } = await calculateVendorShippingForGroups({
         vendorGroups: vendorShippingInput,
@@ -403,7 +400,6 @@ export const placeOrder = asyncHandler(async (req, res) => {
                 baseAmount: item.baseAmount,
                 taxAmount: item.taxAmount,
                 shippingCharge: item.shippingCharge,
-                shippingTax: item.shippingTax,
                 commissionRate: item.commissionRate,
                 commissionAmount: item.commissionAmount,
                 vendorEarnings: item.vendorEarnings,
@@ -427,9 +423,10 @@ export const placeOrder = asyncHandler(async (req, res) => {
         };
     });
 
-    // 6-9. Transactional order creation to avoid partial writes.
+    // 6-10. Transactional order creation to avoid partial writes.
     let order = null;
     let idempotentReplay = false;
+    let createdShipments = [];   // Phase 5.1: collected inside transaction for post-commit events
     const session = await mongoose.startSession();
     try {
         await session.withTransaction(async () => {
@@ -442,6 +439,31 @@ export const placeOrder = asyncHandler(async (req, res) => {
                     idempotentReplay = true;
                     return;
                 }
+            }
+
+            // --- Phase 7: Quote Validation ---
+            let normalizedQuotes = {};
+            if (shippingQuotes && typeof shippingQuotes === 'object') {
+                normalizedQuotes = shippingQuotes;
+            } else if (shippingOption && typeof shippingOption === 'object' && shippingOption.quoteId && vendorItems.length > 0) {
+                // Legacy fallback for frontends sending { quoteId: "..." } in shippingOption
+                normalizedQuotes[String(vendorItems[0].vendorId)] = shippingOption.quoteId;
+            } else if (typeof shippingOption === 'string' && shippingOption.startsWith('QT-') && vendorItems.length > 0) {
+                // If they passed a string like QT-123
+                normalizedQuotes[String(vendorItems[0].vendorId)] = shippingOption;
+            }
+
+            const validatedQuotes = {};
+            for (const [vId, qId] of Object.entries(normalizedQuotes)) {
+                if (!qId) continue;
+                const quote = await ShippingQuote.findOne({ quoteId: qId }).session(session);
+                if (!quote) throw new ApiError(400, `Shipping quote ${qId} not found.`);
+                if (quote.usedForOrder) throw new ApiError(400, `Shipping quote ${qId} has already been used.`);
+                if (quote.expiresAt < new Date()) throw new ApiError(400, `Shipping quote ${qId} has expired. Please refresh checkout.`);
+                if (quote.quoteScope !== idempotencyScope) throw new ApiError(403, `Shipping quote ${qId} does not belong to the current session.`);
+                if (String(quote.vendorId) !== String(vId)) throw new ApiError(400, `Shipping quote ${qId} does not match the assigned vendor.`);
+                
+                validatedQuotes[String(vId)] = quote;
             }
 
             const orderId = generateOrderId();
@@ -467,7 +489,6 @@ export const placeOrder = asyncHandler(async (req, res) => {
                     baseAmount: item.baseAmount,
                     taxAmount: item.taxAmount,
                     shippingCharge: item.shippingCharge,
-                    shippingTax: item.shippingTax,
                     commissionRate: item.commissionRate,
                     commissionAmount: item.commissionAmount,
                     vendorEarnings: item.vendorEarnings,
@@ -502,6 +523,13 @@ export const placeOrder = asyncHandler(async (req, res) => {
                 idempotencyScope: idempotencyKey ? idempotencyScope : undefined,
             }], { session });
             order = createdOrder;
+
+            // --- Phase 7: Consume Quotes ---
+            for (const quote of Object.values(validatedQuotes)) {
+                quote.orderId = order._id;
+                quote.usedForOrder = true;
+                await quote.save({ session });
+            }
 
             // 7. Deduct stock atomically to prevent oversell under concurrent checkout.
             for (const item of enrichedItems) {
@@ -585,6 +613,7 @@ export const placeOrder = asyncHandler(async (req, res) => {
             });
             await Commission.insertMany(commissionDocs, { session });
 
+            // ─────────────────────────────────────────────────────────────────────
             // 9. Increment coupon usage
             if (appliedCoupon) {
                 if (appliedCoupon.usageLimit) {
@@ -606,6 +635,79 @@ export const placeOrder = asyncHandler(async (req, res) => {
                         { session }
                     );
                 }
+            }
+
+            // ─────────────────────────────────────────────────────────────────────
+            // 10. Create Shipment documents — one per vendor group. (Phase 5.1)
+            //
+            // Shipment creation is INSIDE the same transaction as Order creation.
+            // If Shipment creation fails, the entire transaction rolls back —
+            // there will never be an Order without its corresponding Shipment(s).
+            //
+            // Provider selection:
+            //   - If shippingOption.quoteId is present, resolve the ShippingQuote
+            //     and use its providerId + estimatedCost. (Phase 5.1 — future enhancement)
+            //   - Fallback: 'own_fleet' with estimatedDeliveryCost=0 (legacy path,
+            //     for backward compatibility with frontends that don't send a quoteId).
+            //
+            // One Shipment per vendor group (vendorItems[]), not per item.
+            // A multi-vendor order creates N Shipments where N = number of vendors.
+            // ─────────────────────────────────────────────────────────────────────
+            if (!idempotentReplay) {
+                const shipmentDocs = vendorItems.map((vGroup) => {
+                    const quote = validatedQuotes[String(vGroup.vendorId)];
+                    return {
+                        orderId:                order._id,
+                        vendorId:               vGroup.vendorId,
+                        vendorName:             vGroup.vendorName,
+                        providerId:             quote ? quote.providerId : 'own_fleet',
+                        // No quote provided → system automatically defaults to own_fleet. 'AUTO' is correct.
+                        selectedBy:             'AUTO',
+                        providerLocked:         !!quote,
+                        customerShippingCharge: Number(vGroup.shipping) || 0,
+                        estimatedDeliveryCost:  quote ? quote.estimatedCost : 0,
+                        status:                 'pending',
+                        statusHistory: [{
+                            status:    'pending',
+                            updatedAt: new Date(),
+                            updatedBy: 'system',
+                            notes:     quote ? `Shipment created with provider ${quote.providerId} via quote ${quote.quoteId}` : 'Shipment created at order placement (legacy fallback)',
+                        }],
+                        // Package — estimated from order items for this vendor
+                        packageWeight: vGroup.items.reduce(
+                            (sum, item) => sum + (500 * (item.quantity || 1)), 0
+                        ) || 500,
+                        escrowStatus: 'held',
+                        deliveryAssignmentStatus: 'pending',
+                        rejectedDeliveryBoys: [],
+                    };
+                });
+
+                // Phase 5.1: Create Shipments one-by-one using .save({ session }).
+                //
+                // WHY NOT Shipment.create([...], { session })?
+                // → Mongoose/MongoDB requires `ordered: true` for bulk inserts in a session,
+                //   but more critically, we NEED the pre-save hook to run for each doc
+                //   (the hook generates the unique shipmentNumber). Using insertMany() would
+                //   bypass the pre-save hooks entirely.
+                //
+                // WHY NOT insertMany()?
+                // → insertMany() skips Mongoose middleware (pre/post-save hooks).
+                //   shipmentNumber would not be generated, leaving a required-unique field empty.
+                //
+                // Using new Shipment(doc).save({ session }) per document is the correct
+                // pattern for transactional inserts that need middleware execution.
+                createdShipments = [];
+                for (const doc of shipmentDocs) {
+                    const shipment = new Shipment(doc);
+                    await shipment.save({ session });
+                    createdShipments.push(shipment);
+                }
+
+                console.log(
+                    `[placeOrder] ${createdShipments.length} Shipment(s) created for Order ${order.orderId}:`,
+                    createdShipments.map(s => s.shipmentNumber).join(', ')
+                );
             }
         });
     } catch (err) {
@@ -643,8 +745,26 @@ export const placeOrder = asyncHandler(async (req, res) => {
         )
     );
 
-    // Send confirmation email and notifications (async, non-blocking)
+    // ─── Post-commit: Async side effects ──────────────────────────────────────
+    // IMPORTANT: Events and notifications are emitted ONLY after the transaction
+    // has committed successfully. If the transaction rolled back, createdShipments
+    // is empty and no events are emitted.
     if (!idempotentReplay && order?.orderId) {
+        // Phase 5.1: Emit SHIPMENT_CREATED for each shipment (non-blocking).
+        // Each event fires independently — one listener failure does not affect others.
+        // Events are emitted after commit, so a transaction rollback produces zero events.
+        for (const shipment of createdShipments) {
+            logisticsEventBus.emitEvent(LOGISTICS_EVENTS.SHIPMENT_CREATED, {
+                shipmentId:  String(shipment._id),
+                shipmentNumber: shipment.shipmentNumber,
+                orderId:     String(order._id),
+                orderNumber: order.orderId,
+                vendorId:    String(shipment.vendorId),
+                providerId:  shipment.providerId,
+                selectedBy:  shipment.selectedBy,
+            });
+        }
+
         const emailAddress = order?.shippingAddress?.email || (req.user?.email);
         if (emailAddress) {
             sendOrderConfirmationEmail(order, emailAddress).catch((err) =>
@@ -694,7 +814,11 @@ export const getUserOrders = asyncHandler(async (req, res) => {
     const numPage  = Math.max(1, parseInt(req.query.page,  10) || 1);
     const numLimit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const skip = (numPage - 1) * numLimit;
-    const orders = await Order.find({ userId: req.user.id }).sort({ createdAt: -1 }).skip(skip).limit(numLimit);
+    const orders = await Order.find({ userId: req.user.id })
+        .populate('shipments')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(numLimit);
     const total = await Order.countDocuments({ userId: req.user.id });
 
 
@@ -710,10 +834,26 @@ export const getUserOrders = asyncHandler(async (req, res) => {
         returnMap[oId].push(retReq);
     });
 
-    // Attach returnRequests to each order
+    // Attach returnRequests and dynamically compute overall status from Shipments
     const ordersWithReturns = orders.map(order => {
-        const orderObj = order.toObject();
+        const orderObj = order.toObject({ virtuals: true });
         orderObj.returnRequests = returnMap[String(order._id)] || [];
+        
+        if (orderObj.shipments && orderObj.shipments.length > 0) {
+            const allDelivered = orderObj.shipments.every(s => s.status === 'delivered');
+            const anyShipped = orderObj.shipments.some(s => ['shipped', 'out_for_delivery'].includes(s.status));
+            const anyReady = orderObj.shipments.some(s => s.status === 'ready_for_pickup');
+            
+            if (allDelivered) {
+                orderObj.status = 'delivered';
+                orderObj.deliveredAt = orderObj.shipments.find(s => s.deliveredAt)?.deliveredAt || new Date();
+            } else if (anyShipped) {
+                orderObj.status = 'shipped';
+            } else if (anyReady) {
+                orderObj.status = 'ready_for_pickup';
+            }
+        }
+        
         return orderObj;
     });
 
@@ -728,12 +868,33 @@ export const getOrderDetail = asyncHandler(async (req, res) => {
         ? { _id: req.params.id, userId: req.user.id }
         : { orderId: req.params.id, userId: req.user.id };
 
-    const order = await Order.findOne(query).select('+deliveryOtpDebug');
+    const order = await Order.findOne(query)
+        .populate({ path: 'shipments', select: '+deliveryOtpDebug' })
+        .select('+deliveryOtpDebug');
     if (!order) throw new ApiError(404, 'Order not found.');
 
     const returnRequests = await ReturnRequest.find({ orderId: order._id }).populate('vendorId', 'storeName email');
-    const orderObject = order.toObject();
+    const orderObject = order.toObject({ virtuals: true });
     orderObject.returnRequests = returnRequests || [];
+
+    if (orderObject.shipments && orderObject.shipments.length > 0) {
+        const allDelivered = orderObject.shipments.every(s => s.status === 'delivered');
+        const anyShipped = orderObject.shipments.some(s => ['shipped', 'out_for_delivery'].includes(s.status));
+        const anyReady = orderObject.shipments.some(s => s.status === 'ready_for_pickup');
+        
+        if (allDelivered) {
+            orderObject.status = 'delivered';
+            orderObject.deliveredAt = orderObject.shipments.find(s => s.deliveredAt)?.deliveredAt || new Date();
+        } else if (anyShipped) {
+            orderObject.status = 'shipped';
+            const shipmentWithOtp = orderObject.shipments.find(s => s.deliveryOtpDebug);
+            if (shipmentWithOtp) {
+                orderObject.deliveryOtpDebug = shipmentWithOtp.deliveryOtpDebug;
+            }
+        } else if (anyReady) {
+            orderObject.status = 'ready_for_pickup';
+        }
+    }
 
     res.status(200).json(new ApiResponse(200, orderObject, 'Order detail fetched.'));
 });
@@ -902,9 +1063,6 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
 
     const order = await Order.findOne(query);
     if (!order) throw new ApiError(404, 'Order not found.');
-    if (order.status !== 'delivered') {
-        throw new ApiError(400, 'Return can only be requested for delivered orders.');
-    }
 
     const requestedVendorId = String(req.body.vendorId || '').trim();
     const orderItems = Array.isArray(order.items) ? order.items : [];
@@ -924,6 +1082,23 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
     const vendorScopedItems = orderItems.filter((item) => String(item?.vendorId || '') === vendorId);
     if (vendorScopedItems.length === 0) {
         throw new ApiError(400, 'Selected vendor has no items in this order.');
+    }
+
+    // Verify Shipment / Delivery status
+    const shipments = await Shipment.find({ orderId: order._id, vendorId });
+    if (shipments.length > 1) {
+        throw new ApiError(400, 'Multiple shipments found for this vendor. Please contact support.');
+    }
+    
+    if (shipments.length === 1) {
+        if (shipments[0].status !== 'delivered') {
+            throw new ApiError(400, 'Return can only be requested for delivered orders.');
+        }
+    } else {
+        // Fallback for legacy orders that do not have shipments
+        if (order.status !== 'delivered') {
+            throw new ApiError(400, 'Return can only be requested for delivered orders.');
+        }
     }
 
     let requestedItems = [];

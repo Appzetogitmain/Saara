@@ -18,22 +18,22 @@ const RecommendedSection = ({ products = null }) => {
   }
 
   return (
-    <div className="px-4 py-5 bg-gradient-to-br from-blue-50/50 via-white to-purple-50/40 rounded-2xl mx-2">
+    <div className="px-4 md:px-6 py-6 bg-gradient-to-br from-slate-900 via-slate-900/95 to-slate-950 border border-slate-800/80 rounded-3xl mx-2 shadow-xl my-4">
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl shadow-md">
-            <FiThumbsUp className="text-white text-lg" />
+          <div className="p-2.5 bg-primary-500/20 text-primary-300 border border-primary-500/30 backdrop-blur-md rounded-xl shadow-sm">
+            <FiThumbsUp className="text-primary-300 text-lg" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-gray-800 leading-tight">
+            <h2 className="text-xl md:text-2xl font-black text-white leading-tight tracking-tight">
               Recommended for You
             </h2>
-            <p className="text-xs text-gray-500 mt-0.5">Curated just for you</p>
+            <p className="text-xs text-slate-400 font-semibold mt-0.5">Curated just for you</p>
           </div>
         </div>
         <Link
           to="/search"
-          className="flex items-center gap-1 text-sm text-primary-600 font-semibold hover:text-primary-700 transition-colors active:scale-95">
+          className="flex items-center gap-1 text-xs md:text-sm text-primary-400 font-bold hover:text-primary-300 uppercase tracking-wider transition-colors active:scale-95">
           <span>See All</span>
           <FiArrowRight className="text-sm" />
         </Link>

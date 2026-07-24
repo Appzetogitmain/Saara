@@ -51,6 +51,7 @@ const getPriceMeta = (item) => {
 const SwipeableCartItem = ({ item, index }) => {
     const [swipeOffset, setSwipeOffset] = useState(0);
     const [isDeleted, setIsDeleted] = useState(false);
+    const [isRemoving, setIsRemoving] = useState(false);
     const [hasAnimated, setHasAnimated] = useState(false);
     const [selectedSize, setSelectedSize] = useState(String(item?.variant?.size || "XL"));
     const deletedItemRef = useRef(null);
@@ -137,26 +138,26 @@ const SwipeableCartItem = ({ item, index }) => {
             onTouchStart={swipeHandlers.onTouchStart}
             onTouchMove={swipeHandlers.onTouchMove}
             onTouchEnd={swipeHandlers.onTouchEnd}>
-            <div className="bg-white rounded-[22px] relative border border-gray-200 overflow-hidden">
+            <div className="bg-white rounded-2xl relative border border-slate-200/80 overflow-hidden shadow-sm">
                 {/* Delete Background */}
                 {swipeOffset > 0 && (
-                    <div className="absolute inset-0 bg-red-500 rounded-2xl flex items-center justify-end pr-4">
+                    <div className="absolute inset-0 bg-rose-500 rounded-2xl flex items-center justify-end pr-4">
                         <FiTrash2 className="text-white text-xl" />
                     </div>
                 )}
-                <div className="flex gap-4 p-4 relative z-10">
+                <div className="flex gap-4 p-3.5 relative z-10">
                     {/* Product Image */}
-                    <div className="w-20 h-20 flex-shrink-0 rounded-2xl overflow-hidden bg-gray-200 relative z-10">
+                    <div className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-slate-50 border border-slate-100 p-1 relative z-10">
                         <img
                             src={item.image}
                             alt={item.name}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-contain"
                         />
                     </div>
 
                     {/* Product Info */}
                     <div className="flex-1 min-w-0 relative z-10">
-                        <h3 className="font-semibold text-slate-700 text-[13px] leading-5 mb-1 uppercase line-clamp-2">
+                        <h3 className="font-bold text-gray-900 text-[13px] leading-snug mb-1 line-clamp-2">
                             {item.name}
                         </h3>
                         <div className="flex items-center gap-2 mb-2">
@@ -164,7 +165,7 @@ const SwipeableCartItem = ({ item, index }) => {
                                 <select
                                     value={selectedSize}
                                     onChange={(e) => setSelectedSize(e.target.value)}
-                                    className="appearance-none pl-2.5 pr-5 py-1 bg-gray-100 rounded-md text-[11px] text-gray-500 focus:outline-none"
+                                    className="appearance-none pl-2.5 pr-5 py-1 bg-slate-100 rounded-md text-[11px] font-medium text-slate-600 focus:outline-none"
                                 >
                                     {sizeOptions.map((sizeOption) => (
                                         <option key={sizeOption} value={sizeOption}>
@@ -172,46 +173,46 @@ const SwipeableCartItem = ({ item, index }) => {
                                         </option>
                                     ))}
                                 </select>
-                                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-500">▼</span>
+                                <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">▼</span>
                             </div>
-                            <div className="flex items-center bg-gray-100 rounded-md px-1 py-0.5">
+                            <div className="flex items-center bg-slate-100 rounded-lg px-1 py-0.5 border border-slate-200/60">
                                 <button
                                     type="button"
                                     onClick={() => handleQuantityChange(item.id, item.quantity, -1, item.variant)}
-                                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-200 rounded-md transition-colors"
+                                    className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-200 rounded-md transition-colors"
                                 >
                                     <FiMinus size={11} />
                                 </button>
-                                <span className="text-[11px] font-bold text-gray-600 px-2 min-w-[20px] text-center">
+                                <span className="text-[11px] font-bold text-slate-800 px-2 min-w-[20px] text-center">
                                     {item.quantity}
                                 </span>
                                 <button
                                     type="button"
                                     onClick={() => handleQuantityChange(item.id, item.quantity, 1, item.variant)}
-                                    className="w-6 h-6 flex items-center justify-center text-gray-500 hover:bg-gray-200 rounded-md transition-colors"
+                                    className="w-6 h-6 flex items-center justify-center text-slate-600 hover:bg-slate-200 rounded-md transition-colors"
                                 >
                                     <FiPlus size={11} />
                                 </button>
                             </div>
                         </div>
-                        <div className="mb-1.5">
+                        <div className="mb-1">
                             <div className="flex items-center gap-1.5 leading-none">
-                                <span className="text-[13px] font-bold text-slate-800">
+                                <span className="text-sm font-extrabold text-gray-900">
                                     {formatPrice(currentPrice)}
                                 </span>
                                 {hasDiscount && (
                                     <>
-                                        <span className="text-[11px] text-gray-400 line-through">
+                                        <span className="text-[11px] text-slate-400 line-through font-medium">
                                             {formatPrice(originalPrice)}
                                         </span>
-                                        <span className="text-[11px] text-gray-500">
-                                            ({discountPercent}%)
+                                        <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded">
+                                            {discountPercent}% OFF
                                         </span>
                                     </>
                                 )}
                             </div>
                             {hasDiscount && (
-                                <p className="mt-1 text-[12px] font-semibold text-emerald-500">
+                                <p className="mt-1 text-[11px] font-bold text-emerald-600">
                                     You save {formatPrice(savings)}
                                 </p>
                             )}
@@ -225,17 +226,24 @@ const SwipeableCartItem = ({ item, index }) => {
                         )}
                     </div>
                 </div>
-                <div className="border-t border-gray-200 px-4 py-3 flex justify-end relative z-10">
+                <div className="border-t border-slate-100 px-4 py-2 flex justify-end relative z-10 bg-slate-50/50">
                     <button
                         type="button"
-                        onClick={(e) => {
+                        disabled={isRemoving}
+                        onClick={async (e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            removeItem(item.id, item.variant);
+                            if (isRemoving) return;
+                            setIsRemoving(true);
+                            try {
+                                await removeItem(item.id, item.variant);
+                            } finally {
+                                setIsRemoving(false);
+                            }
                         }}
-                        className="text-[12px] font-semibold text-sky-600 hover:text-sky-700 transition-colors"
+                        className={`text-[12px] font-bold transition-colors ${isRemoving ? 'text-slate-400 cursor-not-allowed' : 'text-rose-500 hover:text-rose-600'}`}
                     >
-                        Remove
+                        {isRemoving ? 'Removing...' : 'Remove'}
                     </button>
                 </div>
             </div>

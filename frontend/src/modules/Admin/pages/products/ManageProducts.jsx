@@ -204,14 +204,14 @@ const ManageProducts = () => {
         </div>
         <button
           onClick={() => setProductFormModal({ isOpen: true, productId: "new" })}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-semibold"
+          className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-2xl shadow-md shadow-primary-500/20 active:scale-95 transition-all text-sm font-bold"
         >
           <FiPlus />
           Add Product
         </button>
       </div>
 
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-200">
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200/80">
         {/* Filters Section */}
         <div className="mb-6 pb-6 border-b border-gray-200">
           <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 sm:gap-4">

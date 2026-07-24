@@ -162,13 +162,13 @@ const MobileFilterPanel = ({ isOpen, onClose, filters, onFilterChange, onClearFi
             <div className="border-t border-gray-200 p-4 space-y-2">
               <button
                 onClick={onClearFilters}
-                className="w-full py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors"
+                className="w-full py-3 bg-slate-100 text-slate-700 rounded-xl font-bold hover:bg-slate-200 transition-colors"
               >
                 Clear All
               </button>
               <button
                 onClick={onClose}
-                className="w-full py-3 gradient-green text-white rounded-xl font-semibold hover:shadow-glow-green transition-all"
+                className="w-full py-3 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-bold rounded-xl shadow-md shadow-primary-500/20 active:scale-95 transition-all"
               >
                 Apply Filters
               </button>

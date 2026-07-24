@@ -170,14 +170,14 @@ const ProductCard = ({
     <>
       <motion.div
         style={{ willChange: "transform", transform: "translateZ(0)" }}
-        className="bg-white rounded-2xl overflow-hidden group cursor-pointer h-full flex flex-col hover:shadow-xl transition-all duration-300 border border-gray-100/60"
+        className="bg-white rounded-2xl overflow-hidden group cursor-pointer h-full flex flex-col hover:shadow-lg transition-all duration-300 border border-slate-200/80 shadow-sm"
         {...longPressHandlers}>
         <div className="relative">
           {/* Favorite Icon */}
           <div className="absolute top-2 right-2 z-10">
             <button
               onClick={handleFavorite}
-              className="p-1.5 bg-white/90 backdrop-blur-md rounded-full shadow-sm transition-all duration-300 group/heart hover:bg-white hover:scale-110">
+              className="p-1.5 bg-white/90 backdrop-blur-md rounded-full shadow-sm border border-slate-100 transition-all duration-300 group/heart hover:bg-white hover:scale-110">
               <FiHeart
                 className={`text-sm transition-colors duration-300 ${isFavorite
                   ? "text-red-500 fill-red-500"
@@ -190,14 +190,14 @@ const ProductCard = ({
           {/* Product Image */}
           <Link to={productLink} className="block">
             <div
-              className={`w-full bg-gray-50 flex items-center justify-center overflow-hidden relative group-hover:bg-gray-100/50 transition-colors ${enhancedLayout
+              className={`w-full bg-slate-50 flex items-center justify-center overflow-hidden relative group-hover:bg-slate-100/60 transition-colors ${enhancedLayout
                   ? "h-40 sm:h-48 md:h-56"
                   : "h-36 md:h-44"
                 }`}>
               <LazyImage
                 src={product.image}
                 alt={product.name}
-                className="w-full h-full object-cover transition-transform duration-500 ease-out"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
                 style={{ willChange: "transform", transform: "translateZ(0)" }}
                 onError={(e) => {
                   e.target.src = getPlaceholderImage(300, 300, "Product Image");
@@ -208,34 +208,34 @@ const ProductCard = ({
         </div>
 
         {/* Product Info */}
-        <div className="p-2 flex-1 flex flex-col">
+        <div className="p-2.5 flex-1 flex flex-col">
           {/* Featured Tag */}
           <div className="mb-1">
-            <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-md uppercase tracking-wide">
+            <span className="text-[9px] font-bold bg-primary-500/10 text-primary-600 px-2 py-0.5 rounded-full uppercase tracking-wider">
               Bestseller
             </span>
           </div>
 
           <Link to={productLink} className="block mb-0.5">
-            <h4 className="text-[10px] font-medium text-gray-400 uppercase tracking-tight truncate">
+            <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider truncate">
               {product.brandName || "Premium Brand"}
             </h4>
-            <h3 className="text-xs font-semibold text-gray-800 line-clamp-1 leading-tight mb-1">
+            <h3 className="text-xs font-bold text-gray-900 line-clamp-1 leading-tight mb-1 group-hover:text-primary-600 transition-colors">
               {product.name}
             </h3>
           </Link>
 
           {/* Price Section */}
           <div className="flex items-center flex-wrap gap-1.5 mb-1">
-            <span className="text-base font-bold text-gray-900">
+            <span className="text-base font-extrabold text-gray-900">
               {formatPrice(product.price)}
             </span>
             {product.originalPrice && (
               <>
-                <span className="text-[11px] text-gray-400 line-through font-medium">
+                <span className="text-[11px] text-slate-400 line-through font-medium">
                   {formatPrice(product.originalPrice)}
                 </span>
-                <span className="text-[11px] text-green-600 font-semibold">
+                <span className="text-[10px] text-emerald-600 bg-emerald-50 font-bold px-1.5 py-0.5 rounded-md">
                   {Math.round(
                     ((product.originalPrice - product.price) /
                       product.originalPrice) *
@@ -253,12 +253,12 @@ const ProductCard = ({
                 <FiStar
                   key={i}
                   className={`text-[10px] ${i < Math.floor(product.rating || 4)
-                      ? "text-gray-400 fill-gray-400"
-                      : "text-gray-200"
+                      ? "text-amber-400 fill-amber-400"
+                      : "text-slate-200"
                     }`}
                 />
               ))}
-              <span className="text-[10px] text-gray-400 font-medium ml-1">
+              <span className="text-[10px] text-slate-400 font-medium ml-1">
                 ({product.reviewCount || 47})
               </span>
             </div>
@@ -271,7 +271,7 @@ const ProductCard = ({
                 type="button"
                 onClick={handleRemoveFromCart}
                 whileTap={{ scale: 0.95 }}
-                className="w-full py-2 rounded-xl font-bold text-xs bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 transition-all flex items-center justify-center gap-2">
+                className="w-full py-2.5 rounded-xl font-bold text-xs bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-100 transition-all flex items-center justify-center gap-2 shadow-sm">
                 <FiTrash2 className="text-sm" />
                 <span>Remove</span>
               </motion.button>
@@ -282,9 +282,9 @@ const ProductCard = ({
                 onClick={handleAddToCart}
                 disabled={product.stock === "out_of_stock" || isAdding}
                 whileTap={{ scale: 0.95 }}
-                className={`w-full py-2 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${product.stock === "out_of_stock"
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    : "bg-emerald-500 text-white shadow-sm hover:bg-emerald-600 shadow-emerald-200"
+                className={`w-full py-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${product.stock === "out_of_stock"
+                    ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                    : "bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white shadow-md shadow-primary-500/20 active:scale-95"
                   }`}>
                 <FiShoppingBag className="text-sm" />
                 <span>{isAdding ? "Adding..." : "Add"}</span>

@@ -216,7 +216,7 @@ const StockManagement = () => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-200">
+      <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-sm border border-slate-200/80">
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1">
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />

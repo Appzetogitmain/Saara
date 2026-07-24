@@ -1,3 +1,4 @@
+import logger from '../utils/logger.js';
 import UserWallet from '../models/UserWallet.model.js';
 import WalletTransaction from '../models/WalletTransaction.model.js';
 import Refund from '../models/Refund.model.js';
@@ -154,7 +155,7 @@ export const creditWallet = async (userId, amount, transactionType, details = {}
             amount: String(amount),
             transactionType
         }
-    }).catch(err => console.error('[Wallet Credit Notification Error]', err.message));
+    }).catch(err => logger.error('[Wallet Credit Notification Error]', err.message));
 
     return { wallet, transaction };
 };
@@ -240,7 +241,7 @@ export const debitWallet = async (userId, amount, transactionType, details = {},
             amount: String(amount),
             transactionType
         }
-    }).catch(err => console.error('[Wallet Debit Notification Error]', err.message));
+    }).catch(err => logger.error('[Wallet Debit Notification Error]', err.message));
 
     return { wallet, transaction };
 };

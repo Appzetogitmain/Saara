@@ -49,7 +49,6 @@ const iconMap = {
   "Pickup Locations": FiMapPin,
   Promotions: FiTag,
   Notifications: FiBell,
-  "Shipping Management": FiTruck,
   Customers: FiUsers,
   "Support Tickets": FiMessageSquare,
   "Inventory Reports": FiBarChart2,
@@ -80,7 +79,6 @@ const getChildRoute = (parentRoute, childName) => {
     "/vendor/settings": {
       "Store Settings": "/vendor/settings/store",
       "Payment Settings": "/vendor/settings/payment",
-      "Shipping Settings": "/vendor/settings/shipping",
     },
   };
 
@@ -186,11 +184,11 @@ const VendorSidebar = ({ isOpen, onClose, isCollapsed }) => {
         {/* Main Menu Item */}
         <div
           className={`
-            flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 cursor-pointer
+            flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 cursor-pointer
             ${
               active
-                ? "bg-primary-600 text-white shadow-sm"
-                : "text-gray-300 hover:bg-slate-700"
+                ? "bg-gradient-to-r from-primary-600 to-primary-700 text-white font-bold shadow-md shadow-primary-500/20 active:scale-95"
+                : "text-slate-300 hover:bg-slate-700/60 font-medium"
             }
           `}
           onClick={() => {
@@ -202,7 +200,7 @@ const VendorSidebar = ({ isOpen, onClose, isCollapsed }) => {
           }}>
           <Icon
             className={`text-xl flex-shrink-0 ${
-              active ? "text-white" : "text-gray-400"
+              active ? "text-white" : "text-slate-400"
             }`}
           />
           <span className="font-medium flex-1 text-sm">{item.title}</span>
@@ -210,7 +208,7 @@ const VendorSidebar = ({ isOpen, onClose, isCollapsed }) => {
             <motion.div
               animate={{ rotate: isExpanded ? 180 : 0 }}
               transition={{ duration: 0.2 }}>
-              <FiChevronDown className="text-gray-400 text-sm" />
+              <FiChevronDown className="text-slate-400 text-sm" />
             </motion.div>
           )}
         </div>
@@ -224,7 +222,7 @@ const VendorSidebar = ({ isOpen, onClose, isCollapsed }) => {
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
               className="overflow-hidden">
-              <div className="ml-4 mt-1 pl-4 border-l-2 border-slate-600 space-y-1">
+              <div className="ml-4 mt-1 pl-4 border-l-2 border-slate-700 space-y-1">
                 {item.children.map((child, index) => {
                   const childRoute = getChildRoute(item.route, child);
                   const isChildActive =
@@ -239,11 +237,11 @@ const VendorSidebar = ({ isOpen, onClose, isCollapsed }) => {
                         handleMenuItemClick(childRoute, item.title)
                       }
                       className={`
-                        px-3 py-2 text-xs rounded-lg transition-colors cursor-pointer
+                        px-3 py-2 text-xs rounded-xl transition-all cursor-pointer
                         ${
                           isChildActive
-                            ? "bg-primary-500/20 text-white font-medium"
-                            : "text-gray-400 hover:bg-slate-700"
+                            ? "bg-primary-500/20 text-white font-bold border-l-2 border-primary-500"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 font-medium"
                         }
                       `}>
                       {child}

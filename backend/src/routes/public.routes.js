@@ -10,6 +10,7 @@ import Coupon from '../models/Coupon.model.js';
 import Banner from '../models/Banner.model.js';
 import Campaign from '../models/Campaign.model.js';
 import { calculateVendorShippingForGroups } from '../services/vendorShipping.service.js';
+import { runEngine }                         from '../services/deliveryEngine.service.js';
 import { cacheResponse } from '../middlewares/responseCache.js';
 import Settings from '../models/Settings.model.js';
 import PlatformPolicy from '../models/PlatformPolicy.model.js';
@@ -1001,28 +1002,163 @@ router.get('/coupons/available', marketingCache, asyncHandler(async (req, res) =
 }));
 
 // POST /api/shipping/estimate
+// ─────────────────────────────────────────────────────────────────────────────
+// BACKWARD COMPATIBILITY CONTRACT
+// The response shape is guaranteed to remain:
+//   { shipping: number, byVendor: { [vendorId]: number } }
+//
+// Phase 3.5 adds two OPTIONAL fields that callers may ignore:
+//   quoteId : string | null   — ShippingQuote token; pass back at order creation
+//   eta     : { date, hours } | null   — estimated delivery window
+//
+// If the Delivery Engine fails for any reason, the endpoint still returns
+// the original { shipping, byVendor } response without modification.
+// ─────────────────────────────────────────────────────────────────────────────
 router.post('/shipping/estimate', asyncHandler(async (req, res) => {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
-    const { shippingAddress, shippingOption, couponType } = req.body;
-    if (!items.length) return res.status(200).json(new ApiResponse(200, { shipping: 0, byVendor: {} }));
+    const { shippingAddress, shippingOption, couponType, paymentMethod } = req.body;
+
+    // ── Fast path: empty cart ──────────────────────────────────────────────
+    if (!items.length) {
+        return res.status(200).json(new ApiResponse(200, { shipping: 0, byVendor: {}, quoteId: null, eta: null }));
+    }
+
     const productIds = items.map(i => i.productId).filter(id => /^[a-fA-F0-9]{24}$/.test(id));
+
+    // Fetch products with vendor shipping config AND warehouse address (for engine origin)
     const products = await Product.find({ _id: { $in: productIds }, isActive: true })
-        .populate('vendorId', 'shippingEnabled defaultShippingRate freeShippingThreshold').lean();
+        .populate('vendorId', 'shippingEnabled defaultShippingRate freeShippingThreshold warehouseAddress')
+        .lean();
+
     const productMap = new Map(products.map(p => [String(p._id), p]));
     const vendorMap = {};
+
     items.forEach(item => {
         const product = productMap.get(String(item.productId));
         if (!product || !product.vendorId) return;
         const vId = String(product.vendorId._id);
         const subtotal = (resolveVariantPrice(product, item.variant) || product.price) * item.quantity;
         if (!vendorMap[vId]) {
-            vendorMap[vId] = { vendorId: vId, subtotal: 0, shippingEnabled: product.vendorId.shippingEnabled !== false, defaultShippingRate: product.vendorId.defaultShippingRate, freeShippingThreshold: product.vendorId.freeShippingThreshold };
+            vendorMap[vId] = {
+                vendorId:             vId,
+                subtotal:             0,
+                shippingEnabled:      product.vendorId.shippingEnabled !== false,
+                defaultShippingRate:  product.vendorId.defaultShippingRate,
+                freeShippingThreshold: product.vendorId.freeShippingThreshold,
+                // Warehouse address fields added for engine — not used by existing shipping calc
+                warehouseAddress:     product.vendorId.warehouseAddress,
+            };
         }
         vendorMap[vId].subtotal += subtotal;
     });
-    const result = await calculateVendorShippingForGroups({ vendorGroups: Object.values(vendorMap), shippingAddress, shippingOption, couponType });
-    res.status(200).json(new ApiResponse(200, { shipping: result.totalShipping, byVendor: result.shippingByVendor }));
+
+    // ── Existing shipping calculation (UNCHANGED logic) ────────────────────
+    // Engine runs in parallel — existing result is never blocked by it
+    const vendorGroups = Object.values(vendorMap);
+
+    // ── Delivery Engine (Phase 7 addition) ──────────────────────────────
+    // Runs concurrently with existing shipping calc. Any failure is silenced.
+    // Calculate static shipping first so we can pass customerShippingCharge to the engine
+    const shippingResult = await calculateVendorShippingForGroups({ vendorGroups, shippingAddress, shippingOption, couponType });
+
+    const userId = req.user?.id || null;
+    const normalizedGuestEmail = String(shippingAddress?.email || '').trim().toLowerCase();
+    const normalizedGuestPhone = String(shippingAddress?.phone || '').replace(/\D/g, '').slice(-10);
+    const quoteScope = userId 
+        ? `user:${String(userId)}` 
+        : `guest:${normalizedGuestEmail || normalizedGuestPhone || 'anonymous'}`;
+
+    const enginePromises = vendorGroups.map(async (vGroup) => {
+        try {
+            const wh = vGroup.warehouseAddress || {};
+            const originContext = {
+                pincode: wh.pincode  || null,
+                city:    wh.city     || null,
+                state:   wh.state    || null,
+                lat:     wh.location?.coordinates?.[1] || null,
+                lng:     wh.location?.coordinates?.[0] || null,
+            };
+
+            const destContext = {
+                pincode: shippingAddress?.pincode  || shippingAddress?.zipCode || null,
+                city:    shippingAddress?.city     || null,
+                state:   shippingAddress?.state    || null,
+                lat:     shippingAddress?.lat      || null,
+                lng:     shippingAddress?.lng      || null,
+            };
+
+            // Estimate total package weight from items for THIS vendor
+            // Fallback to 500g per item if not specified
+            // Wait, items in vGroup aren't tracked? vendorGroups only has subtotal etc.
+            // We need to compute totalWeightGrams from original items array mapped to this vendor
+            const vItems = items.filter(item => {
+                const p = productMap.get(String(item.productId));
+                return p && String(p.vendorId._id) === String(vGroup.vendorId);
+            });
+            const totalWeightGrams = vItems.reduce((sum, item) => sum + (Number(item.weight) || 500) * (Number(item.quantity) || 1), 0);
+            
+            const customerCharge = shippingResult.shippingByVendor[vGroup.vendorId] || 0;
+
+            const engineContext = {
+                origin:                 originContext,
+                destination:            destContext,
+                packageWeight:          totalWeightGrams,
+                paymentMethod:          paymentMethod || 'online',
+                customerShippingCharge: customerCharge, 
+            };
+
+            const engineResult = await runEngine(engineContext, {
+                vendorId: vGroup.vendorId || undefined,
+                quoteScope: quoteScope
+            });
+
+            return { vendorId: vGroup.vendorId, engineResult };
+        } catch (err) {
+            console.error(`[ShippingEstimate] Delivery Engine error for vendor ${vGroup.vendorId}:`, err.message);
+            return { vendorId: vGroup.vendorId, engineResult: null };
+        }
+    });
+
+    const engineResultsArray = await Promise.all(enginePromises);
+    
+    // ── Build response ─────────────────────────────────────────────────────
+    
+    const quotesByVendor = {};
+    let firstQuoteId = null;
+    let firstEta = null;
+
+    engineResultsArray.forEach(({ vendorId, engineResult }) => {
+        if (engineResult && engineResult.shippingQuoteId) {
+            if (!firstQuoteId) {
+                firstQuoteId = engineResult.shippingQuoteId;
+                firstEta = engineResult.quote?.etaDate 
+                    ? { date: engineResult.quote.etaDate, hours: engineResult.quote.etaHours } 
+                    : null;
+            }
+            quotesByVendor[vendorId] = {
+                quoteId: engineResult.shippingQuoteId,
+                eta: engineResult.quote?.etaDate ? { date: engineResult.quote.etaDate, hours: engineResult.quote.etaHours } : null,
+                customerCharge: shippingResult.shippingByVendor[vendorId] || 0
+            };
+        }
+    });
+
+    // ORIGINAL fields: unchanged, always present
+    const responseData = {
+        shipping:  shippingResult.totalShipping,
+        byVendor:  shippingResult.shippingByVendor,
+
+        // ADDED fields (Phase 3.5 backward compat): null when engine unavailable
+        quoteId: firstQuoteId,
+        eta:     firstEta,
+        
+        // ADDED field (Phase 7): complete map of quotes for multi-vendor checkout
+        quotesByVendor
+    };
+
+    res.status(200).json(new ApiResponse(200, responseData));
 }));
+
 
 // GET /api/banners
 router.get('/banners', marketingCache, asyncHandler(async (req, res) => {

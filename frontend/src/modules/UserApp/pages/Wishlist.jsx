@@ -376,14 +376,14 @@ const Wishlist = () => {
                       <>
                         <button
                           onClick={handleMoveSelected}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-primary-600 hover:bg-primary-750 text-white rounded-xl text-xs font-extrabold shadow-sm transition-all"
+                          className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-xl text-xs font-extrabold shadow-md shadow-primary-500/20 active:scale-95 transition-all"
                         >
                           <FiShoppingBag />
                           <span>Move Selected ({selectedItems.length})</span>
                         </button>
                         <button
                           onClick={handleRemoveSelected}
-                          className="flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-xs font-bold transition-all"
+                          className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl text-xs font-bold transition-all"
                         >
                           <FiTrash2 />
                           <span>Remove</span>
@@ -408,8 +408,8 @@ const Wishlist = () => {
                     onClick={() => setSelectedFilter(f.key)}
                     className={`px-4 py-1.5 rounded-full text-xs font-bold shrink-0 transition-all border ${
                       selectedFilter === f.key
-                        ? "bg-primary-600 border-primary-600 text-white shadow-sm"
-                        : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                        ? 'bg-gradient-to-r from-primary-600 to-primary-700 text-white border-transparent shadow-md shadow-primary-500/20'
+                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
                     {f.label}
