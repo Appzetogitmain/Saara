@@ -70,9 +70,9 @@ const MobileOrderDetail = () => {
   const [cancelComment, setCancelComment] = useState("");
   const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
 
-  // Lock background body and html scrolling when cancellation modal is open
+  // Lock background body and html scrolling when return or cancellation modal is open
   useEffect(() => {
-    if (cancelModalTarget) {
+    if (showReturnModal || cancelModalTarget) {
       document.body.style.overflow = "hidden";
       document.documentElement.style.overflow = "hidden";
     } else {
@@ -83,7 +83,7 @@ const MobileOrderDetail = () => {
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
     };
-  }, [cancelModalTarget]);
+  }, [showReturnModal, cancelModalTarget]);
 
   const CANCELLATION_REASONS = [
     "Ordered by mistake",
@@ -618,11 +618,30 @@ const MobileOrderDetail = () => {
       const variant = selectedItem
         ? exchangeVariants[selectedItem.productId]
         : null;
-      if (!variant || (!variant.size && !variant.color)) {
+
+      const hasVariantSelection = variant && (Boolean(variant.size) || Boolean(variant.color) || Object.keys(variant).length > 0);
+      if (!hasVariantSelection) {
         toast.error(
-          "Please select a valid replacement variant (size/color) for exchange.",
+          "Please select a replacement size or color variant for exchange.",
         );
         return;
+      }
+
+      // Pre-check stock level in frontend
+      const productData = productDetailsMap[selectedItem.productId];
+      if (productData) {
+        const signature = getVariantSignature(variant);
+        const entries = Object.entries(productData.variants?.stockMap || {});
+        const exact = entries.find(
+          ([k]) => String(k).trim().toLowerCase() === signature.toLowerCase(),
+        );
+        const stockCount = exact ? Number(exact[1]) : 0;
+        if (stockCount <= 0) {
+          toast.error(
+            "The selected replacement variant is out of stock. Please choose an in-stock variant.",
+          );
+          return;
+        }
       }
     }
 
@@ -658,6 +677,7 @@ const MobileOrderDetail = () => {
               "exchangeColor",
               String(variant.color || "").trim(),
             );
+            formData.append("exchangeVariantJson", JSON.stringify(variant));
           }
 
           evidenceFiles.forEach((file) => {
@@ -1221,418 +1241,434 @@ const MobileOrderDetail = () => {
           </div>
 
 
-        {showReturnModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center sm:justify-center"
-            onClick={resetReturnModal}
-          >
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-              className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl p-4 sm:p-5"
+        {showReturnModal &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-hidden select-none"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) resetReturnModal();
+              }}
+              onWheel={(e) => e.stopPropagation()}
+              onTouchMove={(e) => {
+                if (e.target === e.currentTarget) e.preventDefault();
+              }}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-800">
-                  Request Return / Exchange
-                </h3>
-                <button
-                  onClick={resetReturnModal}
-                  className="p-2 rounded-full hover:bg-gray-100"
-                >
-                  <FiX className="text-gray-600" />
-                </button>
-              </div>
-
-              {/* Product Selection List */}
-              {allOrderItems.length > 0 && (
-                <div className="mb-4">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Select Items to Return
-                  </label>
-                  <div className="space-y-2 max-h-56 overflow-y-auto border border-slate-100 p-2 rounded-xl">
-                    {allOrderItems.map((item) => {
-                      const prodId = String(item.productId || item.id || "");
-                      const stateVal = selectedItems[prodId] || {
-                        checked: false,
-                        quantity: 1,
-                        maxQuantity: item.quantity || 1,
-                      };
-                      return (
-                        <div
-                          key={prodId}
-                          className="flex items-center justify-between gap-3 p-2 bg-slate-50/50 rounded-xl border border-slate-100"
-                        >
-                          <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
-                            <input
-                              type="checkbox"
-                              checked={stateVal.checked}
-                              onChange={() => handleToggleCheck(prodId)}
-                              className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 border-gray-300"
-                            />
-                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-100 flex-shrink-0">
-                              <img
-                                src={item.image}
-                                alt={item.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="flex-grow min-w-0">
-                              <span className="block text-xs font-bold text-gray-800 truncate leading-tight">
-                                {item.name}
-                              </span>
-                              <span className="block text-[10px] text-gray-400 font-bold mt-0.5">
-                                Sold by: {item.vendorName}
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-bold">
-                                Qty purchased: {stateVal.maxQuantity}
-                              </span>
-                            </div>
-                          </label>
-
-                          {/* Quantity Controls */}
-                          {stateVal.checked && stateVal.maxQuantity > 1 && (
-                            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateQty(prodId, -1)}
-                                className="w-5 h-5 flex items-center justify-center text-xs font-black text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
-                              >
-                                -
-                              </button>
-                              <span className="w-4 text-center text-xs font-bold text-slate-700">
-                                {stateVal.quantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateQty(prodId, 1)}
-                                className="w-5 h-5 flex items-center justify-center text-xs font-black text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
-                              >
-                                +
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Request Type Selector */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Request Type
-                </label>
-                <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setRequestType("return")}
-                    className={`py-2 rounded-lg text-xs font-bold transition-all ${
-                      requestType === "return"
-                        ? "bg-white text-slate-800 shadow-sm border border-slate-100"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    Return (Refund)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRequestType("exchange")}
-                    className={`py-2 rounded-lg text-xs font-bold transition-all ${
-                      requestType === "exchange"
-                        ? "bg-white text-slate-800 shadow-sm border border-slate-100"
-                        : "text-slate-500 hover:text-slate-700"
-                    }`}
-                  >
-                    Exchange (Replacement)
-                  </button>
-                </div>
-              </div>
-
-              {/* Exchange Fields */}
-              {/* Exchange Fields */}
-              {requestType === "exchange" && (
-                <div className="mb-4 space-y-3 animate-fadeIn">
-                  {/* Find the checked product */}
-                  {(() => {
-                    const checkedEntry = Object.entries(selectedItems).find(
-                      ([_, value]) => value.checked === true,
-                    );
-                    if (!checkedEntry) {
-                      return (
-                        <div className="p-3 bg-purple-50/20 border border-dashed border-purple-200 rounded-xl text-center text-xs font-semibold text-purple-700">
-                          Please select an item above to choose replacement
-                          variant.
-                        </div>
-                      );
-                    }
-
-                    const prodId = checkedEntry[0];
-                    const orderItem = allOrderItems.find(
-                      (it) => String(it.productId || it.id || "") === prodId,
-                    );
-                    if (!orderItem) return null;
-
-                    return (
-                      <div className="space-y-3 p-3 bg-purple-50/20 border border-purple-100 rounded-2xl">
-                        {/* Show Current Variant */}
-                        <div className="p-2.5 bg-white border border-purple-200/60 rounded-xl space-y-1">
-                          <span className="text-[10px] font-black text-purple-900 uppercase tracking-widest block font-sans">
-                            Current Variant Purchased
-                          </span>
-                          <div className="flex gap-4 text-xs font-bold text-slate-700 font-sans">
-                            <span>
-                              Size:{" "}
-                              <span className="text-slate-900">
-                                {orderItem.variant?.size || "N/A"}
-                              </span>
-                            </span>
-                            <span>
-                              Color:{" "}
-                              <span className="text-slate-900 capitalize">
-                                {orderItem.variant?.color || "N/A"}
-                              </span>
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Choose Replacement */}
-                        <div className="space-y-2">
-                          <span className="text-[10px] font-black text-purple-900 uppercase tracking-widest block font-sans">
-                            Choose Replacement Variant
-                          </span>
-                          {productDetailsMap[prodId] ? (
-                            <VariantSelector
-                              variants={productDetailsMap[prodId].variants}
-                              currentPrice={productDetailsMap[prodId].price}
-                              selectedVariant={exchangeVariants[prodId] || {}}
-                              onVariantChange={(newVariant) => {
-                                // Check if it is same as purchased
-                                const sameSize =
-                                  String(newVariant.size || "")
-                                    .trim()
-                                    .toLowerCase() ===
-                                  String(orderItem.variant?.size || "")
-                                    .trim()
-                                    .toLowerCase();
-                                const sameColor =
-                                  String(newVariant.color || "")
-                                    .trim()
-                                    .toLowerCase() ===
-                                  String(orderItem.variant?.color || "")
-                                    .trim()
-                                    .toLowerCase();
-                                if (sameSize && sameColor) {
-                                  toast.error(
-                                    "Cannot exchange for the exact same size and color.",
-                                  );
-                                  return;
-                                }
-                                setExchangeVariants((prev) => ({
-                                  ...prev,
-                                  [prodId]: newVariant,
-                                }));
-                              }}
-                            />
-                          ) : (
-                            <p className="text-xs text-slate-400 font-semibold italic">
-                              Loading variants...
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Inventory Check & Price difference */}
-                        {exchangeVariants[prodId] &&
-                          productDetailsMap[prodId] && (
-                            <div className="pt-2.5 border-t border-purple-200/50 space-y-2.5">
-                              {(() => {
-                                const variant = exchangeVariants[prodId];
-                                const productData = productDetailsMap[prodId];
-
-                                // Get stock level
-                                const signature = getVariantSignature(variant);
-                                const entries = Object.entries(
-                                  productData.variants?.stockMap || {},
-                                );
-                                const exact = entries.find(
-                                  ([k]) =>
-                                    String(k).trim().toLowerCase() ===
-                                    signature.toLowerCase(),
-                                );
-                                const stockCount = exact ? Number(exact[1]) : 0;
-
-                                // Get price difference
-                                const basePrice = Number(
-                                  productData.price || 0,
-                                );
-                                const priceEntries = Object.entries(
-                                  productData.variants?.prices || {},
-                                );
-                                const pExact = priceEntries.find(
-                                  ([k]) =>
-                                    String(k).trim().toLowerCase() ===
-                                    signature.toLowerCase(),
-                                );
-                                const variantPrice = pExact
-                                  ? Number(pExact[1])
-                                  : basePrice;
-
-                                const purchasedPrice = Number(
-                                  orderItem.price || 0,
-                                );
-                                const priceDiff = variantPrice - purchasedPrice;
-
-                                const isOutOfStock = stockCount <= 0;
-
-                                return (
-                                  <div className="space-y-2">
-                                    {/* Stock status */}
-                                    <div className="flex items-center gap-1.5 text-xs font-bold font-sans">
-                                      <span
-                                        className={
-                                          isOutOfStock
-                                            ? "text-red-600"
-                                            : "text-emerald-600"
-                                        }
-                                      >
-                                        {isOutOfStock
-                                          ? "● Out of Stock"
-                                          : stockCount <= 3
-                                            ? `● Low Stock: Only ${stockCount} left`
-                                            : "✓ In Stock"}
-                                      </span>
-                                    </div>
-
-                                    {/* Price Diff */}
-                                    <div className="p-2.5 bg-white rounded-xl border border-slate-100 flex justify-between text-xs font-bold text-slate-700 font-sans shadow-sm">
-                                      <span>Price Difference:</span>
-                                      <span
-                                        className={
-                                          priceDiff > 0
-                                            ? "text-red-650"
-                                            : priceDiff < 0
-                                              ? "text-green-650"
-                                              : "text-slate-900"
-                                        }
-                                      >
-                                        {priceDiff > 0
-                                          ? `Pay Difference: +${formatPrice(priceDiff)}`
-                                          : priceDiff < 0
-                                            ? `Refund Difference: -${formatPrice(Math.abs(priceDiff))}`
-                                            : "No Difference"}
-                                      </span>
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          )}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Reason for Return / Exchange
-                </label>
-                <select
-                  value={returnReason}
-                  onChange={(e) => setReturnReason(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium text-gray-700 bg-white"
-                >
-                  {RETURN_REASONS.map((reason) => (
-                    <option key={reason} value={reason}>
-                      {reason}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {returnReason === "Other" && (
-                <div className="mb-4 animate-fadeIn">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
-                    Custom Reason (min. 10 characters)
-                  </label>
-                  <textarea
-                    value={customReason}
-                    onChange={(e) => setCustomReason(e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
-                    placeholder="Please explain your return request in detail..."
-                  />
-                </div>
-              )}
-
-              {/* Evidence Images Upload */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
-                  Evidence Photos (Optional, max 5)
-                </label>
-                <p className="text-[10px] text-gray-400 mb-2 font-medium">
-                  Upload images showing product defects or details to speed up
-                  vendor inspection.
-                </p>
-
-                {/* File Input */}
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center justify-center w-12 h-12 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-primary-500 hover:bg-slate-50 transition-all flex-shrink-0">
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      className="hidden"
-                      disabled={evidenceFiles.length >= 5}
-                    />
-                    <span className="text-lg font-bold text-gray-400">+</span>
-                  </label>
-
-                  {/* Previews List */}
-                  <div className="flex items-center gap-2 overflow-x-auto flex-1 py-1">
-                    {evidencePreviews.map((preview, index) => (
-                      <div
-                        key={index}
-                        className="relative w-12 h-12 rounded-xl overflow-hidden border border-gray-200 flex-shrink-0 bg-slate-50"
-                      >
-                        <img
-                          src={preview}
-                          alt="preview"
-                          className="w-full h-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeFile(index)}
-                          className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs font-black hover:bg-red-650 transition-colors"
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleRequestReturn}
-                disabled={isSubmittingReturn}
-                className="w-full py-3.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-2xl font-bold shadow-lg shadow-primary-500/20 active:scale-95 transition-all disabled:opacity-70"
+              <div
+                className="relative w-full max-w-lg bg-white rounded-3xl p-5 shadow-2xl flex flex-col max-h-[85vh] my-auto overflow-hidden animate-scaleUp border border-gray-100 select-text"
+                onClick={(e) => e.stopPropagation()}
               >
-                {isSubmittingReturn
-                  ? "Submitting..."
-                  : requestType === "exchange"
-                    ? "Submit Exchange Request"
-                    : "Submit Return Request"}
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
+                {/* Header (Fixed at top) */}
+                <div className="flex items-center justify-between pb-3 border-b border-gray-100 flex-shrink-0">
+                  <h3 className="text-lg font-extrabold text-gray-900">
+                    Request Return / Exchange
+                  </h3>
+                  <button
+                    onClick={resetReturnModal}
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 transition-colors text-gray-600"
+                  >
+                    <FiX className="text-lg" />
+                  </button>
+                </div>
+
+                {/* Scrollable Form Body */}
+                <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-4 py-3">
+                  {/* Product Selection List */}
+                  {allOrderItems.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Select Items to Return
+                      </label>
+                      <div className="space-y-2 max-h-56 overflow-y-auto border border-slate-100 p-2 rounded-xl">
+                        {allOrderItems.map((item) => {
+                          const prodId = String(item.productId || item.id || "");
+                          const stateVal = selectedItems[prodId] || {
+                            checked: false,
+                            quantity: 1,
+                            maxQuantity: item.quantity || 1,
+                          };
+                          return (
+                            <div
+                              key={prodId}
+                              className="flex items-center justify-between gap-3 p-2 bg-slate-50/50 rounded-xl border border-slate-100"
+                            >
+                              <label className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+                                <input
+                                  type="checkbox"
+                                  checked={stateVal.checked}
+                                  onChange={() => handleToggleCheck(prodId)}
+                                  className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 border-gray-300"
+                                />
+                                <div className="w-10 h-10 rounded-lg overflow-hidden bg-white border border-gray-100 flex-shrink-0">
+                                  <img
+                                    src={item.image}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                                <div className="flex-grow min-w-0">
+                                  <span className="block text-xs font-bold text-gray-800 truncate leading-tight">
+                                    {item.name}
+                                  </span>
+                                  <span className="block text-[10px] text-gray-400 font-bold mt-0.5">
+                                    Sold by: {item.vendorName}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-bold">
+                                    Qty purchased: {stateVal.maxQuantity}
+                                  </span>
+                                </div>
+                              </label>
+
+                              {/* Quantity Controls */}
+                              {stateVal.checked && stateVal.maxQuantity > 1 && (
+                                <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateQty(prodId, -1)}
+                                    className="w-5 h-5 flex items-center justify-center text-xs font-black text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="w-4 text-center text-xs font-bold text-slate-700">
+                                    {stateVal.quantity}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateQty(prodId, 1)}
+                                    className="w-5 h-5 flex items-center justify-center text-xs font-black text-slate-500 hover:bg-slate-100 rounded-md transition-colors"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Request Type Selector */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Request Type
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() => setRequestType("return")}
+                        className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                          requestType === "return"
+                            ? "bg-white text-slate-800 shadow-sm border border-slate-100"
+                            : "text-slate-500 hover:text-slate-700"
+                        }`}
+                      >
+                        Return (Refund)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRequestType("exchange")}
+                        className={`py-2 rounded-lg text-xs font-bold transition-all ${
+                          requestType === "exchange"
+                            ? "bg-white text-slate-800 shadow-sm border border-slate-100"
+                            : "text-slate-500 hover:text-slate-700"
+                        }`}
+                      >
+                        Exchange (Replacement)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Exchange Fields */}
+                  {requestType === "exchange" && (
+                    <div className="space-y-3 animate-fadeIn">
+                      {/* Find the checked product */}
+                      {(() => {
+                        const checkedEntry = Object.entries(selectedItems).find(
+                          ([_, value]) => value.checked === true,
+                        );
+                        if (!checkedEntry) {
+                          return (
+                            <div className="p-3 bg-purple-50/20 border border-dashed border-purple-200 rounded-xl text-center text-xs font-semibold text-purple-700">
+                              Please select an item above to choose replacement
+                              variant.
+                            </div>
+                          );
+                        }
+
+                        const prodId = checkedEntry[0];
+                        const orderItem = allOrderItems.find(
+                          (it) => String(it.productId || it.id || "") === prodId,
+                        );
+                        if (!orderItem) return null;
+
+                        const variantObj = typeof orderItem?.variant === "object" && orderItem?.variant !== null ? orderItem.variant : {};
+                        const purchasedSize = String(variantObj.size || variantObj.Size || variantObj.SIZE || "").trim();
+                        const purchasedColor = String(variantObj.color || variantObj.Color || variantObj.COLOR || "").trim();
+                        const formattedLabel = formatVariantLabel(variantObj) || (orderItem.variantKey ? `Variant: ${orderItem.variantKey}` : (typeof orderItem.variant === 'string' ? `Variant: ${orderItem.variant}` : ''));
+
+                        return (
+                          <div className="space-y-3 p-3 bg-purple-50/20 border border-purple-100 rounded-2xl">
+                            {/* Show Current Variant */}
+                            <div className="p-2.5 bg-white border border-purple-200/60 rounded-xl space-y-1">
+                              <span className="text-[10px] font-black text-purple-900 uppercase tracking-widest block font-sans">
+                                Current Variant Purchased
+                              </span>
+                              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-bold text-slate-700 font-sans">
+                                {formattedLabel ? (
+                                  <span className="text-purple-900 font-extrabold bg-purple-50 px-2.5 py-1 rounded-lg border border-purple-200/80">
+                                    {formattedLabel}
+                                  </span>
+                                ) : (
+                                  <>
+                                    {purchasedSize && (
+                                      <span>
+                                        Size: <span className="text-slate-900">{purchasedSize}</span>
+                                      </span>
+                                    )}
+                                    {purchasedColor && (
+                                      <span>
+                                        Color: <span className="text-slate-900 capitalize">{purchasedColor}</span>
+                                      </span>
+                                    )}
+                                    {!purchasedSize && !purchasedColor && (
+                                      <span className="text-slate-500 font-medium">Standard / Single Variant</span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Choose Replacement */}
+                            <div className="space-y-2">
+                              <span className="text-[10px] font-black text-purple-900 uppercase tracking-widest block font-sans">
+                                Choose Replacement Variant
+                              </span>
+                              {productDetailsMap[prodId] ? (
+                                <VariantSelector
+                                  variants={productDetailsMap[prodId].variants}
+                                  currentPrice={productDetailsMap[prodId].price}
+                                  selectedVariant={exchangeVariants[prodId] || {}}
+                                  onVariantChange={(newVariant) => {
+                                    const pSize = purchasedSize.toLowerCase();
+                                    const pColor = purchasedColor.toLowerCase();
+                                    const newSize = String(newVariant.size || "").trim().toLowerCase();
+                                    const newColor = String(newVariant.color || "").trim().toLowerCase();
+                                    const sameSize = pSize ? (newSize === pSize) : !newSize;
+                                    const sameColor = pColor ? (newColor === pColor) : !newColor;
+
+                                    if (sameSize && sameColor && (pSize || pColor)) {
+                                      setExchangeVariants((prev) => {
+                                        const copy = { ...prev };
+                                        delete copy[prodId];
+                                        return copy;
+                                      });
+                                      return;
+                                    }
+                                    setExchangeVariants((prev) => ({
+                                      ...prev,
+                                      [prodId]: newVariant,
+                                    }));
+                                  }}
+                                />
+                              ) : (
+                                <p className="text-xs text-slate-400 font-semibold italic">
+                                  Loading variants...
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Inventory Check & Price difference */}
+                            {exchangeVariants[prodId] &&
+                              productDetailsMap[prodId] && (
+                                <div className="pt-2.5 border-t border-purple-200/50 space-y-2.5">
+                                  {(() => {
+                                    const variant = exchangeVariants[prodId];
+                                    const productData = productDetailsMap[prodId];
+
+                                    // Get stock level
+                                    const signature = getVariantSignature(variant);
+                                    const entries = Object.entries(
+                                      productData.variants?.stockMap || {},
+                                    );
+                                    const exact = entries.find(
+                                      ([k]) =>
+                                        String(k).trim().toLowerCase() ===
+                                        signature.toLowerCase(),
+                                    );
+                                    const stockCount = exact ? Number(exact[1]) : 0;
+
+                                    // Get price difference
+                                    const basePrice = Number(
+                                      productData.price || 0,
+                                    );
+                                    const priceEntries = Object.entries(
+                                      productData.variants?.prices || {},
+                                    );
+                                    const pExact = priceEntries.find(
+                                      ([k]) =>
+                                        String(k).trim().toLowerCase() ===
+                                        signature.toLowerCase(),
+                                    );
+                                    const variantPrice = pExact
+                                      ? Number(pExact[1])
+                                      : basePrice;
+
+                                    const purchasedPrice = Number(
+                                      orderItem.price || 0,
+                                    );
+                                    const priceDiff = variantPrice - purchasedPrice;
+
+                                    const isOutOfStock = stockCount <= 0;
+
+                                    return (
+                                      <div className="space-y-2">
+                                        {/* Stock status */}
+                                        <div className="flex items-center gap-1.5 text-xs font-bold font-sans">
+                                          <span
+                                            className={
+                                              isOutOfStock
+                                                ? "text-red-600"
+                                                : "text-emerald-600"
+                                            }
+                                          >
+                                            {isOutOfStock
+                                              ? "● Out of Stock"
+                                              : stockCount <= 3
+                                                ? `● Low Stock: Only ${stockCount} left`
+                                                : "✓ In Stock"}
+                                          </span>
+                                        </div>
+
+                                        {/* Price Diff */}
+                                        <div className="p-2.5 bg-white rounded-xl border border-slate-100 flex justify-between text-xs font-bold text-slate-700 font-sans shadow-sm">
+                                          <span>Price Difference:</span>
+                                          <span
+                                            className={
+                                              priceDiff > 0
+                                                ? "text-red-650"
+                                                : priceDiff < 0
+                                                  ? "text-green-650"
+                                                  : "text-slate-900"
+                                            }
+                                          >
+                                            {priceDiff > 0
+                                              ? `Pay Difference: +${formatPrice(priceDiff)}`
+                                              : priceDiff < 0
+                                                ? `Refund Difference: -${formatPrice(Math.abs(priceDiff))}`
+                                                : "No Difference"}
+                                          </span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Reason for Return / Exchange
+                    </label>
+                    <select
+                      value={returnReason}
+                      onChange={(e) => setReturnReason(e.target.value)}
+                      className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm font-medium text-gray-700 bg-white"
+                    >
+                      {RETURN_REASONS.map((reason) => (
+                        <option key={reason} value={reason}>
+                          {reason}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {returnReason === "Other" && (
+                    <div className="animate-fadeIn">
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">
+                        Custom Reason (min. 10 characters)
+                      </label>
+                      <textarea
+                        value={customReason}
+                        onChange={(e) => setCustomReason(e.target.value)}
+                        rows={3}
+                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                        placeholder="Please explain your return request in detail..."
+                      />
+                    </div>
+                  )}
+
+                  {/* Evidence Images Upload */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">
+                      Evidence Photos (Optional, max 5)
+                    </label>
+                    <p className="text-[10px] text-gray-400 mb-2 font-medium">
+                      Upload images showing product defects or details to speed up
+                      vendor inspection.
+                    </p>
+
+                    {/* File Input */}
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center justify-center w-12 h-12 border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-primary-500 hover:bg-slate-50 transition-all flex-shrink-0">
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          onChange={handleFileChange}
+                          className="hidden"
+                          disabled={evidenceFiles.length >= 5}
+                        />
+                        <span className="text-lg font-bold text-gray-400">+</span>
+                      </label>
+
+                      {/* Previews List */}
+                      <div className="flex items-center gap-2 overflow-x-auto flex-1 py-1">
+                        {evidencePreviews.map((preview, index) => (
+                          <div
+                            key={index}
+                            className="relative w-12 h-12 rounded-xl overflow-hidden border border-gray-200 flex-shrink-0 bg-slate-50"
+                          >
+                            <img
+                              src={preview}
+                              alt="preview"
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeFile(index)}
+                              className="absolute top-0 right-0 bg-red-500 text-white rounded-bl-lg w-5 h-5 flex items-center justify-center text-xs font-black hover:bg-red-650 transition-colors"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Submit Button (Fixed at Bottom) */}
+                <div className="pt-3 border-t border-gray-100 flex-shrink-0">
+                  <button
+                    onClick={handleRequestReturn}
+                    disabled={isSubmittingReturn}
+                    className="w-full py-3.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-2xl font-bold shadow-lg shadow-primary-500/20 active:scale-95 transition-all disabled:opacity-70"
+                  >
+                    {isSubmittingReturn
+                      ? "Submitting..."
+                      : requestType === "exchange"
+                        ? "Submit Exchange Request"
+                        : "Submit Return Request"}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body
+          )}
 
         {/* Cancellation Modal (Full Order & Vendor Package) */}
         {cancelModalTarget &&

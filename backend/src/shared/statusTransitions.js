@@ -24,7 +24,7 @@ export const EXCHANGE_TRANSITIONS = {
     pickup_pending: ['pickup_assigned'],
     pickup_assigned: ['picked_up'],
     picked_up: ['delivered_to_vendor'],
-    delivered_to_vendor: ['replacement_preparing', 'rejected'],
+    delivered_to_vendor: ['replacement_preparing', 'replacement_ready', 'rejected'],
     replacement_preparing: ['replacement_ready'],
     replacement_ready: ['replacement_assigned'],
     replacement_assigned: ['out_for_delivery'],

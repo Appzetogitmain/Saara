@@ -266,7 +266,11 @@ export const updateVendorReturnRequestStatus = asyncHandler(async (req, res) => 
                     const order = await Order.findById(request.orderId?._id || request.orderId).session(session);
                     updatedRequest = await exchangeWorkflow.prepareReplacement(request._id, 'delivered_to_vendor', order, actor, session);
                 } else if (status === 'replacement_ready') {
-                    updatedRequest = await exchangeWorkflow.markReplacementReady(request._id, 'replacement_preparing', actor, session);
+                    if (request.status === 'delivered_to_vendor') {
+                        const order = await Order.findById(request.orderId?._id || request.orderId).session(session);
+                        updatedRequest = await exchangeWorkflow.prepareReplacement(request._id, 'delivered_to_vendor', order, actor, session);
+                    }
+                    updatedRequest = await exchangeWorkflow.markReplacementReady(request._id, updatedRequest.status, actor, session);
                 } else if (status === 'completed') {
                     if (isExchange) {
                         updatedRequest = await exchangeWorkflow.completeExchange(request._id, 'out_for_delivery', actor, session);

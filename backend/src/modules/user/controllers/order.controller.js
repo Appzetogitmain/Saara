@@ -1160,15 +1160,23 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
     if (requestType === 'exchange') {
         let size = '';
         let color = '';
-        if (req.body.exchangeDetails?.requestedVariant) {
-            size = String(req.body.exchangeDetails.requestedVariant.size || '').trim();
-            color = String(req.body.exchangeDetails.requestedVariant.color || '').trim();
-        } else {
-            size = String(req.body.exchangeSize || '').trim();
-            color = String(req.body.exchangeColor || '').trim();
+        let requestedVariantObj = {};
+
+        if (req.body.exchangeDetails) {
+            let details = req.body.exchangeDetails;
+            if (typeof details === 'string') {
+                try { details = JSON.parse(details); } catch (e) {}
+            }
+            requestedVariantObj = details.requestedVariant || details || {};
+        } else if (req.body.exchangeVariantJson) {
+            try { requestedVariantObj = JSON.parse(req.body.exchangeVariantJson); } catch (e) {}
         }
 
-        if (!size && !color) {
+        size = String(requestedVariantObj.size || req.body.exchangeSize || '').trim();
+        color = String(requestedVariantObj.color || req.body.exchangeColor || '').trim();
+
+        const hasVariantSelection = Boolean(size || color || (typeof requestedVariantObj === 'object' && Object.keys(requestedVariantObj).length > 0));
+        if (!hasVariantSelection) {
             throw new ApiError(400, 'Requested size or color variant selection is required for exchange.');
         }
 
@@ -1179,11 +1187,11 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
 
             const mockOrderItem = {
                 productId: item.productId,
-                variant: { size, color }
+                variant: { ...requestedVariantObj, size, color }
             };
             const variantKey = resolveOrderItemVariantKey(product, mockOrderItem);
             if (!variantKey) {
-                throw new ApiError(400, `The variant Size: ${size}, Color: ${color} is not available for product ${product.name}.`);
+                throw new ApiError(400, `The variant Size: ${size || 'N/A'}, Color: ${color || 'N/A'} is not available for product ${product.name}.`);
             }
 
             // Prevent exchanging for the exact same variant
@@ -1191,7 +1199,7 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
             if (orderItemMatch) {
                 const purchasedSize = String(orderItemMatch.variant?.size || '').trim().toLowerCase();
                 const purchasedColor = String(orderItemMatch.variant?.color || '').trim().toLowerCase();
-                if (purchasedSize === size.toLowerCase() && purchasedColor === color.toLowerCase()) {
+                if (size && color && purchasedSize === size.toLowerCase() && purchasedColor === color.toLowerCase()) {
                     throw new ApiError(400, 'Cannot exchange for the exact same variant size and color.');
                 }
             }
@@ -1203,11 +1211,11 @@ export const createReturnRequest = asyncHandler(async (req, res) => {
             };
             const stock = getStockFromMap(product.variants?.stockMap, variantKey);
             if (stock < item.quantity) {
-                throw new ApiError(400, `The requested variant Size: ${size}, Color: ${color} is currently out of stock for product ${product.name}.`);
+                throw new ApiError(400, `The requested variant (Size: ${size || 'N/A'}, Color: ${color || 'N/A'}) is currently out of stock for product ${product.name}.`);
             }
 
             exchangeDetails = {
-                requestedVariant: { size, color, variantKey }
+                requestedVariant: { ...requestedVariantObj, size, color, variantKey }
             };
         }
     }

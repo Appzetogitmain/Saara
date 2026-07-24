@@ -3,8 +3,8 @@ import crypto from 'crypto';
 import ApiError from '../utils/ApiError.js';
 
 const razorpay = new Razorpay({
-    key_id:     process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
+    key_id:     process.env.RAZORPAY_KEY_ID || 'rzp_test_mock12345',
+    key_secret: process.env.RAZORPAY_KEY_SECRET || 'mock_secret12345',
 });
 
 /**
