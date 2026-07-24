@@ -12,13 +12,22 @@ const MAX_RECENT_SEARCHES = 5;
 const MAX_SUGGESTIONS = 5;
 
 const SearchBar = ({ onSearch }) => {
-  const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return new URLSearchParams(location.search).get('q') || '';
+  });
+
+  // Sync search input state with URL 'q' query parameter
+  useEffect(() => {
+    const qParam = new URLSearchParams(location.search).get('q') || '';
+    setSearchQuery(qParam);
+  }, [location.search]);
+
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [suggestions, setSuggestions] = useState([]);
   const [isFocused, setIsFocused] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
 
   // Check if we're in the mobile app section
   const isMobileApp = location.pathname.startsWith('/app');
@@ -171,7 +180,7 @@ const SearchBar = ({ onSearch }) => {
       if (onSearch) {
         onSearch(finalQuery);
       } else {
-        const searchRoute = `/search?q=${encodeURIComponent(finalQuery)}`;
+        const searchRoute = `/home?q=${encodeURIComponent(finalQuery)}`;
         navigate(searchRoute);
       }
       setShowSuggestions(false);

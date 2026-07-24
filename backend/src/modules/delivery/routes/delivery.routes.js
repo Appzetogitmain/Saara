@@ -62,6 +62,7 @@ router.post('/orders/:id/reject', ...deliveryAuth, orderController.rejectOrder);
 
 // Returns
 router.get('/returns', ...deliveryAuth, returnController.getAssignedReturnPickups);
+router.get('/returns/:id', ...deliveryAuth, returnController.getReturnPickupDetail);
 router.post('/returns/:id/accept', ...deliveryAuth, returnController.acceptReturnPickup);
 router.post('/returns/:id/reject', ...deliveryAuth, returnController.rejectReturnPickup);
 router.post('/returns/:id/verify-otp', ...deliveryAuth, returnController.verifyCustomerPickupOtp);

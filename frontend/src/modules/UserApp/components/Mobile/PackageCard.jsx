@@ -107,8 +107,8 @@ const PackageCard = ({ shipment, index, totalPackages, items, getItemReturnStatu
         ))}
       </div>
 
-      {/* Cancel Product Button for Cancellable Package Status */}
-      {isCancellable && onCancelPackage && (
+      {/* Cancel Product Button for Cancellable Package Status (Only for Multi-Package Orders) */}
+      {isCancellable && isMultiPackage && onCancelPackage && (
         <div className="px-4 py-2.5 bg-rose-50/40 border-t border-rose-100/60 flex justify-end">
           <button
             onClick={() => onCancelPackage(vendorGroup, shipment)}

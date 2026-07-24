@@ -33,6 +33,21 @@ export const getAssignedReturnPickups = asyncHandler(async (req, res) => {
     return res.status(200).json(new ApiResponse(200, returns, 'Assigned return pickups fetched.'));
 });
 
+// GET /api/delivery/returns/:id
+export const getReturnPickupDetail = asyncHandler(async (req, res) => {
+    const returnRequest = await ReturnRequest.findOne({
+        _id: req.params.id,
+        deliveryBoyId: req.user.id
+    })
+    .populate('orderId', 'orderId shippingAddress items total subtotal paymentMethod paymentStatus')
+    .populate('vendorId', 'storeName shopName phone address email')
+    .populate('userId', 'name email phone');
+
+    if (!returnRequest) throw new ApiError(404, 'Return request not found.');
+
+    return res.status(200).json(new ApiResponse(200, returnRequest, 'Return pickup details fetched.'));
+});
+
 // POST /api/delivery/returns/:id/accept
 export const acceptReturnPickup = asyncHandler(async (req, res) => {
     const returnRequest = await ReturnRequest.findOne({

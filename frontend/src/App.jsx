@@ -159,6 +159,7 @@ import DeliveryLayout from "./modules/Delivery/components/Layout/DeliveryLayout"
 import DeliveryDashboard from "./modules/Delivery/pages/Dashboard";
 import DeliveryOrders from "./modules/Delivery/pages/Orders";
 import DeliveryOrderDetail from "./modules/Delivery/pages/OrderDetail";
+import DeliveryReturnPickupDetail from "./modules/Delivery/pages/ReturnPickupDetail";
 import DeliveryProfile from "./modules/Delivery/pages/Profile";
 import DeliveryNotifications from "./modules/Delivery/pages/Notifications";
 import DeliverySupport from "./modules/Delivery/pages/Support";
@@ -775,6 +776,7 @@ const AppRoutes = () => {
         <Route path="dashboard" element={<DeliveryDashboard />} />
         <Route path="orders" element={<DeliveryOrders />} />
         <Route path="orders/:id" element={<DeliveryOrderDetail />} />
+        <Route path="return-pickups/:id" element={<DeliveryReturnPickupDetail />} />
         <Route path="notifications" element={<DeliveryNotifications />} />
         <Route path="profile" element={<DeliveryProfile />} />
         <Route path="support" element={<DeliverySupport />} />

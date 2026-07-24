@@ -322,6 +322,9 @@ export const updateReturnRequestStatus = asyncHandler(async (req, res) => {
                         }
                     } else {
                         // Return completion logic + financial updates
+                        const order = await Order.findById(request.orderId?._id || request.orderId).session(session);
+                        if (!order) throw new ApiError(404, 'Associated order not found');
+
                         const commRecord = await Commission.findOne({
                             orderId: order._id,
                             vendorId: request.vendorId,

@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   FiPackage,
@@ -63,11 +64,26 @@ const MobileOrderDetail = () => {
   const [evidencePreviews, setEvidencePreviews] = useState([]);
   const [isRetryingPayment, setIsRetryingPayment] = useState(false);
 
-  // Partial Cancellation Modal State
-  const [selectedCancelPackage, setSelectedCancelPackage] = useState(null);
+  // Cancellation Modal State (handles both full order and vendor package cancellations)
+  const [cancelModalTarget, setCancelModalTarget] = useState(null); // 'order' or vendorGroup object
   const [cancelReason, setCancelReason] = useState("Ordered by mistake");
   const [cancelComment, setCancelComment] = useState("");
   const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+  // Lock background body and html scrolling when cancellation modal is open
+  useEffect(() => {
+    if (cancelModalTarget) {
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
+    };
+  }, [cancelModalTarget]);
 
   const CANCELLATION_REASONS = [
     "Ordered by mistake",
@@ -78,25 +94,40 @@ const MobileOrderDetail = () => {
     "Other",
   ];
 
-  const handleOpenCancelModal = (vendorGroup, shipment) => {
-    const vg = vendorGroup || (order?.vendorItems || []).find(v => String(v.vendorId) === String(shipment?.vendorId));
-    if (!vg) return;
-    setSelectedCancelPackage(vg);
+  const handleCancel = () => {
+    if (!['pending', 'processing', 'payment_pending'].includes(order?.status)) {
+      toast.error("This order cannot be cancelled at this stage.");
+      return;
+    }
+    setCancelModalTarget('order');
     setCancelReason("Ordered by mistake");
     setCancelComment("");
   };
 
-  const handleConfirmCancelPackage = async () => {
-    if (!selectedCancelPackage || !order) return;
+  const handleOpenCancelModal = (vendorGroup, shipment) => {
+    const vg = vendorGroup || (order?.vendorItems || []).find(v => String(v.vendorId) === String(shipment?.vendorId));
+    if (!vg) return;
+    setCancelModalTarget(vg);
+    setCancelReason("Ordered by mistake");
+    setCancelComment("");
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelModalTarget || !order) return;
     setIsSubmittingCancel(true);
     try {
-      const vendorItemId = selectedCancelPackage._id || selectedCancelPackage.vendorId;
-      await cancelVendorItem(order.id, vendorItemId, cancelReason, cancelComment);
-      toast.success("Package cancelled successfully!");
-      setSelectedCancelPackage(null);
+      if (cancelModalTarget === 'order') {
+        await cancelOrder(order.id, cancelReason);
+        toast.success("Order cancelled successfully!");
+      } else {
+        const vendorItemId = cancelModalTarget._id || cancelModalTarget.vendorId;
+        await cancelVendorItem(order.id, vendorItemId, cancelReason, cancelComment);
+        toast.success("Package cancelled successfully!");
+      }
+      setCancelModalTarget(null);
       await fetchOrderById(order.id);
     } catch (err) {
-      toast.error(err?.response?.data?.message || err?.message || "Failed to cancel package.");
+      toast.error(err?.response?.data?.message || err?.message || "Failed to cancel.");
     } finally {
       setIsSubmittingCancel(false);
     }
@@ -356,22 +387,6 @@ const MobileOrderDetail = () => {
     navigate("/checkout");
   };
 
-  const handleCancel = async () => {
-    if (window.confirm("Are you sure you want to cancel this order?")) {
-      if (["pending", "processing", "payment_pending"].includes(order.status)) {
-        try {
-          await cancelOrder(order.id);
-          toast.success("Order cancelled successfully");
-          navigate("/orders");
-        } catch (error) {
-          toast.error(error?.message || "Failed to cancel order");
-        }
-      } else {
-        toast.error("This order cannot be cancelled");
-      }
-    }
-  };
-
   // Phase 2.2 — Retry payment for payment_pending orders
 
   const loadRazorpay = () =>
@@ -397,15 +412,22 @@ const MobileOrderDetail = () => {
         return;
       }
 
-      const { data: retryData } = await api.post(
+      const response = await api.post(
         `/user/payment/retry/${order.orderId}`,
       );
-      const payload = retryData?.data ?? retryData;
+      const payload = response?.data ?? response;
+
+      if (!payload || !payload.razorpayOrderId) {
+        toast.error("Unable to initialize payment retry. Please try again.");
+        return;
+      }
+
+      const razorpayKey = payload.key || payload.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID;
 
       await new Promise((resolve) => {
         const options = {
-          key: payload.key,
-          amount: Math.round((payload.amount || 0) * 100),
+          key: razorpayKey,
+          amount: Math.round((payload.amount || order.total || 0) * 100),
           currency: payload.currency || "INR",
           order_id: payload.razorpayOrderId,
           name: "Porutkal",
@@ -1612,99 +1634,126 @@ const MobileOrderDetail = () => {
           </motion.div>
         )}
 
-        {/* Cancel Product Modal */}
-        {selectedCancelPackage && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-            <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 space-y-5 animate-slideUp">
-              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                <div>
-                  <h3 className="text-lg font-extrabold text-gray-900">Cancel Product</h3>
-                  <p className="text-xs text-gray-500 font-medium mt-0.5">
-                    Store: <span className="font-bold text-gray-700">{selectedCancelPackage.vendorName || "Vendor"}</span>
-                  </p>
-                </div>
-                <button
-                  onClick={() => setSelectedCancelPackage(null)}
-                  className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
-                >
-                  <FiX className="text-xl" />
-                </button>
-              </div>
-
-              {/* Product preview */}
-              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                {selectedCancelPackage.items?.map((it, idx) => (
-                  <div key={idx} className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-gray-800 truncate max-w-[220px]">{it.name}</span>
-                    <span className="text-gray-600 font-extrabold">Qty: {it.quantity} • {formatPrice(it.price * it.quantity)}</span>
+        {/* Cancellation Modal (Full Order & Vendor Package) */}
+        {cancelModalTarget &&
+          createPortal(
+            <div
+              className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-hidden select-none"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setCancelModalTarget(null);
+              }}
+              onWheel={(e) => e.stopPropagation()}
+            >
+              <div
+                className="relative w-full max-w-md bg-white rounded-3xl p-5 shadow-2xl flex flex-col max-h-[85vh] my-auto overflow-hidden animate-scaleUp border border-gray-100 select-text"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Header - Fixed Top */}
+                <div className="flex justify-between items-center border-b border-gray-100 pb-3 flex-shrink-0">
+                  <div>
+                    <h3 className="text-lg font-extrabold text-gray-900">
+                      {cancelModalTarget === 'order' ? 'Cancel Order' : 'Cancel Product'}
+                    </h3>
+                    <p className="text-xs text-gray-500 font-medium mt-0.5">
+                      {cancelModalTarget === 'order'
+                        ? `Order #${order.orderId || order.id}`
+                        : `Store: ${cancelModalTarget.vendorName || "Vendor"}`}
+                    </p>
                   </div>
-                ))}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setCancelModalTarget(null)}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                  >
+                    <FiX className="text-xl" />
+                  </button>
+                </div>
 
-              {/* Reasons */}
-              <div>
-                <label className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-2">
-                  Why are you cancelling?
-                </label>
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {CANCELLATION_REASONS.map((r) => (
-                    <label
-                      key={r}
-                      onClick={() => setCancelReason(r)}
-                      className={`flex items-center gap-3 p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
-                        cancelReason === r
-                          ? "bg-rose-50 border-rose-300 text-rose-800 shadow-sm"
-                          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="cancellationReason"
-                        checked={cancelReason === r}
-                        onChange={() => setCancelReason(r)}
-                        className="text-rose-600 focus:ring-rose-500"
-                      />
-                      {r}
+                {/* Scrollable Content Body - Fixed Middle */}
+                <div className="space-y-4 overflow-y-auto py-3 pr-1.5 flex-1 min-h-0">
+                  {/* Product preview */}
+                  <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                    {(cancelModalTarget === 'order'
+                      ? (order.items || orderItems || [])
+                      : (cancelModalTarget.items || [])
+                    ).map((it, idx) => (
+                      <div key={idx} className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-gray-800 truncate max-w-[200px]">{it.name}</span>
+                        <span className="text-gray-600 font-extrabold">Qty: {it.quantity} • {formatPrice((it.price || 0) * (it.quantity || 1))}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Reasons */}
+                  <div>
+                    <label className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-2">
+                      Why are you cancelling?
                     </label>
-                  ))}
+                    <div className="space-y-2">
+                      {CANCELLATION_REASONS.map((r) => (
+                        <label
+                          key={r}
+                          onClick={() => setCancelReason(r)}
+                          className={`flex items-center gap-3 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                            cancelReason === r
+                              ? "bg-rose-50 border-rose-300 text-rose-800 shadow-sm"
+                              : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="cancellationReason"
+                            checked={cancelReason === r}
+                            onChange={() => setCancelReason(r)}
+                            className="text-rose-600 focus:ring-rose-500"
+                          />
+                          {r}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Comments */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">
+                      Comments (optional)
+                    </label>
+                    <textarea
+                      value={cancelComment}
+                      onChange={(e) => setCancelComment(e.target.value)}
+                      placeholder="Add any additional context..."
+                      rows={2}
+                      className="w-full text-xs p-2.5 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Submit Footer - Fixed Bottom */}
+                <div className="flex gap-3 pt-3 flex-shrink-0 border-t border-gray-100 mt-auto bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setCancelModalTarget(null)}
+                    className="flex-1 py-2.5 px-4 rounded-xl border border-gray-200 text-gray-700 font-bold text-xs hover:bg-gray-50 transition-colors"
+                  >
+                    Back
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isSubmittingCancel}
+                    onClick={handleConfirmCancel}
+                    className="flex-1 py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition-colors disabled:opacity-50"
+                  >
+                    {isSubmittingCancel
+                      ? "Cancelling..."
+                      : cancelModalTarget === 'order'
+                      ? "Cancel Order"
+                      : "Cancel Product"}
+                  </button>
                 </div>
               </div>
-
-              {/* Comments */}
-              <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">
-                  Comments (optional)
-                </label>
-                <textarea
-                  value={cancelComment}
-                  onChange={(e) => setCancelComment(e.target.value)}
-                  placeholder="Add any additional context..."
-                  rows={2}
-                  className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
-                />
-              </div>
-
-              {/* Submit */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedCancelPackage(null)}
-                  className="flex-1 py-3 px-4 rounded-xl border border-gray-200 text-gray-700 font-bold text-xs hover:bg-gray-50 transition-colors"
-                >
-                  Back
-                </button>
-                <button
-                  type="button"
-                  disabled={isSubmittingCancel}
-                  onClick={handleConfirmCancelPackage}
-                  className="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition-colors disabled:opacity-50"
-                >
-                  {isSubmittingCancel ? "Cancelling..." : "Cancel Product"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+            </div>,
+            document.body
+          )}
         </div>
       </MobileLayout>
     </PageTransition>

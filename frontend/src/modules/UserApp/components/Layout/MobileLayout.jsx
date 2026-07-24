@@ -19,19 +19,7 @@ const MobileLayout = ({ children, showBottomNav = true, showCartBar = true, show
       onSearch(query);
       return;
     }
-    
-    const SEARCH_CONTEXTS = {
-      HOME: ['/', '/home'],
-      SHOP: ['/shop']
-    };
-    
-    if (SEARCH_CONTEXTS.HOME.includes(location.pathname)) {
-      navigate(`${location.pathname}?q=${encodeURIComponent(query)}`);
-    } else if (SEARCH_CONTEXTS.SHOP.includes(location.pathname)) {
-      navigate(`/shop?q=${encodeURIComponent(query)}`);
-    } else {
-      navigate(`/shop?q=${encodeURIComponent(query)}`);
-    }
+    navigate(`/home?q=${encodeURIComponent(query)}`);
   };
 
   // Hide header and bottom nav on login, register, and verification pages

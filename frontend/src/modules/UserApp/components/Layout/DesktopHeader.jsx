@@ -1,4 +1,4 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useCartStore, useUIStore } from "../../../../shared/store/useStore";
 import { useWishlistStore } from "../../../../shared/store/wishlistStore";
 import { useAuthStore } from "../../../../shared/store/authStore";
@@ -31,6 +31,7 @@ import { useUserNotificationStore } from "../../store/userNotificationStore";
 
 const DesktopHeader = ({ onSearch }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAuthenticated, logout } = useAuthStore();
   const itemCount = useCartStore((state) => state.getItemCount());
   const wishlistCount = useWishlistStore((state) => state.getItemCount());
@@ -46,7 +47,15 @@ const DesktopHeader = ({ onSearch }) => {
   const [selectedCategoryName, setSelectedCategoryName] =
     useState("All Categories");
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(() => {
+    return new URLSearchParams(window.location.search).get("q") || "";
+  });
+
+  // Keep search input in sync with URL search parameter
+  useEffect(() => {
+    const qParam = new URLSearchParams(location.search).get("q") || "";
+    setSearchQuery(qParam);
+  }, [location.search]);
 
   const { isListening, isSupported, startListening, stopListening } = useSpeechRecognition({
     onResult: (text, isFinal) => {
@@ -122,7 +131,7 @@ const DesktopHeader = ({ onSearch }) => {
       if (onSearch) {
         onSearch(finalQuery);
       } else {
-        let searchRoute = `/shop?q=${encodeURIComponent(finalQuery)}`;
+        let searchRoute = `/home?q=${encodeURIComponent(finalQuery)}`;
         navigate(searchRoute);
       }
     }

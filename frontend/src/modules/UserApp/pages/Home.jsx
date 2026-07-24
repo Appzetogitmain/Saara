@@ -257,43 +257,70 @@ const MobileHome = () => {
   const [userSections, setUserSections] = useState([]);
   const [homepageLoading, setHomepageLoading] = useState(true);
 
+  // Catalog & Banners State
+  const [catalogProducts, setCatalogProducts] = useState([]);
+  const [homeVendors, setHomeVendors] = useState([]);
+  const [homeBrands, setHomeBrands] = useState([]);
+  const [slides, setSlides] = useState(DEFAULT_HERO_SLIDES);
+  const [promoBanners, setPromoBanners] = useState([]);
+  const [sideBanner, setSideBanner] = useState(null);
+  const [categoryFocusBanner, setCategoryFocusBanner] = useState(null);
+  const [categoryFocusItems, setCategoryFocusItems] = useState([]);
+  const [dealItems, setDealItems] = useState([]);
+
   // Search State
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  useEffect(() => {
-    if (q) {
-      setIsSearching(true);
-      api.get("/shop/products", { params: { q, limit: 50 } })
-        .then(res => {
-          const payload = extractResponseData(res);
-          const list = (payload?.products || []).map(normalizeProduct);
-          setSearchResults(list);
-          setIsSearching(false);
-        })
-        .catch(err => {
-          setIsSearching(false);
-        });
-    } else {
-      setSearchResults([]);
-    }
-  }, [q]);
-
+  // Slide state
   const [currentSlide, setCurrentSlide] = useState(0);
   const [touchStart, setTouchStart] = useState(null);
   const [touchEnd, setTouchEnd] = useState(null);
   const [dragOffset, setDragOffset] = useState(0);
   const [autoSlidePaused, setAutoSlidePaused] = useState(false);
   const [isDraggingSlide, setIsDraggingSlide] = useState(false);
-  const [slides, setSlides] = useState(DEFAULT_HERO_SLIDES);
-  const [promoBanners, setPromoBanners] = useState([]);
-  const [sideBanner, setSideBanner] = useState(null);
-  const [catalogProducts, setCatalogProducts] = useState([]);
-  const [homeVendors, setHomeVendors] = useState([]);
-  const [homeBrands, setHomeBrands] = useState([]);
-  const [categoryFocusBanner, setCategoryFocusBanner] = useState(null);
-  const [categoryFocusItems, setCategoryFocusItems] = useState([]);
-  const [dealItems, setDealItems] = useState([]);
+
+  useEffect(() => {
+    if (q) {
+      setIsSearching(true);
+      api.get("/products", { params: { q, page: 1, limit: 120 } })
+        .then(res => {
+          const payload = extractResponseData(res);
+          const rawList = Array.isArray(payload?.products) ? payload.products : (Array.isArray(payload) ? payload : []);
+          let list = rawList.map(normalizeProduct).filter((p) => p.id && p.isActive !== false);
+
+          if (list.length === 0 && catalogProducts.length > 0) {
+            const lowerQ = String(q).toLowerCase().trim();
+            list = catalogProducts.filter(p =>
+              String(p.name || '').toLowerCase().includes(lowerQ) ||
+              String(p.categoryName || '').toLowerCase().includes(lowerQ) ||
+              String(p.brandName || '').toLowerCase().includes(lowerQ) ||
+              String(p.description || '').toLowerCase().includes(lowerQ)
+            );
+          }
+
+          setSearchResults(list);
+          setIsSearching(false);
+        })
+        .catch(() => {
+          if (catalogProducts.length > 0) {
+            const lowerQ = String(q).toLowerCase().trim();
+            const list = catalogProducts.filter(p =>
+              String(p.name || '').toLowerCase().includes(lowerQ) ||
+              String(p.categoryName || '').toLowerCase().includes(lowerQ) ||
+              String(p.brandName || '').toLowerCase().includes(lowerQ) ||
+              String(p.description || '').toLowerCase().includes(lowerQ)
+            );
+            setSearchResults(list);
+          } else {
+            setSearchResults([]);
+          }
+          setIsSearching(false);
+        });
+    } else {
+      setSearchResults([]);
+    }
+  }, [q, catalogProducts]);
 
   const fallbackMostPopular = getMostPopular();
   const fallbackTrending = getTrending();

@@ -466,6 +466,20 @@ export const useDeliveryAuthStore = create(
         }
       },
 
+      fetchReturnPickupById: async (id) => {
+        set({ isLoadingOrder: true });
+        try {
+          const response = await api.get(`/delivery/returns/${id}`);
+          const payload = response?.data ?? response;
+          const ret = payload?.data ?? payload;
+          set({ isLoadingOrder: false });
+          return ret;
+        } catch (error) {
+          set({ isLoadingOrder: false });
+          throw error;
+        }
+      },
+
       acceptReturnPickup: async (id) => {
         set({ isUpdatingOrderStatus: true });
         try {
