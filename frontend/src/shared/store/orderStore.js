@@ -265,6 +265,27 @@ export const useOrderStore = create(
         return true;
       },
 
+      cancelVendorItem: async (orderId, vendorItemId, reason, comment = '') => {
+        try {
+          const response = await api.patch(`/user/orders/${orderId}/items/${vendorItemId}/cancel`, {
+            reason,
+            comment,
+          });
+          const data = response?.data ?? response;
+          if (data?.order) {
+            const normalized = normalizeOrder(data.order);
+            set((state) => ({
+              orders: state.orders.map((o) =>
+                String(o.id) === String(orderId) ? normalized : o
+              ),
+            }));
+          }
+          return true;
+        } catch (error) {
+          throw error;
+        }
+      },
+
       requestReturn: async (orderId, payload = {}) => {
         let body;
         if (payload instanceof FormData) {

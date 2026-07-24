@@ -12,6 +12,12 @@ import { buildOrderItemsSummary, buildVendorItemsSummary } from '../../../utils/
 import { handleOrderDeliveryBalances } from '../../../services/orderFinancialHelper.js';
 import mongoose from 'mongoose';
 import { processDeliveryBoyPayout } from '../../../services/deliveryPayout.service.js';
+import Shipment from '../../../models/Shipment.model.js';
+import Coupon from '../../../models/Coupon.model.js';
+import Refund from '../../../models/Refund.model.js';
+import AuditLog from '../../../models/AuditLog.model.js';
+import { creditWallet } from '../../../services/wallet.service.js';
+import { cancelShipmentDeliveryAssignment } from '../../../services/assignmentService.js';
 
 // GET /api/admin/orders
 export const getAllOrders = asyncHandler(async (req, res) => {
@@ -369,3 +375,182 @@ export const deleteOrder = asyncHandler(async (req, res) => {
     if (!order) throw new ApiError(404, 'Order not found.');
     res.status(200).json(new ApiResponse(200, null, 'Order archived.'));
 });
+
+// PATCH /api/admin/orders/:id/items/:vendorItemId/cancel
+export const adminOverrideCancelVendorItem = asyncHandler(async (req, res) => {
+    const { id: orderIdParam, vendorItemId } = req.params;
+    const { reason, comment, forceRefund } = req.body;
+
+    const session = await mongoose.startSession();
+    let updatedOrder = null;
+    let cancelledVendorGroup = null;
+    let calculatedRefund = 0;
+
+    try {
+        await session.withTransaction(async () => {
+            const isMongoId = mongoose.Types.ObjectId.isValid(orderIdParam);
+            const query = isMongoId
+                ? { _id: orderIdParam }
+                : { orderId: orderIdParam };
+
+            const order = await Order.findOne(query).session(session);
+            if (!order) throw new ApiError(404, 'Order not found.');
+
+            const vendorGroupIndex = (order.vendorItems || []).findIndex(
+                (vGroup) => String(vGroup._id) === String(vendorItemId) || String(vGroup.vendorId) === String(vendorItemId)
+            );
+
+            if (vendorGroupIndex === -1) {
+                throw new ApiError(404, 'Package / Vendor items not found in this order.');
+            }
+
+            const targetVendorGroup = order.vendorItems[vendorGroupIndex];
+
+            if (targetVendorGroup.status === 'cancelled') {
+                throw new ApiError(400, 'This package is already cancelled.');
+            }
+
+            targetVendorGroup.status = 'cancelled';
+            targetVendorGroup.cancelledAt = new Date();
+            targetVendorGroup.cancelledBy = 'admin';
+            targetVendorGroup.cancellationReason = reason || 'Cancelled by Admin';
+            targetVendorGroup.cancellationComment = comment || 'Admin override cancellation';
+
+            cancelledVendorGroup = targetVendorGroup;
+
+            // Cancel shipment & unassign rider
+            const shipment = await Shipment.findOne({
+                orderId: order._id,
+                vendorId: targetVendorGroup.vendorId,
+            }).session(session);
+
+            if (shipment) {
+                await cancelShipmentDeliveryAssignment(shipment._id, reason || 'Admin cancelled package', session);
+            }
+
+            // Restore Inventory
+            for (const item of targetVendorGroup.items) {
+                const quantity = Number(item.quantity || 0);
+                if (quantity <= 0) continue;
+
+                const product = await Product.findByIdAndUpdate(item.productId, { $inc: { stockQuantity: quantity } }, { new: true, session });
+                if (product) {
+                    const nextStockState =
+                        product.stockQuantity <= 0
+                            ? 'out_of_stock'
+                            : (product.stockQuantity <= product.lowStockThreshold ? 'low_stock' : 'in_stock');
+
+                    await Product.updateOne(
+                        { _id: product._id },
+                        { $set: { stock: nextStockState } },
+                        { session }
+                    );
+                }
+            }
+
+            // Calculate refund
+            calculatedRefund = parseFloat(
+                ((targetVendorGroup.subtotal || 0) - (targetVendorGroup.discount || 0) + (targetVendorGroup.tax || 0) + (targetVendorGroup.shipping || 0)).toFixed(2)
+            );
+
+            if (forceRefund || order.paymentStatus === 'paid' || order.walletAmountUsed > 0) {
+                if (calculatedRefund > 0 && order.userId) {
+                    await creditWallet(
+                        order.userId,
+                        calculatedRefund,
+                        'cancel_refund',
+                        {
+                            orderId: order._id,
+                            vendorId: targetVendorGroup.vendorId,
+                            description: `Admin Override Refund: cancelled package (${targetVendorGroup.vendorName}) in Order #${order.orderId}`,
+                            reference: `ADMIN_CANCEL_${order._id}_${targetVendorGroup.vendorId}`,
+                            reason: reason || 'Admin Override Cancellation',
+                        },
+                        session
+                    );
+
+                    await Refund.create([{
+                        orderId:          order._id,
+                        amount:           calculatedRefund,
+                        referenceId:      `ADMIN_CANCEL_${order._id}_${targetVendorGroup.vendorId}`,
+                        method:           'wallet_credit',
+                        destination:      'wallet',
+                        status:           'completed',
+                        notes:            `Admin Override Cancellation: ${reason || 'Admin cancelled'}`,
+                    }], { session });
+
+                    targetVendorGroup.refundedAmount = calculatedRefund;
+                }
+            }
+
+            // Reverse Commission & Escrow
+            await Commission.updateMany(
+                {
+                    orderId: order._id,
+                    vendorId: targetVendorGroup.vendorId,
+                    status: { $ne: 'cancelled' },
+                },
+                {
+                    $set: {
+                        status: 'cancelled',
+                        escrowStatus: 'cancelled',
+                        paidAt: null,
+                        settlementId: null,
+                    },
+                },
+                { session }
+            );
+
+            // Roll-up status
+            const remainingGroups = (order.vendorItems || []).filter((v) => v.status !== 'cancelled');
+            if (remainingGroups.length === 0) {
+                order.status = 'cancelled';
+                order.cancelledAt = new Date();
+                order.cancellationReason = reason || 'Cancelled by Admin';
+            } else {
+                const anyDelivered = remainingGroups.some((v) => v.status === 'delivered');
+                order.status = anyDelivered ? 'partially_delivered' : 'partially_cancelled';
+            }
+
+            // Audit log
+            await AuditLog.create([{
+                adminId: req.user.id,
+                action: 'ADMIN_PARTIAL_CANCEL_ORDER_ITEM',
+                resource: 'Order',
+                resourceId: order._id,
+                changes: {
+                    orderId: order.orderId,
+                    vendorId: String(targetVendorGroup.vendorId),
+                    reason,
+                    comment,
+                    refundAmount: calculatedRefund,
+                },
+                ipAddress: req.ip,
+                userAgent: req.get('user-agent'),
+            }], { session });
+
+            await order.save({ session });
+            updatedOrder = order;
+        });
+    } finally {
+        await session.endSession();
+    }
+
+    if (updatedOrder) {
+        notifyOrderUpdate(updatedOrder);
+
+        if (updatedOrder.userId) {
+            createNotification({
+                recipientId: updatedOrder.userId,
+                recipientType: 'user',
+                title: 'Package Cancelled by Admin',
+                message: `Admin has cancelled package from ${cancelledVendorGroup?.vendorName} in Order #${updatedOrder.orderId}.${calculatedRefund > 0 ? ` ₹${calculatedRefund} has been refunded to your wallet.` : ''}`,
+                type: 'order',
+                data: { orderId: String(updatedOrder._id) },
+            }).catch(err => console.error('[Notif Error]:', err.message));
+        }
+    }
+
+    res.status(200).json(new ApiResponse(200, { order: updatedOrder }, 'Package cancelled by admin successfully.'));
+});
+

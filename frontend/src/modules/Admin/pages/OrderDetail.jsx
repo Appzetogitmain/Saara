@@ -345,6 +345,14 @@ const OrderDetail = () => {
                           <p className="text-[11px] text-gray-400 font-mono mt-1">
                             {shipment.shipmentNumber || shipment._id}
                           </p>
+
+                          {vendorGroup?.status === 'cancelled' && (
+                            <div className="mt-2 p-2 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 space-y-0.5">
+                              <p className="font-bold flex items-center gap-1">❌ Package Cancelled ({vendorGroup.cancelledBy || 'customer'})</p>
+                              {vendorGroup.cancellationReason && <p><span className="font-semibold">Reason:</span> {vendorGroup.cancellationReason}</p>}
+                              {vendorGroup.refundedAmount > 0 && <p className="font-bold text-emerald-700">Refunded: ₹{vendorGroup.refundedAmount}</p>}
+                            </div>
+                          )}
                         </div>
 
                         {/* Tracking / Provider */}

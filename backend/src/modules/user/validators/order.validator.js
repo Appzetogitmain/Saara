@@ -68,3 +68,9 @@ export const createReturnRequestSchema = Joi.object({
     }).optional(),
     upiId: Joi.string().allow('').optional(),
 });
+
+export const cancelVendorItemSchema = Joi.object({
+    reason: Joi.string().required(),
+    comment: Joi.string().trim().allow('').optional(),
+});
+

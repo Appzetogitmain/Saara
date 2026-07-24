@@ -101,6 +101,7 @@ router.get('/analytics/inventory-stats',...adminAuth, analyticsController.getInv
 router.get('/orders', ...adminAuth, orderController.getAllOrders);
 router.get('/orders/:id', ...adminAuth, orderController.getOrderById);
 router.patch('/orders/:id/status', ...adminAuth, audit('UPDATE_ORDER_STATUS', 'Order'), orderController.updateOrderStatus);
+router.patch('/orders/:id/items/:vendorItemId/cancel', ...adminAuth, audit('ADMIN_CANCEL_ORDER_ITEM', 'Order'), orderController.adminOverrideCancelVendorItem);
 
 router.delete('/orders/:id', ...adminAuth, audit('DELETE_ORDER', 'Order'), orderController.deleteOrder);
 

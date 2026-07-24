@@ -812,6 +812,55 @@ export const autoAssignExchangeReplacementPartner = async (returnRequestId) => {
     }
 };
 
+/**
+ * Unassign rider and cancel shipment delivery task.
+ * Called when a vendor item/package is cancelled by customer or admin.
+ */
+export const cancelShipmentDeliveryAssignment = async (shipmentId, reason = 'Package cancelled', session = null) => {
+    try {
+        const shipment = await Shipment.findById(shipmentId).session(session);
+        if (!shipment) return;
+
+        const assignedRiderId = shipment.deliveryBoyId;
+
+        // Update shipment status and assignment
+        shipment.status = 'cancelled';
+        shipment.deliveryAssignmentStatus = 'cancelled';
+        shipment.deliveryBoyId = undefined;
+        if (!Array.isArray(shipment.statusHistory)) {
+            shipment.statusHistory = [];
+        }
+        shipment.statusHistory.push({
+            status: 'cancelled',
+            updatedAt: new Date(),
+            updatedBy: 'system',
+            notes: `Shipment cancelled: ${reason}`
+        });
+
+        if (session) {
+            await shipment.save({ session });
+        } else {
+            await shipment.save();
+        }
+
+        // Notify assigned rider if rider was assigned
+        if (assignedRiderId) {
+            createNotification({
+                recipientId: assignedRiderId,
+                recipientType: 'delivery',
+                title: 'Delivery Task Cancelled',
+                message: `Delivery task for Shipment #${shipment.shipmentNumber || shipment._id} has been cancelled. Reason: ${reason}`,
+                type: 'order',
+                data: { shipmentId: String(shipment._id) }
+            }).catch(err => console.error('[Rider Notification Error]:', err.message));
+        }
+    } catch (err) {
+        logger.error(`[cancelShipmentDeliveryAssignment] Error:`, err.message);
+        throw err;
+    }
+};
+
+
 // ───────────────────────────────────────────────────────────────────────────────
 // Polling scheduler for offer timeouts
 // ───────────────────────────────────────────────────────────────────────────────

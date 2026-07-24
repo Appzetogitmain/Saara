@@ -189,7 +189,7 @@ const shipmentSchema = new mongoose.Schema(
         },
         deliveryAssignmentStatus: {
             type: String,
-            enum: ['pending', 'assigned', 'accepted', 'rejected', 'manual_override', 'failed'],
+            enum: ['pending', 'assigned', 'accepted', 'rejected', 'manual_override', 'failed', 'cancelled'],
         },
         rejectedDeliveryBoys: [{ type: mongoose.Schema.Types.ObjectId, ref: 'DeliveryBoy' }],
         deliveryPriority: { type: Number },

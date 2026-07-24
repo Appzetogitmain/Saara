@@ -47,7 +47,7 @@ const RETURN_REASONS = [
 const MobileOrderDetail = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
-  const { getOrder, cancelOrder, fetchOrderById, requestReturn } =
+  const { getOrder, cancelOrder, cancelVendorItem, fetchOrderById, requestReturn } =
     useOrderStore();
   const { addItem } = useCartStore();
   const [isResolving, setIsResolving] = useState(true);
@@ -62,6 +62,45 @@ const MobileOrderDetail = () => {
   const [evidenceFiles, setEvidenceFiles] = useState([]);
   const [evidencePreviews, setEvidencePreviews] = useState([]);
   const [isRetryingPayment, setIsRetryingPayment] = useState(false);
+
+  // Partial Cancellation Modal State
+  const [selectedCancelPackage, setSelectedCancelPackage] = useState(null);
+  const [cancelReason, setCancelReason] = useState("Ordered by mistake");
+  const [cancelComment, setCancelComment] = useState("");
+  const [isSubmittingCancel, setIsSubmittingCancel] = useState(false);
+
+  const CANCELLATION_REASONS = [
+    "Ordered by mistake",
+    "Found cheaper elsewhere",
+    "Delivery taking too long",
+    "Changed my mind",
+    "Wrong item selected",
+    "Other",
+  ];
+
+  const handleOpenCancelModal = (vendorGroup, shipment) => {
+    const vg = vendorGroup || (order?.vendorItems || []).find(v => String(v.vendorId) === String(shipment?.vendorId));
+    if (!vg) return;
+    setSelectedCancelPackage(vg);
+    setCancelReason("Ordered by mistake");
+    setCancelComment("");
+  };
+
+  const handleConfirmCancelPackage = async () => {
+    if (!selectedCancelPackage || !order) return;
+    setIsSubmittingCancel(true);
+    try {
+      const vendorItemId = selectedCancelPackage._id || selectedCancelPackage.vendorId;
+      await cancelVendorItem(order.id, vendorItemId, cancelReason, cancelComment);
+      toast.success("Package cancelled successfully!");
+      setSelectedCancelPackage(null);
+      await fetchOrderById(order.id);
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || "Failed to cancel package.");
+    } finally {
+      setIsSubmittingCancel(false);
+    }
+  };
 
   const fetchDetailsForProduct = async (productId) => {
     if (productDetailsMap[productId]) return;
@@ -655,29 +694,27 @@ const MobileOrderDetail = () => {
               </div>
             )}
             {/* Shipment / Package Cards */}
-            {order.shipments && order.shipments.length > 0 && (
+            {((order.shipments && order.shipments.length > 0) || (order.vendorItems && order.vendorItems.length > 0)) && (
               <div className="space-y-4">
-                {order.shipments.map((shipment, index) => {
-                  // Find corresponding items for this shipment
-                  let items = [];
-                  if (order.vendorItems && order.vendorItems.length > 0) {
-                    const vendorGroup = order.vendorItems.find(
-                      (vg) => String(vg.vendorId) === String(shipment.vendorId)
-                    );
-                    items = vendorGroup ? vendorGroup.items : [];
-                  } else {
-                    items = orderItems;
-                  }
+                {(order.shipments && order.shipments.length > 0 ? order.shipments : order.vendorItems).map((itemGroup, index) => {
+                  const isShipmentDoc = !!itemGroup.shipmentNumber;
+                  const shipment = isShipmentDoc ? itemGroup : order.shipments?.find(s => String(s.vendorId) === String(itemGroup.vendorId));
+                  const vendorGroup = isShipmentDoc
+                    ? (order.vendorItems || []).find(vg => String(vg.vendorId) === String(itemGroup.vendorId))
+                    : itemGroup;
+                  const items = vendorGroup ? vendorGroup.items : (orderItems || []);
 
                   return (
                     <PackageCard
-                      key={shipment._id || index}
+                      key={itemGroup._id || index}
                       shipment={shipment}
+                      vendorGroup={vendorGroup}
                       index={index}
-                      totalPackages={order.shipments.length}
+                      totalPackages={order.shipments?.length || order.vendorItems?.length || 1}
                       items={items}
                       getItemReturnStatus={getItemReturnStatus}
-                      isMultiPackage={order.shipments.length > 1}
+                      isMultiPackage={(order.shipments?.length > 1) || (order.vendorItems?.length > 1)}
+                      onCancelPackage={handleOpenCancelModal}
                     />
                   );
                 })}
@@ -1573,6 +1610,100 @@ const MobileOrderDetail = () => {
               </button>
             </motion.div>
           </motion.div>
+        )}
+
+        {/* Cancel Product Modal */}
+        {selectedCancelPackage && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl p-6 space-y-5 animate-slideUp">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                <div>
+                  <h3 className="text-lg font-extrabold text-gray-900">Cancel Product</h3>
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">
+                    Store: <span className="font-bold text-gray-700">{selectedCancelPackage.vendorName || "Vendor"}</span>
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedCancelPackage(null)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+                >
+                  <FiX className="text-xl" />
+                </button>
+              </div>
+
+              {/* Product preview */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                {selectedCancelPackage.items?.map((it, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-gray-800 truncate max-w-[220px]">{it.name}</span>
+                    <span className="text-gray-600 font-extrabold">Qty: {it.quantity} • {formatPrice(it.price * it.quantity)}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Reasons */}
+              <div>
+                <label className="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-2">
+                  Why are you cancelling?
+                </label>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {CANCELLATION_REASONS.map((r) => (
+                    <label
+                      key={r}
+                      onClick={() => setCancelReason(r)}
+                      className={`flex items-center gap-3 p-3 rounded-xl border text-xs font-bold cursor-pointer transition-all ${
+                        cancelReason === r
+                          ? "bg-rose-50 border-rose-300 text-rose-800 shadow-sm"
+                          : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="cancellationReason"
+                        checked={cancelReason === r}
+                        onChange={() => setCancelReason(r)}
+                        className="text-rose-600 focus:ring-rose-500"
+                      />
+                      {r}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Comments */}
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">
+                  Comments (optional)
+                </label>
+                <textarea
+                  value={cancelComment}
+                  onChange={(e) => setCancelComment(e.target.value)}
+                  placeholder="Add any additional context..."
+                  rows={2}
+                  className="w-full text-xs p-3 rounded-xl border border-gray-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
+                />
+              </div>
+
+              {/* Submit */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedCancelPackage(null)}
+                  className="flex-1 py-3 px-4 rounded-xl border border-gray-200 text-gray-700 font-bold text-xs hover:bg-gray-50 transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmittingCancel}
+                  onClick={handleConfirmCancelPackage}
+                  className="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs shadow-md transition-colors disabled:opacity-50"
+                >
+                  {isSubmittingCancel ? "Cancelling..." : "Cancel Product"}
+                </button>
+              </div>
+            </div>
+          </div>
         )}
         </div>
       </MobileLayout>
