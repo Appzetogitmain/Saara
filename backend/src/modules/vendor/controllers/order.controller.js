@@ -15,6 +15,7 @@ import {
 import { notifyOrderUpdate } from '../../../services/socket.service.js';
 import { buildVendorItemsSummary } from '../../../utils/notificationProductFormatter.js';
 import { getDefaultCommissionRate } from '../../../services/settingsService.js';
+import { processCancellationRefund } from '../../../services/cancellationRefundService.js';
 
 const deriveTopLevelOrderStatus = (vendorItems = [], fallback = 'pending') => {
     const statuses = (vendorItems || [])
@@ -189,8 +190,10 @@ export const getVendorOrderById = asyncHandler(async (req, res) => {
 // PATCH /api/vendor/orders/:id/status
 export const updateOrderStatus = asyncHandler(async (req, res) => {
     const { status } = req.body;
+    if (!status) throw new ApiError(400, 'Status is required.');
     const allowed = ['pending', 'processing', 'ready_for_pickup', 'shipped', 'cancelled'];
     if (!allowed.includes(status)) throw new ApiError(400, `Status must be one of: ${allowed.join(', ')}`);
+
     const transitionMap = {
         pending: ['pending', 'processing', 'cancelled'],
         processing: ['processing', 'ready_for_pickup', 'cancelled'],
@@ -199,16 +202,17 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
         cancelled: ['cancelled'],
     };
 
-    const { id } = req.params;
-    const idFilter = [{ orderId: id }];
-    if (mongoose.Types.ObjectId.isValid(id)) {
-        idFilter.push({ _id: id });
-    }
-
-    const order = await Order.findOne({
-        $or: idFilter,
+    const orderIdParam = req.params.id;
+    const isMongoId = mongoose.Types.ObjectId.isValid(orderIdParam);
+    const query = {
+        $or: [
+            { orderId: orderIdParam },
+            { _id: isMongoId ? orderIdParam : null }
+        ],
         'vendorItems.vendorId': req.user.id,
-    });
+    };
+
+    const order = await Order.findOne(query);
     if (!order) throw new ApiError(404, 'Order not found.');
     const vendorItem = order.vendorItems.find((vi) => String(vi.vendorId) === String(req.user.id));
     if (!vendorItem) throw new ApiError(404, 'Vendor order item not found.');
@@ -217,6 +221,19 @@ export const updateOrderStatus = asyncHandler(async (req, res) => {
     const allowedNextStatuses = transitionMap[currentStatus] || [];
     if (!allowedNextStatuses.includes(status)) {
         throw new ApiError(409, `Cannot move order from ${currentStatus} to ${status}.`);
+    }
+
+    if (status === 'cancelled') {
+        const result = await processCancellationRefund({
+            orderId: order._id,
+            vendorGroupId: req.user.id,
+            cancelledBy: 'vendor',
+            reason: req.body.reason || 'Cancelled by vendor',
+            comment: req.body.comment || '',
+        });
+
+        notifyOrderUpdate(result.order || order);
+        return res.status(200).json(new ApiResponse(200, result.order || order, `Order item marked as cancelled and refund of ₹${result.refundAmount || 0} processed.`));
     }
 
     // Update only this vendor's items status

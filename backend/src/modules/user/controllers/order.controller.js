@@ -13,6 +13,7 @@ import PaymentAttempt from '../../../models/PaymentAttempt.model.js';
 import Refund from '../../../models/Refund.model.js';
 import ShippingQuote from '../../../models/ShippingQuote.model.js';
 import { creditWallet } from '../../../services/wallet.service.js';
+import { processCancellationRefund } from '../../../services/cancellationRefundService.js';
 import { generateOrderId } from '../../../utils/generateOrderId.js';
 import { generateTrackingNumber } from '../../../utils/generateTrackingNumber.js';
 import mongoose from 'mongoose';
@@ -904,144 +905,37 @@ export const getOrderDetail = asyncHandler(async (req, res) => {
 
 // PATCH /api/user/orders/:id/cancel
 export const cancelOrder = asyncHandler(async (req, res) => {
-    const session = await mongoose.startSession();
-    let order = null;
-    try {
-        await session.withTransaction(async () => {
-            const isMongoId = mongoose.Types.ObjectId.isValid(req.params.id);
-            const query = isMongoId
-                ? { _id: req.params.id, userId: req.user.id }
-                : { orderId: req.params.id, userId: req.user.id };
+    const isMongoId = mongoose.Types.ObjectId.isValid(req.params.id);
+    const query = isMongoId
+        ? { _id: req.params.id, userId: req.user.id }
+        : { orderId: req.params.id, userId: req.user.id };
 
-            order = await Order.findOne(query).session(session);
-            if (!order) throw new ApiError(404, 'Order not found.');
-            if (!['pending', 'processing', 'payment_pending'].includes(order.status)) throw new ApiError(400, 'Order cannot be cancelled at this stage.');
-
-            // FIX MED-01: preserve original status BEFORE overwriting so stock-restore check is correct
-            const originalStatus = order.status;
-
-            order.status = 'cancelled';
-            order.cancelledAt = new Date();
-            order.cancellationReason = req.body.reason || 'Cancelled by customer';
-            if (Array.isArray(order.vendorItems)) {
-                order.vendorItems = order.vendorItems.map((vendorGroup) => ({
-                    ...vendorGroup.toObject(),
-                    status: 'cancelled',
-                }));
-            }
-
-            // FIX MED-02: expire all pending/created PaymentAttempts so no zombie payment can succeed
-            await PaymentAttempt.updateMany(
-                { orderId: order._id, status: { $in: ['created', 'processing'] } },
-                { $set: { status: 'failed', notes: 'Order cancelled by customer' } },
-                { session }
-            );
-
-            // Credit refund to wallet directly inside transaction
-            let refundAmount = 0;
-            if (order.paymentStatus === 'paid') {
-                refundAmount = order.total;
-            } else if (order.walletAmountUsed > 0) {
-                refundAmount = order.walletAmountUsed;
-            }
-
-            if (refundAmount > 0) {
-                await creditWallet(
-                    order.userId,
-                    refundAmount,
-                    'cancel_refund',
-                    {
-                        orderId: order._id,
-                        description: `Refunded ₹${refundAmount} to wallet for cancelled Order #${order.orderId}`,
-                        reference: `ORDER_CANCEL_REFUND_${order._id}`
-                    },
-                    session
-                );
-
-                await Refund.create([{
-                    orderId:          order._id,
-                    amount:           refundAmount,
-                    referenceId:      `ORDER_CANCEL_REFUND_${order._id}`,
-                    method:           'wallet_credit',
-                    destination:      'wallet',
-                    status:           'completed',
-                    notes:            'Refund: customer cancelled order',
-                }], { session });
-
-                await Payment.updateMany({ orderId: order._id }, { status: 'refunded' }, { session });
-                order.paymentStatus = 'refunded';
-            }
-
-            await order.save({ session });
-
-            // Restore stock and status (only for orders that had stock deducted — not payment_pending)
-            if (originalStatus !== 'payment_pending') {
-                for (const item of order.items) {
-                    const quantity = Number(item.quantity || 0);
-                    if (quantity <= 0) continue;
-
-                    const productSnapshot = await Product.findById(item.productId)
-                        .select('variants.stockMap variants.prices')
-                        .session(session)
-                        .lean();
-                    const variantKey = resolveOrderItemVariantKey(productSnapshot, item);
-
-                    const incUpdate = { stockQuantity: quantity };
-                    if (variantKey) {
-                        incUpdate[`variants.stockMap.${variantKey}`] = quantity;
-                    }
-
-                    const product = await Product.findByIdAndUpdate(item.productId, { $inc: incUpdate }, { new: true, session });
-                    if (!product) continue;
-
-                    const nextStockState =
-                        product.stockQuantity <= 0
-                            ? 'out_of_stock'
-                            : (product.stockQuantity <= product.lowStockThreshold ? 'low_stock' : 'in_stock');
-
-                    await Product.updateOne(
-                        { _id: product._id },
-                        { $set: { stock: nextStockState } },
-                        { session }
-                    );
-                }
-            }
-
-            // T1.4: Release coupon usage slot so cancelled orders don't permanently exhaust coupons
-            if (order.couponCode) {
-                const couponFilter = order.couponId
-                    ? { _id: order.couponId, usedCount: { $gt: 0 } }
-                    : { code: order.couponCode.toUpperCase(), usedCount: { $gt: 0 } };
-                await Coupon.updateOne(couponFilter, { $inc: { usedCount: -1 } }, { session });
-            }
-
-            // Reverse vendor earnings visibility for this order.
-            await Commission.updateMany(
-                {
-                    orderId: order._id,
-                    status: { $ne: 'cancelled' },
-                },
-                {
-                    $set: {
-                        status: 'cancelled',
-                        paidAt: null,
-                        settlementId: null,
-                    },
-                },
-                { session }
-            );
-        });
-    } finally {
-        await session.endSession();
+    const order = await Order.findOne(query);
+    if (!order) throw new ApiError(404, 'Order not found.');
+    if (!['pending', 'processing', 'payment_pending'].includes(order.status)) {
+        throw new ApiError(400, 'Order cannot be cancelled at this stage.');
     }
 
+    const result = await processCancellationRefund({
+        orderId: order._id,
+        cancelledBy: 'customer',
+        reason: req.body.reason || 'Cancelled by customer',
+    });
 
+    // Expire all pending/created PaymentAttempts so no zombie payment can succeed
+    await PaymentAttempt.updateMany(
+        { orderId: order._id, status: { $in: ['created', 'processing'] } },
+        { $set: { status: 'failed', notes: 'Order cancelled by customer' } }
+    );
 
-    if (order) {
-        notifyOrderUpdate(order);
-    }
-
-    res.status(200).json(new ApiResponse(200, null, 'Order cancelled successfully.'));
+    notifyOrderUpdate(result.order || order);
+    res.status(200).json(
+        new ApiResponse(
+            200,
+            result.order || order,
+            `Order cancelled successfully.${result.refundAmount > 0 ? ` ₹${result.refundAmount} refunded to your wallet.` : ''}`
+        )
+    );
 });
 
 // PATCH /api/user/orders/:id/items/:vendorItemId/cancel
@@ -1053,285 +947,64 @@ export const cancelVendorItem = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'Cancellation reason is required.');
     }
 
-    const session = await mongoose.startSession();
-    let updatedOrder = null;
-    let cancelledVendorGroup = null;
-    let calculatedRefund = 0;
+    const isMongoId = mongoose.Types.ObjectId.isValid(orderIdParam);
+    const query = isMongoId
+        ? { _id: orderIdParam, userId: req.user.id }
+        : { orderId: orderIdParam, userId: req.user.id };
 
-    try {
-        await session.withTransaction(async () => {
-            const isMongoId = mongoose.Types.ObjectId.isValid(orderIdParam);
-            const query = isMongoId
-                ? { _id: orderIdParam, userId: req.user.id }
-                : { orderId: orderIdParam, userId: req.user.id };
+    const order = await Order.findOne(query);
+    if (!order) throw new ApiError(404, 'Order not found.');
 
-            const order = await Order.findOne(query).session(session);
-            if (!order) throw new ApiError(404, 'Order not found.');
+    const targetVendorGroup = (order.vendorItems || []).find(
+        (vGroup) => String(vGroup._id) === String(vendorItemId) || String(vGroup.vendorId) === String(vendorItemId)
+    );
 
-            // Find target vendor group in vendorItems
-            const vendorGroupIndex = (order.vendorItems || []).findIndex(
-                (vGroup) => String(vGroup._id) === String(vendorItemId) || String(vGroup.vendorId) === String(vendorItemId)
-            );
-
-            if (vendorGroupIndex === -1) {
-                throw new ApiError(404, 'Package / Vendor items not found in this order.');
-            }
-
-            const targetVendorGroup = order.vendorItems[vendorGroupIndex];
-
-            // 1. Conflict Validation: Check active return/exchange requests
-            const activeReturn = await ReturnRequest.findOne({
-                orderId: order._id,
-                vendorId: targetVendorGroup.vendorId,
-                status: { $nin: ['rejected'] },
-            }).session(session);
-
-            if (activeReturn) {
-                throw new ApiError(400, 'Cannot cancel package. An active return or exchange request already exists for this vendor.');
-            }
-
-            // 2. Validate package status is cancellable
-            if (targetVendorGroup.status === 'cancelled') {
-                throw new ApiError(400, 'This package is already cancelled.');
-            }
-
-            const nonCancellableStatuses = ['packed', 'pickup_assigned', 'shipped', 'delivered', 'returned'];
-            if (nonCancellableStatuses.includes(targetVendorGroup.status)) {
-                throw new ApiError(400, `Package cannot be cancelled at status: ${targetVendorGroup.status}.`);
-            }
-
-            // 3. Mark vendor group as cancelled
-            targetVendorGroup.status = 'cancelled';
-            targetVendorGroup.cancelledAt = new Date();
-            targetVendorGroup.cancelledBy = 'customer';
-            targetVendorGroup.cancellationReason = reason;
-            targetVendorGroup.cancellationComment = comment || '';
-
-            cancelledVendorGroup = targetVendorGroup;
-
-            // 4. Update corresponding Shipment & unassign delivery rider
-            const shipment = await Shipment.findOne({
-                orderId: order._id,
-                vendorId: targetVendorGroup.vendorId,
-            }).session(session);
-
-            if (shipment) {
-                await cancelShipmentDeliveryAssignment(shipment._id, reason, session);
-            }
-
-            // 5. Restore Inventory Stock for cancelled items
-            for (const item of targetVendorGroup.items) {
-                const quantity = Number(item.quantity || 0);
-                if (quantity <= 0) continue;
-
-                const productSnapshot = await Product.findById(item.productId)
-                    .select('variants.stockMap variants.prices')
-                    .session(session)
-                    .lean();
-                const variantKey = resolveOrderItemVariantKey(productSnapshot, item);
-
-                const incUpdate = { stockQuantity: quantity };
-                if (variantKey) {
-                    incUpdate[`variants.stockMap.${variantKey}`] = quantity;
-                }
-
-                const product = await Product.findByIdAndUpdate(item.productId, { $inc: incUpdate }, { new: true, session });
-                if (product) {
-                    const nextStockState =
-                        product.stockQuantity <= 0
-                            ? 'out_of_stock'
-                            : (product.stockQuantity <= product.lowStockThreshold ? 'low_stock' : 'in_stock');
-
-                    await Product.updateOne(
-                        { _id: product._id },
-                        { $set: { stock: nextStockState } },
-                        { session }
-                    );
-                }
-            }
-
-            // 6. Wallet Refund / Payment calculations
-            const productAmount = parseFloat((targetVendorGroup.subtotal || 0).toFixed(2));
-            const taxRefund = parseFloat((targetVendorGroup.tax || 0).toFixed(2));
-            const shippingRefund = parseFloat((targetVendorGroup.shipping || 0).toFixed(2));
-            const discountAdjustment = parseFloat((targetVendorGroup.discount || 0).toFixed(2));
-            calculatedRefund = parseFloat((productAmount - discountAdjustment + taxRefund + shippingRefund).toFixed(2));
-
-            targetVendorGroup.refundBreakdown = {
-                productAmount,
-                taxRefund,
-                shippingRefund,
-                discountAdjustment: -discountAdjustment,
-                finalRefund: calculatedRefund,
-            };
-
-            if (order.paymentStatus === 'paid' || order.walletAmountUsed > 0) {
-                if (calculatedRefund > 0) {
-                    const itemNames = (targetVendorGroup.items || []).map(i => i.name).join(', ');
-                    await creditWallet(
-                        order.userId,
-                        calculatedRefund,
-                        'cancel_refund',
-                        {
-                            orderId: order._id,
-                            orderNumber: order.orderId,
-                            vendorId: targetVendorGroup.vendorId,
-                            vendorName: targetVendorGroup.vendorName,
-                            items: itemNames,
-                            reason,
-                            comment: comment || '',
-                            description: `Refund ₹${calculatedRefund} for cancelled ${targetVendorGroup.vendorName} package (${itemNames}) in Order #${order.orderId}`,
-                            reference: `PARTIAL_CANCEL_${order._id}_${targetVendorGroup.vendorId}`,
-                        },
-                        session
-                    );
-
-                    await Refund.create([{
-                        orderId:          order._id,
-                        amount:           calculatedRefund,
-                        referenceId:      `PARTIAL_CANCEL_${order._id}_${targetVendorGroup.vendorId}`,
-                        method:           'wallet_credit',
-                        destination:      'wallet',
-                        status:           'completed',
-                        notes:            `Partial Cancellation: ${reason}`,
-                    }], { session });
-
-                    targetVendorGroup.refundedAmount = calculatedRefund;
-                }
-            }
-
-            // 7. Adjust Escrow and Reverse Commission for cancelled vendor
-            await Commission.updateMany(
-                {
-                    orderId: order._id,
-                    vendorId: targetVendorGroup.vendorId,
-                    status: { $ne: 'cancelled' },
-                },
-                {
-                    $set: {
-                        status: 'cancelled',
-                        escrowStatus: 'cancelled',
-                        paidAt: null,
-                        settlementId: null,
-                    },
-                },
-                { session }
-            );
-
-            // 8. Recalculate Financials & Order Status Roll-up
-            const remainingGroups = (order.vendorItems || []).filter((v) => v.status !== 'cancelled');
-
-            if (remainingGroups.length === 0) {
-                // All vendor items cancelled
-                order.status = 'cancelled';
-                order.cancelledAt = new Date();
-                order.cancellationReason = reason;
-                if (order.paymentStatus === 'paid') {
-                    order.paymentStatus = 'refunded';
-                }
-                // Release coupon usage slot if fully cancelled
-                if (order.couponCode) {
-                    const couponFilter = order.couponId
-                        ? { _id: order.couponId, usedCount: { $gt: 0 } }
-                        : { code: order.couponCode.toUpperCase(), usedCount: { $gt: 0 } };
-                    await Coupon.updateOne(couponFilter, { $inc: { usedCount: -1 } }, { session });
-                }
-            } else {
-                // Some active remaining
-                const anyDelivered = remainingGroups.some((v) => v.status === 'delivered');
-                order.status = anyDelivered ? 'partially_delivered' : 'partially_cancelled';
-
-                // Recalculate subtotal, tax, shipping, discount, total from remaining active groups
-                const newSubtotal = parseFloat(remainingGroups.reduce((sum, v) => sum + (v.subtotal || 0), 0).toFixed(2));
-                const newTax = parseFloat(remainingGroups.reduce((sum, v) => sum + (v.tax || 0), 0).toFixed(2));
-                const newShipping = parseFloat(remainingGroups.reduce((sum, v) => sum + (v.shipping || 0), 0).toFixed(2));
-
-                // Proportional coupon check
-                let newDiscount = parseFloat(remainingGroups.reduce((sum, v) => sum + (v.discount || 0), 0).toFixed(2));
-                if (order.couponCode) {
-                    const coupon = await Coupon.findOne({ code: order.couponCode.toUpperCase() }).session(session);
-                    if (coupon && coupon.minOrderValue && newSubtotal < coupon.minOrderValue) {
-                        // Coupon threshold broken -> remove coupon discount for remaining items
-                        newDiscount = 0;
-                        remainingGroups.forEach((v) => { v.discount = 0; });
-                    }
-                }
-
-                order.subtotal = newSubtotal;
-                order.tax = newTax;
-                order.shipping = newShipping;
-                order.discount = newDiscount;
-                order.total = parseFloat((newSubtotal - newDiscount + newTax + newShipping).toFixed(2));
-            }
-
-            // 9. Write Audit Log
-            await AuditLog.create([{
-                action: 'PARTIAL_CANCEL_ORDER_ITEM',
-                resource: 'Order',
-                resourceId: order._id,
-                changes: {
-                    orderId: order.orderId,
-                    vendorId: String(targetVendorGroup.vendorId),
-                    vendorName: targetVendorGroup.vendorName,
-                    reason,
-                    comment,
-                    refundAmount: calculatedRefund,
-                    previousPackageStatus: 'processing',
-                    newPackageStatus: 'cancelled',
-                },
-                ipAddress: req.ip,
-                userAgent: req.get('user-agent'),
-            }], { session });
-
-            await order.save({ session });
-            updatedOrder = order;
-        });
-    } finally {
-        await session.endSession();
+    if (!targetVendorGroup) {
+        throw new ApiError(404, 'Package / Vendor items not found in this order.');
     }
 
-    // 10. Post-Commit Notifications & Real-Time Events
-    if (updatedOrder && cancelledVendorGroup) {
-        notifyOrderUpdate(updatedOrder);
+    // 1. Conflict Validation: Check active return/exchange requests
+    const activeReturn = await ReturnRequest.findOne({
+        orderId: order._id,
+        vendorId: targetVendorGroup.vendorId,
+        status: { $nin: ['rejected'] },
+    });
 
-        const vendorId = cancelledVendorGroup.vendorId;
-        const vendorItemsList = (cancelledVendorGroup.items || []).map(i => i.name).join(', ');
-
-        // Customer Notification
-        createNotification({
-            recipientId: req.user.id,
-            recipientType: 'user',
-            title: 'Package Cancelled',
-            message: `Your package from ${cancelledVendorGroup.vendorName} (${vendorItemsList}) in Order #${updatedOrder.orderId} has been cancelled successfully.${calculatedRefund > 0 ? ` ₹${calculatedRefund} has been credited to your wallet.` : ''}`,
-            type: 'order',
-            data: { orderId: String(updatedOrder.orderId || updatedOrder._id) },
-        }).catch(err => console.error('[Notif Error]:', err.message));
-
-        // Vendor Notification
-        createNotification({
-            recipientId: vendorId,
-            recipientType: 'vendor',
-            title: 'Package Cancelled by Customer',
-            message: `Customer cancelled package (${vendorItemsList}) in Order #${updatedOrder.orderId} before shipment. Reason: ${reason}`,
-            type: 'order',
-            data: { orderId: String(updatedOrder.orderId || updatedOrder._id) },
-        }).catch(err => console.error('[Notif Error]:', err.message));
-
-        // Admin Notification
-        const admins = await Admin.find({ isActive: true }).select('_id').lean();
-        Promise.allSettled(admins.map(adm =>
-            createNotification({
-                recipientId: adm._id,
-                recipientType: 'admin',
-                title: 'Partial Package Cancellation',
-                message: `Order #${updatedOrder.orderId} has a partial package cancellation for vendor ${cancelledVendorGroup.vendorName}. Refund ₹${calculatedRefund}.`,
-                type: 'order',
-                data: { orderId: String(updatedOrder._id) },
-            })
-        ));
+    if (activeReturn) {
+        throw new ApiError(400, 'Cannot cancel package. An active return or exchange request already exists for this vendor.');
     }
 
-    res.status(200).json(new ApiResponse(200, { order: updatedOrder }, 'Package cancelled successfully.'));
+    // 2. Validate package status is cancellable
+    if (targetVendorGroup.status === 'cancelled') {
+        throw new ApiError(400, 'This package is already cancelled.');
+    }
+
+    const nonCancellableStatuses = ['packed', 'pickup_assigned', 'shipped', 'delivered', 'returned'];
+    if (nonCancellableStatuses.includes(targetVendorGroup.status)) {
+        throw new ApiError(400, `Package cannot be cancelled at status: ${targetVendorGroup.status}.`);
+    }
+
+    const result = await processCancellationRefund({
+        orderId: order._id,
+        vendorGroupId: targetVendorGroup.vendorId,
+        cancelledBy: 'customer',
+        reason,
+        comment: comment || '',
+    });
+
+    notifyOrderUpdate(result.order || order);
+    res.status(200).json(
+        new ApiResponse(
+            200,
+            {
+                orderId: (result.order || order).orderId,
+                status: (result.order || order).status,
+                vendorItems: (result.order || order).vendorItems,
+                refundAmount: result.refundAmount || 0,
+            },
+            `Package cancelled successfully.${result.refundAmount > 0 ? ` ₹${result.refundAmount} refunded to your wallet.` : ''}`
+        )
+    );
 });
 
 

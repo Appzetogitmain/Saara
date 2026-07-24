@@ -468,10 +468,12 @@ export const initializePayment = asyncHandler(async (req, res) => {
 
             // 3. Vendor Notifications
             (order.vendorItems || []).forEach(vGroup => {
+                const vendorId = vGroup.vendorId?._id || vGroup.vendorId;
+                if (!vendorId) return;
                 const vItemsText = buildVendorItemsSummary(vGroup.items);
                 notificationTasks.push(
                     createNotification({
-                        recipientId: vGroup.vendorId,
+                        recipientId: vendorId,
                         recipientType: 'vendor',
                         title: 'New Order Received!',
                         message: `You have received a new order ${order.orderId} totalling ₹${vGroup.subtotal}.${vItemsText}`,
@@ -777,9 +779,11 @@ export const initializePayment = asyncHandler(async (req, res) => {
 
         // Notify vendors
         (order.vendorItems || []).forEach(vGroup => {
+            const vendorId = vGroup.vendorId?._id || vGroup.vendorId;
+            if (!vendorId) return;
             const vItemsText = buildVendorItemsSummary(vGroup.items);
             createNotification({
-                recipientId: vGroup.vendorId,
+                recipientId: vendorId,
                 recipientType: 'vendor',
                 title: 'New Order Received!',
                 message: `You have received a new order ${order.orderId} totalling ₹${vGroup.subtotal}.${vItemsText}`,

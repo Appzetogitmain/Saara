@@ -18,13 +18,13 @@ export const useVendorNotificationStore = create((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await getVendorNotifications({ page, limit: 10 });
-      const payload = response?.data || {};
+      const payload = response?.notifications ? response : (response?.data || response || {});
       const list = Array.isArray(payload.notifications) ? payload.notifications : [];
       const pages = Number(payload.pages || 1);
 
       set((state) => ({
         notifications: page === 1 ? list : [...state.notifications, ...list],
-        unreadCount: Number(payload.unreadCount || 0),
+        unreadCount: Number(payload.unreadCount !== undefined ? payload.unreadCount : state.unreadCount),
         page: Number(page),
         hasMore: Number(page) < pages,
         isLoading: false,
