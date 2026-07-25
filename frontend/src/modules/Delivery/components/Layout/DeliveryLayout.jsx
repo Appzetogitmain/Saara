@@ -118,6 +118,27 @@ const DeliveryLayout = () => {
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
+  // Lock body & html scroll completely when mobile sidebar is open
+  useEffect(() => {
+    if (sidebarOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+      document.documentElement.style.overflow = "hidden";
+      document.documentElement.style.touchAction = "none";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
+      document.documentElement.style.touchAction = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+      document.documentElement.style.overflow = "";
+      document.documentElement.style.touchAction = "";
+    };
+  }, [sidebarOpen]);
+
   const handleLogout = () => {
     logout();
     toast.success("Logged out successfully");
@@ -343,26 +364,27 @@ const DeliveryLayout = () => {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setSidebarOpen(false)}
-                className="fixed inset-0 bg-black bg-opacity-50 z-40"
+                onTouchMove={(e) => e.preventDefault()}
+                className="fixed inset-0 bg-black/60 z-[10000] backdrop-blur-xs touch-none"
               />
               <motion.div
                 initial={{ x: -300 }}
                 animate={{ x: 0 }}
                 exit={{ x: -300 }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                className="fixed left-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50 overflow-y-auto flex flex-col"
+                className="fixed left-0 top-0 bottom-0 w-72 bg-white shadow-2xl z-[10001] flex flex-col h-full overflow-hidden"
               >
                 {/* Sidebar Header */}
-                <div className="p-4 border-b border-gray-200">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center font-bold text-white text-xl shadow-sm">
+                <div className="p-4 border-b border-slate-100 flex-shrink-0">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center font-black text-white text-xl shadow-sm">
                       {(deliveryBoy?.name || "D").charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <h2 className="font-semibold text-gray-800 leading-tight">
+                    <div className="min-w-0 flex-1">
+                      <h2 className="font-bold text-slate-800 leading-tight truncate">
                         {deliveryBoy?.name || "Delivery Boy"}
                       </h2>
-                      <p className="text-xs text-gray-600 truncate max-w-[150px] mt-0.5 leading-none">
+                      <p className="text-xs text-slate-400 truncate max-w-[150px] mt-0.5 leading-none">
                         {deliveryBoy?.email}
                       </p>
                     </div>
@@ -371,14 +393,14 @@ const DeliveryLayout = () => {
                     <div
                       className={`w-2 h-2 rounded-full ${getStatusColor(deliveryBoy?.status)}`}
                     />
-                    <span className="text-xs text-gray-600 capitalize">
+                    <span className="text-xs font-semibold text-slate-500 capitalize">
                       {deliveryBoy?.status || "offline"}
                     </span>
                   </div>
                 </div>
 
                 {/* Navigation Menu */}
-                <nav className="p-2 flex-1 space-y-1">
+                <nav className="p-3 flex-1 space-y-1 overflow-y-auto">
                   {menuItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = location.pathname === item.path;
@@ -389,14 +411,14 @@ const DeliveryLayout = () => {
                           navigate(item.path);
                           setSidebarOpen(false);
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors text-sm font-bold ${
                           isActive
                             ? "bg-primary-50 text-primary-700"
-                            : "text-gray-700 hover:bg-gray-100"
+                            : "text-slate-600 hover:bg-slate-50"
                         }`}
                       >
-                        <Icon className="text-xl flex-shrink-0" />
-                        <span className="font-medium">{item.label}</span>
+                        <Icon className="text-lg flex-shrink-0" />
+                        <span>{item.label}</span>
                         {item.path === "/delivery/notifications" &&
                           unreadCount > 0 && (
                             <span className="ml-auto min-w-[20px] px-1.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-semibold text-center">
@@ -409,13 +431,16 @@ const DeliveryLayout = () => {
                 </nav>
 
                 {/* Logout Button */}
-                <div className="p-2 border-t border-gray-200">
+                <div className="p-4 border-t border-slate-100 flex-shrink-0 bg-white pb-8">
                   <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors"
+                    onClick={() => {
+                      setSidebarOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-colors font-bold text-sm"
                   >
                     <FiLogOut className="text-xl flex-shrink-0" />
-                    <span className="font-medium">Logout</span>
+                    <span>Logout</span>
                   </button>
                 </div>
               </motion.div>

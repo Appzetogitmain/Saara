@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useDeliveryAuthStore } from '../store/deliveryStore';
-import { FiUser, FiMail, FiPhone, FiTruck, FiEdit2, FiSave, FiX, FiLogOut } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiTruck, FiEdit2, FiSave, FiX, FiLogOut, FiChevronDown } from 'react-icons/fi';
 import PageTransition from '../../../shared/components/PageTransition';
 import toast from 'react-hot-toast';
 import { formatPrice } from '../../../shared/utils/helpers';
@@ -24,6 +24,7 @@ const DeliveryProfile = () => {
     vehicleType: deliveryBoy?.vehicleType || '',
     vehicleNumber: deliveryBoy?.vehicleNumber || '',
   });
+  const [vehicleDropdownOpen, setVehicleDropdownOpen] = useState(false);
 
   const loadProfile = useCallback(async () => {
     try {
@@ -314,17 +315,41 @@ const DeliveryProfile = () => {
           <div>
             <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1.5">Vehicle Type</label>
             {isEditing ? (
-              <select
-                name="vehicleType"
-                value={formData.vehicleType}
-                onChange={handleChange}
-                className="w-full px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-primary-500 focus:outline-none text-sm bg-white transition-all"
-              >
-                <option value="Bike">Bike</option>
-                <option value="Car">Car</option>
-                <option value="Scooter">Scooter</option>
-                <option value="Van">Van</option>
-              </select>
+              <div className="relative w-full">
+                <button
+                  type="button"
+                  onClick={() => setVehicleDropdownOpen(!vehicleDropdownOpen)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border-2 border-slate-100 focus:border-primary-500 focus:outline-none text-sm bg-white transition-all text-left"
+                >
+                  <span className="font-semibold text-slate-800">{formData.vehicleType || 'Select Vehicle Type'}</span>
+                  <FiChevronDown className={`text-slate-400 text-base flex-shrink-0 transition-transform ${vehicleDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                <AnimatePresence>
+                  {vehicleDropdownOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl z-50 overflow-hidden"
+                    >
+                      {['Bike', 'Scooter', 'Car', 'Van'].map((type) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => {
+                            setFormData({ ...formData, vehicleType: type });
+                            setVehicleDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-3 text-sm font-semibold hover:bg-primary-50 transition-colors ${formData.vehicleType === type ? 'bg-primary-50 text-primary-700 font-extrabold' : 'text-slate-700'}`}
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             ) : (
               <p className="px-4 py-3 bg-slate-50/50 border border-slate-50 rounded-2xl text-slate-800 text-sm font-semibold">{formData.vehicleType}</p>
             )}
