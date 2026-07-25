@@ -7,9 +7,9 @@ const deliveryBoySchema = new mongoose.Schema(
         email: { type: String, required: true, unique: true, lowercase: true },
         password: { type: String, required: true, select: false },
         phone: { type: String, required: true },
-        address: { type: String, trim: true },
-        vehicleType: { type: String, trim: true },
-        vehicleNumber: { type: String, trim: true },
+        address: { type: String, required: [true, 'Address is required'], trim: true },
+        vehicleType: { type: String, required: [true, 'Vehicle type is required'], trim: true },
+        vehicleNumber: { type: String, required: [true, 'Vehicle number is required'], trim: true },
         avatar: { type: String },
         applicationStatus: {
             type: String,
@@ -35,8 +35,8 @@ const deliveryBoySchema = new mongoose.Schema(
             default: 'available',
         },
         currentLocation: {
-            type: { type: String, default: 'Point' },
-            coordinates: [Number] // [lng, lat]
+            type: { type: String, enum: ['Point'], default: 'Point' },
+            coordinates: { type: [Number], default: [0, 0] }
         },
         totalDeliveries: { type: Number, default: 0 },
         rating: { type: Number, default: 0 },

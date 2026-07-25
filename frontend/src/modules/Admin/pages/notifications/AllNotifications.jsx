@@ -1,10 +1,12 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { FiBell, FiCheck, FiChevronDown } from "react-icons/fi";
 import { useNotificationStore } from "../../store/notificationStore";
 import { formatDateTime } from "../../utils/adminHelpers";
 
 const AllNotifications = () => {
+  const navigate = useNavigate();
   const {
     notifications,
     unreadCount,
@@ -19,6 +21,22 @@ const AllNotifications = () => {
   useEffect(() => {
     fetchNotifications(1);
   }, [fetchNotifications]);
+
+  const handleNotificationClick = (notification) => {
+    markAsRead(notification._id);
+    const orderId = notification.orderId || notification.data?.orderId;
+    const withdrawalId = notification.withdrawalId || notification.data?.withdrawalId;
+    const deliveryBoyId = notification.deliveryBoyId || notification.data?.deliveryBoyId;
+    const titleLower = String(notification.title || '').toLowerCase();
+
+    if (withdrawalId || titleLower.includes('payout') || titleLower.includes('withdrawal')) {
+      navigate('/admin/delivery/payout-requests');
+    } else if (orderId) {
+      navigate('/admin/orders');
+    } else if (deliveryBoyId || titleLower.includes('delivery') || titleLower.includes('driver')) {
+      navigate('/admin/delivery/delivery-boys');
+    }
+  };
 
   return (
     <motion.div
@@ -68,7 +86,8 @@ const AllNotifications = () => {
             {notifications.map((notification) => (
               <div
                 key={notification._id}
-                className={`border rounded-lg p-4 transition-colors ${
+                onClick={() => handleNotificationClick(notification)}
+                className={`border rounded-lg p-4 transition-colors cursor-pointer hover:bg-slate-50/80 ${
                   notification.isRead
                     ? "border-gray-200 bg-white"
                     : "border-blue-200 bg-blue-50/40"
@@ -89,7 +108,10 @@ const AllNotifications = () => {
                   </div>
                   {!notification.isRead && (
                     <button
-                      onClick={() => markAsRead(notification._id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        markAsRead(notification._id);
+                      }}
                       className="p-2 text-green-600 hover:bg-green-50 rounded-lg"
                       title="Mark as read"
                     >
@@ -120,4 +142,3 @@ const AllNotifications = () => {
 };
 
 export default AllNotifications;
-

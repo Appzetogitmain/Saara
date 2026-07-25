@@ -4,6 +4,7 @@ import ApiError from '../../../utils/ApiError.js';
 import DeliveryBoy from '../../../models/DeliveryBoy.model.js';
 import DeliveryWithdrawal from '../../../models/DeliveryWithdrawal.model.js';
 import DeliveryWalletTransaction from '../../../models/DeliveryWalletTransaction.model.js';
+import { createNotification } from '../../../services/notification.service.js';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 
@@ -70,6 +71,16 @@ export const updateWithdrawalStatus = asyncHandler(async (req, res) => {
         if (!withdrawal) {
             throw new ApiError(400, 'Withdrawal request is not pending or already processed.');
         }
+
+        await createNotification({
+            recipientId: withdrawal.deliveryBoyId,
+            recipientType: 'delivery',
+            title: 'Payout Request Processing',
+            message: `Your withdrawal request of ₹${withdrawal.amount} is currently being processed by finance.`,
+            type: 'system',
+            data: { withdrawalId: String(withdrawal._id), status: 'processing' }
+        }).catch(e => console.error('Failed sending driver notification:', e));
+
         return res.status(200).json(new ApiResponse(200, withdrawal, 'Withdrawal request marked as processing.'));
     }
 
@@ -91,6 +102,16 @@ export const updateWithdrawalStatus = asyncHandler(async (req, res) => {
         if (!withdrawal) {
             throw new ApiError(400, 'Withdrawal request is already processed or invalid.');
         }
+
+        await createNotification({
+            recipientId: withdrawal.deliveryBoyId,
+            recipientType: 'delivery',
+            title: 'Payout Approved & Transferred',
+            message: `Your withdrawal of ₹${withdrawal.amount} has been successfully transferred! Ref: #${transactionId}`,
+            type: 'system',
+            data: { withdrawalId: String(withdrawal._id), status: 'completed', transactionId }
+        }).catch(e => console.error('Failed sending driver notification:', e));
+
         return res.status(200).json(new ApiResponse(200, withdrawal, 'Withdrawal request approved successfully.'));
     }
 
@@ -153,6 +174,17 @@ export const updateWithdrawalStatus = asyncHandler(async (req, res) => {
         throw new ApiError(400, err.message);
     } finally {
         await session.endSession();
+    }
+
+    if (withdrawalResult) {
+        await createNotification({
+            recipientId: withdrawalResult.deliveryBoyId,
+            recipientType: 'delivery',
+            title: 'Payout Request Rejected',
+            message: `Your withdrawal request of ₹${withdrawalResult.amount} was rejected (${withdrawalResult.rejectionReason || 'Details invalid'}). ₹${withdrawalResult.amount} has been refunded to your wallet.`,
+            type: 'system',
+            data: { withdrawalId: String(withdrawalResult._id), status: withdrawalResult.status, rejectionReason: withdrawalResult.rejectionReason }
+        }).catch(e => console.error('Failed sending driver notification:', e));
     }
 
     res.status(200).json(new ApiResponse(200, withdrawalResult, `Withdrawal request successfully marked as ${action === 'reject' ? 'rejected' : 'failed'} and refunded.`));

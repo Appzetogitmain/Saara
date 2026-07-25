@@ -36,7 +36,7 @@ const DeliveryRegister = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.email || !formData.phone || !formData.password) {
+    if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.vehicleType || !formData.vehicleNumber || !formData.password) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -113,10 +113,10 @@ const DeliveryRegister = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Address</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Address <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <FiMapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                  <input type="text" name="address" value={formData.address} onChange={handleChange} placeholder="City, State" className="w-full pl-12 pr-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800" />
+                  <input type="text" name="address" value={formData.address} onChange={handleChange} placeholder="City, State" required className="w-full pl-12 pr-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800" />
                 </div>
               </div>
             </div>
@@ -126,16 +126,16 @@ const DeliveryRegister = () => {
             <h3 className="text-lg font-semibold text-gray-800 mb-4">Vehicle Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Vehicle Type</label>
-                <select name="vehicleType" value={formData.vehicleType} onChange={handleChange} className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Vehicle Type <span className="text-red-500">*</span></label>
+                <select name="vehicleType" value={formData.vehicleType} onChange={handleChange} required className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800">
                   <option value="Bike">Bike</option>
                   <option value="Scooter">Scooter</option>
                   <option value="Car">Car</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Vehicle Number</label>
-                <input type="text" name="vehicleNumber" value={formData.vehicleNumber} onChange={handleChange} placeholder="ABC-1234" className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800" />
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Vehicle Number <span className="text-red-500">*</span></label>
+                <input type="text" name="vehicleNumber" value={formData.vehicleNumber} onChange={handleChange} placeholder="ABC-1234" required className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800" />
               </div>
             </div>
           </div>

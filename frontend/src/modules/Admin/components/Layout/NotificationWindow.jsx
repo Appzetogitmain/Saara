@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { FiBell, FiCheck, FiX, FiChevronRight } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { formatDateTime } from '../../utils/adminHelpers';
@@ -14,7 +14,6 @@ const NotificationWindow = ({ isOpen, onClose, position = 'right' }) => {
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (windowRef.current && !windowRef.current.contains(event.target)) {
-        // Check if click is not on the notification button
         if (!event.target.closest('[data-notification-button]')) {
           onClose();
         }
@@ -32,27 +31,21 @@ const NotificationWindow = ({ isOpen, onClose, position = 'right' }) => {
     };
   }, [isOpen, onClose]);
 
-
-
-  const getNotificationIcon = (type) => {
-    return FiBell;
-  };
-
-  const getNotificationColor = (type) => {
-    const colors = {
-      order_placed: 'bg-blue-100 text-blue-600',
-      order_cancelled: 'bg-red-100 text-red-600',
-      payment_failed: 'bg-yellow-100 text-yellow-600',
-      order_delivered: 'bg-green-100 text-green-600',
-    };
-    return colors[type] || 'bg-gray-100 text-gray-600';
-  };
-
   const handleNotificationClick = (notification) => {
     markAsRead(notification._id);
     const orderId = notification.orderId || notification.data?.orderId;
-    if (orderId) {
+    const withdrawalId = notification.withdrawalId || notification.data?.withdrawalId;
+    const deliveryBoyId = notification.deliveryBoyId || notification.data?.deliveryBoyId;
+    const titleLower = String(notification.title || '').toLowerCase();
+
+    if (withdrawalId || titleLower.includes('payout') || titleLower.includes('withdrawal')) {
+      navigate('/admin/delivery/payout-requests');
+      onClose();
+    } else if (orderId) {
       navigate('/admin/orders');
+      onClose();
+    } else if (deliveryBoyId || titleLower.includes('delivery') || titleLower.includes('driver')) {
+      navigate('/admin/delivery/delivery-boys');
       onClose();
     }
   };
@@ -76,7 +69,7 @@ const NotificationWindow = ({ isOpen, onClose, position = 'right' }) => {
             className="fixed inset-0 bg-black/20 z-[9999] lg:hidden"
           />
 
-          {/* Notification Window - positioned absolutely relative to parent on desktop, fixed on mobile */}
+          {/* Notification Window */}
           <motion.div
             ref={windowRef}
             initial={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -124,70 +117,59 @@ const NotificationWindow = ({ isOpen, onClose, position = 'right' }) => {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {notifications.map((notification) => {
-                    const Icon = getNotificationIcon(notification.type);
-                    return (
-                      <motion.div
-                        key={notification._id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${!notification.isRead ? 'bg-blue-50/30' : ''
-                          }`}
-                        onClick={() => handleNotificationClick(notification)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${getNotificationColor(
-                              notification.type
-                            )}`}
-                          >
-                            <Icon className="text-lg" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-semibold text-gray-800 text-sm">
-                                    {notification.title}
-                                  </h4>
-                                  {!notification.isRead && (
-                                    <span className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full"></span>
-                                  )}
-                                </div>
-                                <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                                  {notification.message}
-                                </p>
-                                <div className="flex items-center gap-3 mt-2">
-                                  <span className="text-xs text-gray-500">
-                                    {formatDateTime(notification.createdAt)}
-                                  </span>
-                                  {(notification.orderId || notification.data?.orderId) && (
-                                    <span className="text-xs font-medium text-primary-600">
-                                      {notification.orderId || notification.data?.orderId}
-                                    </span>
-                                  )}
-                                </div>
+                  {notifications.map((notification) => (
+                    <motion.div
+                      key={notification._id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
+                        !notification.isRead ? 'bg-blue-50/30' : ''
+                      }`}
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                          <FiBell className="text-lg" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-semibold text-gray-800 text-sm">
+                                  {notification.title}
+                                </h4>
+                                {!notification.isRead && (
+                                  <span className="flex-shrink-0 w-2 h-2 bg-blue-600 rounded-full"></span>
+                                )}
+                              </div>
+                              <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                {notification.message}
+                              </p>
+                              <div className="flex items-center gap-3 mt-2">
+                                <span className="text-xs text-gray-500">
+                                  {formatDateTime(notification.createdAt)}
+                                </span>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            {!notification.isRead && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  markAsRead(notification._id);
-                                }}
-                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                title="Mark as read"
-                              >
-                                <FiCheck className="text-sm" />
-                              </button>
-                            )}
-                          </div>
                         </div>
-                      </motion.div>
-                    );
-                  })}
+                        <div className="flex items-center gap-1">
+                          {!notification.isRead && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markAsRead(notification._id);
+                              }}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Mark as read"
+                            >
+                              <FiCheck className="text-sm" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               )}
             </div>
@@ -215,4 +197,3 @@ const NotificationWindow = ({ isOpen, onClose, position = 'right' }) => {
 };
 
 export default NotificationWindow;
-

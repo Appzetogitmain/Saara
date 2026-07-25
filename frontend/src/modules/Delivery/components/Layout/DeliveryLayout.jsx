@@ -10,6 +10,8 @@ import {
   FiBell,
   FiMessageSquare,
   FiCreditCard,
+  FiMapPin,
+  FiNavigation,
 } from "react-icons/fi";
 import { useDeliveryAuthStore } from "../../store/deliveryStore";
 import { useDeliveryNotificationStore } from "../../store/deliveryNotificationStore";
@@ -21,9 +23,10 @@ import { appLogo } from "../../../../data/logos";
 const DeliveryLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { deliveryBoy, logout } = useDeliveryAuthStore();
+  const { deliveryBoy, logout, updateProfile } = useDeliveryAuthStore();
   const { unreadCount, fetchNotifications } = useDeliveryNotificationStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [gpsStatus, setGpsStatus] = useState("prompt"); // 'prompt' | 'active' | 'denied' | 'unsupported'
   const [isCollapsed, setIsCollapsed] = useState(
     localStorage.getItem("delivery_sidebar_collapsed") === "true",
   );
@@ -33,6 +36,81 @@ const DeliveryLayout = () => {
     setIsCollapsed(nextVal);
     localStorage.setItem("delivery_sidebar_collapsed", String(nextVal));
   };
+
+  const requestLocationAccess = () => {
+    if (!navigator.geolocation) {
+      setGpsStatus("unsupported");
+      toast.error("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    if (gpsStatus === "denied") {
+      const currentHost = typeof window !== "undefined" ? window.location.host : "your browser address bar";
+      toast.error(
+        `Location is blocked by browser settings! Click the 🔒 tune/lock icon in your address bar (next to ${currentHost}) and change Location to 'Allow', then click Enable GPS.`,
+        { duration: 6000 }
+      );
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        setGpsStatus("active");
+        toast.success("GPS Location Active!");
+        updateProfile({
+          currentLocation: {
+            type: "Point",
+            coordinates: [longitude, latitude],
+          },
+        }).catch((e) => console.error("Failed syncing location:", e));
+      },
+      (err) => {
+        console.warn("Geolocation access denied:", err.message);
+        setGpsStatus("denied");
+        if (err.code === err.PERMISSION_DENIED) {
+          const currentHost = typeof window !== "undefined" ? window.location.host : "your address bar";
+          toast.error(
+            `Location access was blocked. Please enable Location in your address bar settings (next to ${currentHost}).`,
+            { duration: 6000 }
+          );
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  };
+
+  // Start watching location on mount
+  useEffect(() => {
+    requestLocationAccess();
+
+    let watchId = null;
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const { latitude, longitude } = pos.coords;
+          setGpsStatus("active");
+          updateProfile({
+            currentLocation: {
+              type: "Point",
+              coordinates: [longitude, latitude],
+            },
+          }).catch(() => {});
+        },
+        (err) => {
+          if (err.code === err.PERMISSION_DENIED) {
+            setGpsStatus("denied");
+          }
+        },
+        { enableHighAccuracy: true, maximumAge: 30000 }
+      );
+    }
+
+    return () => {
+      if (watchId !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchId);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     fetchNotifications(1);
@@ -50,7 +128,6 @@ const DeliveryLayout = () => {
     { icon: FiHome, label: "Dashboard", path: "/delivery/dashboard" },
     { icon: FiPackage, label: "Orders", path: "/delivery/orders" },
     { icon: FiCreditCard, label: "Wallet", path: "/delivery/wallet" },
-    { icon: FiBell, label: "Notifications", path: "/delivery/notifications" },
     { icon: FiMessageSquare, label: "Support", path: "/delivery/support" },
     { icon: FiUser, label: "Profile", path: "/delivery/profile" },
   ];
@@ -223,16 +300,36 @@ const DeliveryLayout = () => {
             </div>
 
             {/* Quick unread badge in top navbar for mobile */}
-            <div className="md:hidden">
-              <Link
-                to="/delivery/notifications"
-                className="relative p-2 block hover:bg-slate-50 rounded-xl"
-              >
-                <FiBell className="text-slate-600 text-xl" />
-                {unreadCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                )}
-              </Link>
+            <div className="flex items-center gap-2">
+              {gpsStatus === "active" ? (
+                <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  GPS Live
+                </span>
+              ) : (
+                <button
+                  onClick={requestLocationAccess}
+                  className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold hover:bg-amber-100 transition-all"
+                >
+                  <FiMapPin className="text-amber-600" />
+                  Enable GPS
+                </button>
+              )}
+
+              <div>
+                <Link
+                  to="/delivery/notifications"
+                  className="relative p-2 block hover:bg-slate-100 rounded-xl transition-colors"
+                  title="Notifications"
+                >
+                  <FiBell className="text-slate-600 text-xl" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 right-1 min-w-[18px] px-1 py-0.5 rounded-full bg-red-500 text-white text-[9px] font-black text-center leading-none shadow-sm">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </Link>
+              </div>
             </div>
           </div>
         </header>
@@ -330,6 +427,22 @@ const DeliveryLayout = () => {
         <main
           className={`pt-20 ${location.pathname === "/delivery/support" && new URLSearchParams(location.search).get("id") ? "pb-0" : "pb-20"} md:pb-6 flex-1 bg-slate-50/30`}
         >
+          {gpsStatus === "denied" && (
+            <div className="bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-amber-800 text-xs font-semibold flex items-center justify-between gap-3 max-w-5xl mx-auto rounded-2xl mb-4 shadow-sm">
+              <div className="flex items-center gap-2">
+                <FiMapPin className="text-amber-600 text-lg flex-shrink-0" />
+                <span>
+                  <strong>Location Permission Blocked:</strong> Click the 🔒 icon next to <code>{typeof window !== "undefined" ? window.location.host : "URL"}</code> in your browser address bar $\rightarrow$ set <strong>Location</strong> to <em>Allow</em> $\rightarrow$ click <strong>Enable GPS</strong>.
+                </span>
+              </div>
+              <button
+                onClick={requestLocationAccess}
+                className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex-shrink-0 shadow-sm"
+              >
+                Enable GPS
+              </button>
+            </div>
+          )}
           <Outlet />
         </main>
 

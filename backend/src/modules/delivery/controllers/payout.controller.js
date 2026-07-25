@@ -4,6 +4,8 @@ import ApiError from "../../../utils/ApiError.js";
 import DeliveryBoy from "../../../models/DeliveryBoy.model.js";
 import DeliveryWithdrawal from "../../../models/DeliveryWithdrawal.model.js";
 import DeliveryWalletTransaction from "../../../models/DeliveryWalletTransaction.model.js";
+import Admin from "../../../models/Admin.model.js";
+import { createNotification } from "../../../services/notification.service.js";
 import mongoose from "mongoose";
 import Settings from "../../../models/Settings.model.js";
 
@@ -139,6 +141,26 @@ export const requestWithdrawal = asyncHandler(async (req, res) => {
           },
         ],
         { session },
+      );
+
+      // Notify active Admins about new payout request
+      const admins = await Admin.find({ isActive: true }).session(session).select("_id");
+      const methodText = boy.payoutMethodDetails?.method === "upi" ? "UPI" : "Bank Transfer";
+      await Promise.all(
+        admins.map((admin) =>
+          createNotification({
+            recipientId: admin._id,
+            recipientType: "admin",
+            title: "New Payout Withdrawal Request",
+            message: `${boy.name} requested a withdrawal of ₹${reqAmount} via ${methodText}.`,
+            type: "system",
+            data: {
+              withdrawalId: String(withdrawal._id),
+              deliveryBoyId: String(req.user.id),
+              amount: reqAmount,
+            },
+          })
+        )
       );
     });
   } finally {

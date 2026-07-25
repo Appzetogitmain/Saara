@@ -82,13 +82,21 @@ const DeliveryProfile = () => {
       toast.error('Phone is required');
       return;
     }
+    if (!formData.vehicleType?.trim()) {
+      toast.error('Vehicle type is required');
+      return;
+    }
+    if (!formData.vehicleNumber?.trim()) {
+      toast.error('Vehicle number is required');
+      return;
+    }
     try {
       await updateProfile({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         phone: formData.phone.trim(),
-        vehicleType: formData.vehicleType?.trim() || '',
-        vehicleNumber: formData.vehicleNumber?.trim() || '',
+        vehicleType: formData.vehicleType.trim(),
+        vehicleNumber: formData.vehicleNumber.trim(),
       });
       setIsEditing(false);
       toast.success('Profile updated successfully');
