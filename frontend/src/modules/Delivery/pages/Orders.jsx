@@ -335,19 +335,19 @@ const DeliveryOrders = () => {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2"
         >
           <div>
-            <h1 className="text-2xl font-black text-slate-800 uppercase tracking-wide">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-800 uppercase tracking-wide">
               {activeTab === 'deliveries' ? 'Assigned Deliveries' : 'Return Pickups'}
             </h1>
             <p className="text-xs text-slate-400 font-bold mt-0.5">
               {activeTab === 'deliveries'
-                ? 'Manage forwards orders details'
+                ? 'Manage forward order details'
                 : 'Collect items from customers and deliver to shops'}
             </p>
           </div>
-          <span className="text-xs font-bold text-slate-400 bg-slate-50 border border-slate-100 px-3 py-1 rounded-full">
+          <span className="text-xs font-bold text-slate-500 bg-slate-100 border border-slate-200 px-3 py-1 rounded-full w-fit">
             {activeTab === 'deliveries'
               ? `${Number(ordersPagination?.total || orders.length)} orders`
               : `${filteredReturns.length} returns`}
@@ -359,7 +359,7 @@ const DeliveryOrders = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4"
+            className="flex gap-2 overflow-x-auto pb-2 scrollbar-none no-scrollbar -mx-4 px-4 max-w-[100vw]"
           >
             {['all', 'pending', 'in-transit', 'completed'].map((tab) => (
               <button
@@ -368,10 +368,10 @@ const DeliveryOrders = () => {
                   setFilter(tab);
                   setCurrentPage(1);
                 }}
-                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
                   filter === tab
                     ? 'bg-primary-600 text-white shadow-sm'
-                    : 'bg-slate-50 border border-slate-100 text-slate-500 hover:text-slate-800'
+                    : 'bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900'
                 }`}
               >
                 {tab.charAt(0).toUpperCase() + tab.slice(1).replace('-', ' ')}
@@ -382,7 +382,7 @@ const DeliveryOrders = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4"
+            className="flex gap-2 overflow-x-auto pb-2 scrollbar-none no-scrollbar -mx-4 px-4 max-w-[100vw]"
           >
             {[
               { id: 'all', label: 'All Returns' },
@@ -393,10 +393,10 @@ const DeliveryOrders = () => {
               <button
                 key={tab.id}
                 onClick={() => setReturnFilter(tab.id)}
-                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+                className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all ${
                   returnFilter === tab.id
                     ? 'bg-primary-600 text-white shadow-sm'
-                    : 'bg-slate-50 border border-slate-100 text-slate-500 hover:text-slate-800'
+                    : 'bg-slate-100 border border-slate-200 text-slate-600 hover:text-slate-900'
                 }`}
               >
                 {tab.label}
@@ -602,33 +602,35 @@ const DeliveryOrders = () => {
                   >
                     <div className={`absolute top-0 bottom-0 left-0 w-1.5 rounded-l-3xl ${currentStatus.bar}`} />
                     
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[8px] font-black uppercase tracking-wider mr-1.5">
-                          {isReplacementLeg2 ? 'Replacement Delivery' : 'Return Pickup'}
-                        </span>
-                        <span className="font-mono text-[9px] font-black text-slate-500 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md inline-block">
-                          ID: {String(ret._id).slice(-6).toUpperCase()}
-                        </span>
-                        <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mt-2 leading-none">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[9px] font-black uppercase tracking-wider">
+                            {isReplacementLeg2 ? 'Replacement Delivery' : 'Return Pickup'}
+                          </span>
+                          <span className="font-mono text-[9px] font-black text-slate-500 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">
+                            ID: {String(ret._id).slice(-6).toUpperCase()}
+                          </span>
+                        </div>
+                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1.5 leading-none">
                           {isReplacementLeg2 ? 'Pickup from Shop:' : 'Pickup from Customer:'}
                         </h3>
-                        <p className="text-sm font-bold text-slate-800 mt-1 leading-tight">
+                        <p className="text-sm font-bold text-slate-800 mt-1 leading-tight break-words">
                           {isReplacementLeg2 
                             ? (ret.vendorId?.storeName || ret.vendorId?.shopName || 'Vendor Shop')
                             : (ret.orderId?.shippingAddress?.name || 'Customer')
                           }
                         </p>
                       </div>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${currentStatus.badge}`}>
+                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border shrink-0 w-fit ${currentStatus.badge}`}>
                         {currentStatus.label}
                       </span>
                     </div>
 
                     {/* Pickup Location Details */}
-                    <div className="flex items-start gap-2 p-3 bg-slate-50/50 border border-slate-50 rounded-2xl">
+                    <div className="flex items-start gap-2 p-3 bg-slate-50/50 border border-slate-100 rounded-2xl min-w-0">
                       <FiMapPin className="text-primary-650 mt-0.5 flex-shrink-0 text-sm" />
-                      <p className="text-xs font-semibold text-slate-650 leading-tight">
+                      <p className="text-xs font-semibold text-slate-650 leading-tight break-words min-w-0">
                         {isReplacementLeg2 
                           ? (formatVendorAddress(ret.vendorId?.address) || 'Vendor shop address')
                           : (ret.orderId?.shippingAddress?.address || 'Customer pickup location')
@@ -637,11 +639,11 @@ const DeliveryOrders = () => {
                     </div>
 
                     {/* Destination Handoff Details */}
-                    <div className="border-t border-dashed border-slate-150 pt-2.5 space-y-1.5">
+                    <div className="border-t border-dashed border-slate-200 pt-2.5 space-y-1.5 min-w-0">
                       <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
                         {isReplacementLeg2 ? 'Deliver to Customer:' : 'Deliver back to Vendor:'}
                       </h3>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         <FiTruck className="text-slate-450 text-xs flex-shrink-0" />
                         <span className="text-xs font-black text-slate-700 truncate">
                           {isReplacementLeg2
@@ -650,9 +652,9 @@ const DeliveryOrders = () => {
                           }
                         </span>
                       </div>
-                      <div className="flex items-start gap-1.5">
+                      <div className="flex items-start gap-1.5 min-w-0">
                         <FiMapPin className="text-slate-450 text-xs flex-shrink-0 mt-0.5" />
-                        <p className="text-[11px] font-semibold text-slate-500 leading-tight">
+                        <p className="text-[11px] font-semibold text-slate-500 leading-tight break-words min-w-0">
                           {isReplacementLeg2
                             ? (ret.orderId?.shippingAddress?.address || 'Customer shipping address')
                             : (formatVendorAddress(ret.vendorId?.address) || 'Vendor shop address')
@@ -661,28 +663,28 @@ const DeliveryOrders = () => {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-slate-50 pt-3">
-                      <div className="flex items-center gap-3 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-wider min-w-0 flex-1">
                         <span>Items: {ret.items?.length || 0}</span>
-                        <div className="w-1 h-1 rounded-full bg-slate-200" />
-                        <span>Reason: {ret.returnReason}</span>
+                        <div className="w-1 h-1 rounded-full bg-slate-300" />
+                        <span className="truncate max-w-[150px]">Reason: {ret.returnReason}</span>
                       </div>
-                      <p className="font-black text-slate-800 text-xs font-mono">{formatPrice(ret.refundAmount)}</p>
+                      <p className="font-black text-slate-800 text-xs font-mono shrink-0 ml-auto">{formatPrice(ret.refundAmount)}</p>
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
                       {isOffer ? (
                         <>
                           <button
                             onClick={() => handleAcceptReturn(ret._id)}
-                            className="flex-1 px-3 py-2 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                            className="w-full flex-1 px-3 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
                           >
                             {isReplacementLeg2 ? 'Accept Delivery' : 'Accept Pickup'}
                           </button>
                           <button
                             onClick={() => handleRejectReturn(ret._id)}
-                            className="flex-1 px-3 py-2 bg-slate-50 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-100 rounded-xl text-xs font-bold transition-all"
+                            className="w-full flex-1 px-3 py-2.5 bg-slate-50 hover:bg-red-50 text-slate-600 hover:text-red-600 border border-slate-200 rounded-xl text-xs font-bold transition-all"
                           >
                             Reject
                           </button>
