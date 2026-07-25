@@ -16,4 +16,9 @@ router.put('/providers/:providerId', audit('UPDATE_LOGISTICS_PROVIDER', 'Logisti
 router.get('/engine-config', logisticsController.getEngineConfig);
 router.put('/engine-config', audit('UPDATE_ENGINE_CONFIG', 'AppConfig'), logisticsController.updateEngineConfig);
 
+// Delivery Rate Configs & Rain Mode
+router.get('/rate-configs', logisticsController.getRateConfigs);
+router.put('/rate-configs/:vehicleType', audit('UPDATE_DELIVERY_RATE_CONFIG', 'DeliveryRateConfig'), logisticsController.updateRateConfig);
+router.patch('/rate-configs/rain-mode', audit('TOGGLE_RAIN_MODE', 'DeliveryRateConfig'), logisticsController.toggleRainMode);
+
 export default router;
