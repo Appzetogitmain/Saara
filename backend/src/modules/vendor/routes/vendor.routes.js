@@ -36,13 +36,33 @@ import {
     updateProductSchema,
     productIdParamSchema,
 } from '../validators/product.validator.js';
-import { uploadSingle, uploadMultiple, uploadDocumentSingle } from '../../../middlewares/upload.js';
+import { uploadSingle, uploadMultiple, uploadDocumentSingle, uploadVendorRegistrationDocuments } from '../../../middlewares/upload.js';
 
 const router = Router();
 const vendorAuth = [authenticate, authorize('vendor'), enforceAccountStatus];
 
 // Auth
-router.post('/auth/register', authLimiter, validate(registerSchema), authController.register);
+router.post(
+    '/auth/register',
+    authLimiter,
+    uploadVendorRegistrationDocuments([
+        { name: 'license', maxCount: 1 },
+        { name: 'identity', maxCount: 1 },
+    ]),
+    (req, res, next) => {
+        // Parse req.body.address if passed as string in multipart form data
+        if (typeof req.body.address === 'string') {
+            try {
+                req.body.address = JSON.parse(req.body.address);
+            } catch (e) {
+                // Ignore parse error, will fail validation cleanly
+            }
+        }
+        next();
+    },
+    validate(registerSchema),
+    authController.register
+);
 router.post('/auth/verify-otp', otpVerifyLimiter, validate(verifyOtpSchema), authController.verifyOTP);
 router.post('/auth/resend-otp', otpLimiter, validate(resendOtpSchema), authController.resendOTP);
 router.post('/auth/forgot-password', authLimiter, validate(forgotPasswordSchema), authController.forgotPassword);

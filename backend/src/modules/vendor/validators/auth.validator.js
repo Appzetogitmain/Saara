@@ -8,11 +8,32 @@ export const registerSchema = Joi.object({
     storeName: Joi.string().trim().min(2).max(100).required(),
     storeDescription: Joi.string().trim().max(500).allow('').optional(),
     address: Joi.object({
-        street: Joi.string().allow('').optional(),
-        city: Joi.string().allow('').optional(),
-        state: Joi.string().allow('').optional(),
-        zipCode: Joi.string().allow('').optional(),
-        country: Joi.string().allow('').optional(),
+        street: Joi.string().trim().min(2).required().messages({
+            'any.required': 'Street Address is required.',
+            'string.empty': 'Street Address is required.',
+        }),
+        city: Joi.string().trim().min(2).required().messages({
+            'any.required': 'City is required.',
+            'string.empty': 'City is required.',
+        }),
+        state: Joi.string().trim().min(2).required().messages({
+            'any.required': 'State is required.',
+            'string.empty': 'State is required.',
+        }),
+        zipCode: Joi.string().trim().min(2).required().messages({
+            'any.required': 'Zip Code is required.',
+            'string.empty': 'Zip Code is required.',
+        }),
+        country: Joi.string().trim().min(2).required().messages({
+            'any.required': 'Country is required.',
+            'string.empty': 'Country is required.',
+        }),
+    }).required().messages({
+        'any.required': 'Business Address is required.',
+    }),
+    documents: Joi.object({
+        license: Joi.string().allow('').optional(),
+        identity: Joi.string().allow('').optional(),
     }).optional(),
 });
 

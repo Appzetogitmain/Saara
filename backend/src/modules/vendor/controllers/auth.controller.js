@@ -15,13 +15,80 @@ import {
 } from '../../../services/refreshToken.service.js';
 import { isVendorApprovalRequired } from '../../../services/settingsService.js';
 
+import VendorDocument from '../../../models/VendorDocument.model.js';
+import { cleanupLocalFiles, uploadLocalFileToCloudinaryAndCleanupWithType } from '../../../services/upload.service.js';
+
 // POST /api/vendor/auth/register
 export const register = asyncHandler(async (req, res) => {
-    const { name, email, password, phone, storeName, storeDescription, address } = req.body;
+    const { name, email, password, phone, storeName, storeDescription } = req.body;
+    let address = req.body.address;
+    if (typeof address === 'string') {
+        try { address = JSON.parse(address); } catch (e) {}
+    }
+
+    // Validate Business Address
+    const street = String(address?.street || '').trim();
+    const city = String(address?.city || '').trim();
+    const state = String(address?.state || '').trim();
+    const zipCode = String(address?.zipCode || '').trim();
+    const country = String(address?.country || '').trim();
+
+    if (!street || !city || !state || !zipCode || !country) {
+        throw new ApiError(400, 'All Business Address fields (Street Address, City, State, Zip Code, Country) are mandatory.');
+    }
+
+    // Check files or payload for Business License & Identity Proof
+    const licenseFile = req.files?.license?.[0];
+    const identityFile = req.files?.identity?.[0];
+    let licenseUrl = req.body.documents?.license || req.body.licenseUrl || '';
+    let identityUrl = req.body.documents?.identity || req.body.identityUrl || '';
+
+    if (!licenseFile && !licenseUrl) {
+        throw new ApiError(400, 'Business License document is mandatory.');
+    }
+    if (!identityFile && !identityUrl) {
+        throw new ApiError(400, 'Identity Proof document is mandatory.');
+    }
 
     const normalizedEmail = String(email || '').trim().toLowerCase();
     const existing = await Vendor.findOne({ email: normalizedEmail });
-    if (existing) throw new ApiError(409, 'Email already registered.');
+    if (existing) {
+        if (licenseFile?.path || identityFile?.path) {
+            await cleanupLocalFiles([licenseFile?.path, identityFile?.path].filter(Boolean));
+        }
+        throw new ApiError(409, 'Email already registered.');
+    }
+
+    // Handle File Uploads to Cloudinary (with local upload fallback)
+    let licensePublicId = 'doc_' + Date.now();
+    let identityPublicId = 'doc_' + Date.now();
+
+    try {
+        if (licenseFile?.path) {
+            const uploadedLicense = await uploadLocalFileToCloudinaryAndCleanupWithType(
+                licenseFile.path,
+                'vendor/documents',
+                'auto'
+            );
+            licenseUrl = uploadedLicense?.url || `/uploads/tmp/${licenseFile.filename}`;
+            if (uploadedLicense?.publicId) licensePublicId = uploadedLicense.publicId;
+        }
+
+        if (identityFile?.path) {
+            const uploadedIdentity = await uploadLocalFileToCloudinaryAndCleanupWithType(
+                identityFile.path,
+                'vendor/documents',
+                'auto'
+            );
+            identityUrl = uploadedIdentity?.url || `/uploads/tmp/${identityFile.filename}`;
+            if (uploadedIdentity?.publicId) identityPublicId = uploadedIdentity.publicId;
+        }
+    } catch (err) {
+        if (licenseFile?.path || identityFile?.path) {
+            await cleanupLocalFiles([licenseFile?.path, identityFile?.path].filter(Boolean));
+        }
+        throw err;
+    }
 
     const vendor = await Vendor.create({
         name: String(name || '').trim(),
@@ -30,9 +97,44 @@ export const register = asyncHandler(async (req, res) => {
         phone: String(phone || '').trim(),
         storeName: String(storeName || '').trim(),
         storeDescription: String(storeDescription || '').trim(),
-        address,
+        address: { street, city, state, zipCode, country },
+        documents: {
+            businessLicense: licenseUrl,
+            identity: identityUrl,
+        },
         status: 'pending'
     });
+
+    // Save VendorDocument records for Admin Review
+    try {
+        await VendorDocument.create([
+            {
+                vendorId: vendor._id,
+                name: 'Business License',
+                category: 'License',
+                fileUrl: licenseUrl,
+                filePublicId: licensePublicId,
+                fileName: licenseFile?.originalname || 'business_license',
+                fileType: licenseFile?.mimetype || 'application/pdf',
+                fileSize: licenseFile?.size || 0,
+                status: 'pending',
+            },
+            {
+                vendorId: vendor._id,
+                name: 'Identity Proof',
+                category: 'Other',
+                fileUrl: identityUrl,
+                filePublicId: identityPublicId,
+                fileName: identityFile?.originalname || 'identity_proof',
+                fileType: identityFile?.mimetype || 'application/pdf',
+                fileSize: identityFile?.size || 0,
+                status: 'pending',
+            },
+        ]);
+    } catch (docErr) {
+        console.warn(`VendorDocument creation warning for ${vendor._id}: ${docErr.message}`);
+    }
+
     await sendOTP(vendor, 'vendor_verification');
 
     // Notify all active admins about a new vendor registration request.

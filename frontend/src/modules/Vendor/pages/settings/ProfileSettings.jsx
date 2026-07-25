@@ -137,7 +137,26 @@ const ProfileSettings = () => {
         <div className="p-3 sm:p-4 md:p-6">
           {/* Profile Info Section */}
           {activeSection === 'profile' && (
-            <form onSubmit={handleProfileSubmit} className="space-y-6">
+            <div className="space-y-6">
+              {/* Commission Rate Summary Card */}
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-purple-600 text-white rounded-xl flex items-center justify-center shadow-md font-bold text-xl">
+                    %
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-800 text-base">Active Store Commission Rate</h3>
+                    <p className="text-xs sm:text-sm text-gray-600">Configured by Admin for your vendor account</p>
+                  </div>
+                </div>
+                <div className="bg-white border border-purple-200 px-4 py-2 rounded-xl shadow-inner text-center self-stretch sm:self-auto">
+                  <span className="text-2xl font-black text-purple-700">
+                    {((vendor?.commissionRate !== undefined && vendor?.commissionRate !== null ? (vendor.commissionRate <= 1 ? vendor.commissionRate * 100 : vendor.commissionRate) : 10)).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+
+              <form onSubmit={handleProfileSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -192,6 +211,7 @@ const ProfileSettings = () => {
                 </button>
               </div>
             </form>
+          </div>
           )}
 
           {/* Change Password Section */}

@@ -192,6 +192,44 @@ export const updateCommissionRate = asyncHandler(async (req, res) => {
 
     const vendor = await Vendor.findByIdAndUpdate(req.params.id, { commissionRate: dbCommissionRate }, { new: true });
     if (!vendor) throw new ApiError(404, 'Vendor not found.');
+
+    const formattedRate = `${dbCommissionRate.toFixed(1)}%`;
+    const vendorMessage = `Your store's commission rate has been updated to ${formattedRate} by Admin.`;
+
+    // 1. In-app notification with clickable route to profile settings
+    await createNotification({
+        recipientId: vendor._id,
+        recipientType: 'vendor',
+        title: 'Commission Rate Updated',
+        message: vendorMessage,
+        type: 'system',
+        data: {
+            actionUrl: '/vendor/profile',
+            link: '/vendor/profile',
+            type: 'commission_update',
+            commissionRate: formattedRate,
+        },
+    });
+
+    // 2. Send email notification
+    try {
+        await sendEmail({
+            to: vendor.email,
+            subject: 'Store Commission Rate Updated',
+            text: vendorMessage,
+            html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+                    <h2 style="color: #4F46E5;">Commission Rate Update</h2>
+                    <p>Dear ${vendor.storeName || vendor.name || 'Vendor'},</p>
+                    <p>${vendorMessage}</p>
+                    <p>You can review your updated rate anytime in your Vendor Profile Settings.</p>
+                </div>
+            `,
+        });
+    } catch (err) {
+        console.warn(`Commission update email failed for ${vendor.email}: ${err.message}`);
+    }
+
     res.status(200).json(new ApiResponse(200, toApiVendor(vendor), 'Commission rate updated.'));
 });
 

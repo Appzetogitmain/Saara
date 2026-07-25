@@ -397,6 +397,17 @@ const AllOrders = () => {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  const [globalOrders, setGlobalOrders] = useState([]);
+
+  const fetchGlobalOrders = useCallback(async () => {
+    try {
+      const response = await getAllOrders({ limit: 500 });
+      const orderList = response?.data?.orders || response?.orders || [];
+      setGlobalOrders(orderList);
+    } catch (error) {
+      console.error("Failed to fetch global orders stats:", error);
+    }
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
@@ -434,6 +445,7 @@ const AllOrders = () => {
   }, [selectedStatus, searchQuery, dateRange]);
 
   useEffect(() => {
+    fetchGlobalOrders();
     fetchOrders();
 
     const token = localStorage.getItem('admin-token') || localStorage.getItem('token');
@@ -443,6 +455,7 @@ const AllOrders = () => {
         joinRoom('admin_room');
 
         const handleOrderUpdate = () => {
+          fetchGlobalOrders();
           fetchOrders();
         };
 
@@ -456,9 +469,9 @@ const AllOrders = () => {
         };
       }
     }
-  }, [fetchOrders]);
+  }, [fetchOrders, fetchGlobalOrders]);
 
-  // Calculate order status counts
+  // Calculate global order status counts for KPI cards
   const orderStats = useMemo(() => {
     const stats = {
       awaiting: 0,
@@ -468,10 +481,12 @@ const AllOrders = () => {
       delivered: 0,
       cancelled: 0,
       returned: 0,
-      total: orders.length,
+      total: 0,
     };
 
-    orders.forEach((order) => {
+    const targetList = globalOrders.length > 0 ? globalOrders : orders;
+
+    targetList.forEach((order) => {
       const status = order.status?.toLowerCase() || "";
 
       // Map statuses to our categories
@@ -492,8 +507,9 @@ const AllOrders = () => {
       }
     });
 
+    stats.total = targetList.length;
     return stats;
-  }, [orders]);
+  }, [globalOrders, orders]);
 
   const filteredOrders = useMemo(() => {
     let filtered = orders;

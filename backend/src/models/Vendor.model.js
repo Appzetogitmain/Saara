@@ -29,11 +29,11 @@ const vendorSchema = new mongoose.Schema(
         totalSales: { type: Number, default: 0 },
         totalEarnings: { type: Number, default: 0 },
         address: {
-            street: String,
-            city: String,
-            state: String,
-            zipCode: String,
-            country: String,
+            street: { type: String, required: true, trim: true },
+            city: { type: String, required: true, trim: true },
+            state: { type: String, required: true, trim: true },
+            zipCode: { type: String, required: true, trim: true },
+            country: { type: String, required: true, trim: true },
             location: {
                 type: { type: String, default: 'Point' },
                 coordinates: [Number] // [lng, lat]
@@ -82,7 +82,8 @@ const vendorSchema = new mongoose.Schema(
             gst: String,
             pan: String,
             aadhar: String,
-            businessLicense: String,
+            businessLicense: { type: String, required: true },
+            identity: { type: String, required: true },
         },
         otp: { type: String, select: false },
         otpExpiry: { type: Date, select: false },
