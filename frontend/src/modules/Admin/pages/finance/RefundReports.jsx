@@ -26,9 +26,10 @@ const RefundReports = () => {
 
         while (page <= totalPages) {
           const response = await getAllReturnRequests({ page, limit: 200 });
-          const payload = response?.data || {};
-          allReturns.push(...(payload.returnRequests || []));
-          totalPages = payload.pagination?.pages || 1;
+          const payload = response || {};
+          const list = payload.returnRequests || (Array.isArray(response) ? response : []);
+          allReturns.push(...list);
+          totalPages = payload.pagination?.pages || payload.pages || 1;
           page += 1;
         }
 
@@ -44,14 +45,14 @@ const RefundReports = () => {
 
           return {
             id: request._id || request.id,
-            orderId: request.orderId || request.orderRefId || "N/A",
-            customerName: request.customer?.name || "Guest Customer",
+            orderId: request.orderId?.orderId || request.orderId || request.orderRefId || "N/A",
+            customerName: request.userId?.name || request.orderId?.shippingAddress?.name || "Customer",
             amount: Number(request.refundAmount) || 0,
-            reason: request.reason || "N/A",
+            reason: request.returnReason || request.reason || "N/A",
             requestStatus,
             refundStatus,
             status,
-            requestedDate: request.requestDate || request.createdAt,
+            requestedDate: request.createdAt || request.requestDate,
             processedDate:
               status === "completed" || status === "rejected"
                 ? request.updatedAt || null
@@ -60,6 +61,8 @@ const RefundReports = () => {
         });
 
         if (mounted) setRefunds(normalizedRefunds);
+      } catch (err) {
+        console.error("Failed fetching refund reports:", err);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -92,7 +95,7 @@ const RefundReports = () => {
       label: "Refund ID",
       sortable: true,
       render: (value) => (
-        <span className="font-semibold text-gray-800">{value}</span>
+        <span className="font-semibold text-gray-800">{String(value).slice(-8).toUpperCase()}</span>
       ),
     },
     {
@@ -126,7 +129,7 @@ const RefundReports = () => {
       label: "Return Status",
       sortable: true,
       render: (value) => (
-        <Badge variant={value === "completed" ? "success" : value === "rejected" ? "error" : "warning"}>
+        <Badge variant={value === "completed" || value === "delivered_to_vendor" ? "success" : value === "rejected" ? "error" : "warning"}>
           {value}
         </Badge>
       ),
@@ -136,7 +139,7 @@ const RefundReports = () => {
       label: "Refund Status",
       sortable: true,
       render: (value) => (
-        <Badge variant={value === "processed" ? "success" : value === "failed" ? "error" : "warning"}>
+        <Badge variant={value === "processed" || value === "completed" ? "success" : value === "failed" ? "error" : "warning"}>
           {value}
         </Badge>
       ),

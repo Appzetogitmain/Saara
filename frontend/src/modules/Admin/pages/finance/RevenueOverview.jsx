@@ -56,20 +56,22 @@ const RevenueOverview = () => {
   }, [period, fetchFinancialSummary]);
 
   const chartData = useMemo(() => {
-    return financialSummary.map(item => ({
+    const list = Array.isArray(financialSummary) ? financialSummary : [];
+    return list.map(item => ({
       ...item,
       date: item._id, // Map _id to date for the chart
     }));
   }, [financialSummary]);
 
   const stats = useMemo(() => {
-    const revenue = financialSummary.reduce((sum, item) => sum + item.revenue, 0);
-    const orders = financialSummary.reduce((sum, item) => sum + item.orders, 0);
+    const list = Array.isArray(financialSummary) ? financialSummary : [];
+    const revenue = list.reduce((sum, item) => sum + (item.revenue || 0), 0);
+    const orders = list.reduce((sum, item) => sum + (item.orders || 0), 0);
     const aov = orders > 0 ? revenue / orders : 0;
     return { revenue, orders, aov };
   }, [financialSummary]);
 
-  if (isPageLoading && financialSummary.length === 0) {
+  if (isPageLoading && (!Array.isArray(financialSummary) || financialSummary.length === 0)) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>

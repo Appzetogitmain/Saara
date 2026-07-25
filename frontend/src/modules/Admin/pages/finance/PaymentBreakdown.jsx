@@ -20,14 +20,17 @@ const PaymentBreakdown = () => {
         let totalPages = 1;
 
         while (page <= totalPages) {
-          const response = await getSalesReport({ page, limit: 200, status: 'delivered' });
-          const payload = response?.data || {};
-          allOrders.push(...(payload.orders || []));
+          const response = await getSalesReport({ page, limit: 200, status: 'all' });
+          const payload = response || {};
+          const fetchedOrders = payload.orders || (Array.isArray(response) ? response : []);
+          allOrders.push(...fetchedOrders);
           totalPages = payload.pages || 1;
           page += 1;
         }
 
         if (mounted) setOrders(allOrders);
+      } catch (err) {
+        console.error("Failed to fetch payment breakdown orders:", err);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -50,8 +53,8 @@ const PaymentBreakdown = () => {
     };
 
     orders.forEach((order) => {
-      const method = order.paymentMethod || "card";
-      const normalizedMethod = breakdown[method] ? method : "card";
+      const method = String(order.paymentMethod || "cod").toLowerCase();
+      const normalizedMethod = breakdown[method] ? method : "cod";
       breakdown[normalizedMethod].count += 1;
       breakdown[normalizedMethod].total += Number(order.total) || 0;
     });

@@ -23,14 +23,17 @@ const TaxReports = () => {
         let totalPages = 1;
 
         while (page <= totalPages) {
-          const response = await getSalesReport({ page, limit: 200, status: 'delivered' });
-          const payload = response?.data || {};
-          allOrders.push(...(payload.orders || []));
+          const response = await getSalesReport({ page, limit: 200, status: 'all' });
+          const payload = response || {};
+          const fetchedOrders = payload.orders || (Array.isArray(response) ? response : []);
+          allOrders.push(...fetchedOrders);
           totalPages = payload.pages || 1;
           page += 1;
         }
 
         if (mounted) setOrders(allOrders);
+      } catch (err) {
+        console.error("Failed fetching tax report orders:", err);
       } finally {
         if (mounted) setIsLoading(false);
       }
@@ -43,7 +46,6 @@ const TaxReports = () => {
   }, []);
 
   const taxData = useMemo(() => {
-    // Generate tax data from orders and create daily aggregates for better chart visualization
     const dailyData = {};
 
     orders.forEach((order) => {
@@ -83,7 +85,6 @@ const TaxReports = () => {
       });
     });
 
-    // Convert to array format for table and add individual order entries
     const tableData = [];
     Object.values(dailyData).forEach((dayData) => {
       dayData.orders.forEach((order) => {
