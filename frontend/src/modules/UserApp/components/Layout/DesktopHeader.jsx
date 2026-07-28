@@ -144,7 +144,7 @@ const DesktopHeader = ({ onSearch }) => {
 
       {/* 2. MAIN HEADER BAR */}
       <div className="w-full bg-white py-4 border-b border-gray-50">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-12 flex items-center justify-between gap-8 h-16">
+        <div className="max-w-[1440px] mx-auto px-8 lg:px-16 xl:px-20 flex items-center justify-between gap-8 h-16">
           {/* Logo */}
           <Link to="/home" className="flex-shrink-0 flex items-center gap-2">
             {appLogo.src ? (
@@ -356,7 +356,7 @@ const DesktopHeader = ({ onSearch }) => {
 
       {/* 3. SUB-HEADER NAVIGATION BAR */}
       <div className="w-full bg-white border-b border-gray-200">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-8 lg:px-12 flex items-center justify-between h-12">
+        <div className="max-w-[1440px] mx-auto px-8 lg:px-16 xl:px-20 flex items-center justify-between h-12">
           {/* Categories Button with dropdown */}
           <div ref={navCategoriesRef} className="relative">
             <button
