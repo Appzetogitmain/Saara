@@ -375,17 +375,18 @@ const MobileProductDetail = () => {
   }, [isAuthenticated, fetchUserOrders]);
 
   const hasPurchasedAndDelivered = useMemo(() => {
-    if (!isAuthenticated || !orders) return false;
+    if (!isAuthenticated || !orders || !product?.id) return false;
     return orders.some(
       (order) =>
         order.status === 'delivered' &&
         order.items.some((item) => String(item.productId || item.id) === String(product.id))
     );
-  }, [orders, product.id, isAuthenticated]);
+  }, [orders, product?.id, isAuthenticated]);
 
   const productReviews = useMemo(() => {
+    if (!product?.id) return [];
     return reviews[product.id] || [];
-  }, [reviews, product.id]);
+  }, [reviews, product?.id]);
 
   const userReview = useMemo(() => {
     if (!isAuthenticated || !user) return null;
@@ -395,6 +396,14 @@ const MobileProductDetail = () => {
   }, [productReviews, user, isAuthenticated]);
 
   const meta = useMemo(() => {
+    if (!product?.id) {
+      return {
+        averageRating: 0,
+        totalReviews: 0,
+        distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        images: []
+      };
+    }
     return reviewsMeta[product.id] || {
       averageRating: product.rating || 0,
       totalReviews: product.reviewCount || 0,
@@ -404,6 +413,7 @@ const MobileProductDetail = () => {
   }, [reviewsMeta, product]);
 
   const handleReviewSubmit = async (reviewData) => {
+    if (!product?.id) return false;
     const matchingOrder = orders.find(
       (order) =>
         order.status === 'delivered' &&
@@ -528,33 +538,6 @@ const MobileProductDetail = () => {
       fetchReviews(product.id, { sort: "newest", limit: 50 });
     }
   }, [product?.id, fetchReviews]);
-
-  if (!product) {
-    return (
-      <PageTransition>
-        <MobileLayout showBottomNav={false} showCartBar={false}>
-          <div className="flex items-center justify-center min-h-[60vh] px-4">
-            <div className="text-center">
-              {isLoadingProduct ? (
-                <h2 className="text-xl font-bold text-gray-800 mb-4">Loading product...</h2>
-              ) : (
-                <>
-                  <h2 className="text-xl font-bold text-gray-800 mb-4">
-                    Product Not Found
-                  </h2>
-                  <button
-                    onClick={() => navigate("/home")}
-                    className="gradient-green text-white px-6 py-3 rounded-xl font-semibold">
-                    Go Back Home
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </MobileLayout>
-      </PageTransition>
-    );
-  }
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -753,6 +736,33 @@ const MobileProductDetail = () => {
       { id: 4, label: "Skin Friendly", desc: "Hypoallergenic components designed for daily comfort." }
     ];
   }, [product]);
+
+  if (!product) {
+    return (
+      <PageTransition>
+        <MobileLayout showBottomNav={false} showCartBar={false}>
+          <div className="flex items-center justify-center min-h-[60vh] px-4">
+            <div className="text-center">
+              {isLoadingProduct ? (
+                <h2 className="text-xl font-bold text-gray-800 mb-4">Loading product...</h2>
+              ) : (
+                <>
+                  <h2 className="text-xl font-bold text-gray-800 mb-4">
+                    Product Not Found
+                  </h2>
+                  <button
+                    onClick={() => navigate("/home")}
+                    className="gradient-green text-white px-6 py-3 rounded-xl font-semibold">
+                    Go Back Home
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </MobileLayout>
+      </PageTransition>
+    );
+  }
 
   return (
     <>

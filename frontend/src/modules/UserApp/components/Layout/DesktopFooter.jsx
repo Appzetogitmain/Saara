@@ -14,7 +14,7 @@ const DesktopFooter = () => {
 
   return (
     <footer className="hidden lg:block bg-slate-900 text-slate-300 border-t border-slate-800 pt-16 pb-8 w-full mt-auto">
-      <div className="max-w-[1440px] mx-auto px-6 md:px-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10">
+      <div className="max-w-[1440px] mx-auto px-8 lg:px-16 xl:px-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10">
         {/* Brand Column */}
         <div className="space-y-6">
           <Link to="/" className="flex items-center gap-2">
@@ -151,7 +151,7 @@ const DesktopFooter = () => {
       </div>
 
       {/* Bottom Bar */}
-      <div className="max-w-[1440px] mx-auto px-6 md:px-12 mt-16 pt-8 border-t border-slate-800 flex flex-col lg:flex-row items-center justify-between gap-6">
+      <div className="max-w-[1440px] mx-auto px-8 lg:px-16 xl:px-20 mt-16 pt-8 border-t border-slate-800 flex flex-col lg:flex-row items-center justify-between gap-6">
         <p className="text-xs text-slate-500 font-semibold text-center lg:text-left">
           © {new Date().getFullYear()} Porutkal Marketplace. All rights
           reserved. Developed with ❤️.
