@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FiPlus, FiChevronRight, FiSend, FiArrowLeft, FiAlertCircle } from 'react-icons/fi';
-import { motion } from 'framer-motion';
+import { FiPlus, FiChevronRight, FiChevronDown, FiSend, FiArrowLeft, FiAlertCircle } from 'react-icons/fi';
+import { motion, AnimatePresence } from 'framer-motion';
 import PageTransition from '../../../shared/components/PageTransition';
 import * as supportService from '../services/supportService';
 import { getSocket, joinRoom, leaveRoom } from '../../../shared/utils/socket';
@@ -79,6 +79,8 @@ const DeliverySupport = () => {
         message: '',
         priority: 'medium'
     });
+    const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+    const [priorityDropdownOpen, setPriorityDropdownOpen] = useState(false);
 
     useEffect(() => {
         fetchInitialData();
@@ -434,33 +436,102 @@ const DeliverySupport = () => {
                                 </div>
 
                                 {/* Category and Priority */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full">
+                                    {/* Custom Category Dropdown */}
+                                    <div className="relative w-full">
                                         <label className="block text-sm font-bold text-gray-700 mb-2">Select Category *</label>
-                                        <select 
-                                            value={newTicket.ticketTypeId}
-                                            onChange={(e) => setNewTicket({...newTicket, ticketTypeId: e.target.value})}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:outline-none bg-white text-sm"
-                                            required
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setCategoryDropdownOpen(!categoryDropdownOpen);
+                                                setPriorityDropdownOpen(false);
+                                            }}
+                                            className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 text-left transition-all"
                                         >
-                                            <option value="">Select Category</option>
-                                            {ticketTypes.map(type => (
-                                                <option key={type._id} value={type._id}>{type.icon || '❓'} {type.name}</option>
-                                            ))}
-                                        </select>
+                                            <span className="truncate">
+                                                {newTicket.ticketTypeId ? (
+                                                    (() => {
+                                                        const selected = ticketTypes.find(t => t._id === newTicket.ticketTypeId);
+                                                        return selected ? `${selected.icon || '❓'} ${selected.name}` : 'Select Category';
+                                                    })()
+                                                ) : (
+                                                    <span className="text-gray-400">Select Category</span>
+                                                )}
+                                            </span>
+                                            <FiChevronDown className={`text-gray-400 text-base flex-shrink-0 transition-transform ${categoryDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+
+                                        <AnimatePresence>
+                                            {categoryDropdownOpen && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -4 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -4 }}
+                                                    className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto"
+                                                >
+                                                    {ticketTypes.map(type => (
+                                                        <button
+                                                            key={type._id}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setNewTicket({ ...newTicket, ticketTypeId: type._id });
+                                                                setCategoryDropdownOpen(false);
+                                                            }}
+                                                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-blue-50 flex items-center gap-2 transition-colors ${newTicket.ticketTypeId === type._id ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700'}`}
+                                                        >
+                                                            <span className="flex-shrink-0">{type.icon || '❓'}</span>
+                                                            <span className="truncate">{type.name}</span>
+                                                        </button>
+                                                    ))}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
-                                    <div>
+
+                                    {/* Custom Priority Dropdown */}
+                                    <div className="relative w-full">
                                         <label className="block text-sm font-bold text-gray-700 mb-2">Priority (optional)</label>
-                                        <select 
-                                            value={newTicket.priority}
-                                            onChange={(e) => setNewTicket({...newTicket, priority: e.target.value})}
-                                            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:outline-none bg-white text-sm uppercase font-semibold"
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setPriorityDropdownOpen(!priorityDropdownOpen);
+                                                setCategoryDropdownOpen(false);
+                                            }}
+                                            className="w-full flex items-center justify-between px-4 py-3 bg-white border border-gray-200 rounded-xl text-sm uppercase font-semibold focus:outline-none focus:border-blue-500 text-left transition-all"
                                         >
-                                            <option value="low">Low</option>
-                                            <option value="medium">Medium</option>
-                                            <option value="high">High</option>
-                                            <option value="urgent">Urgent</option>
-                                        </select>
+                                            <span>{newTicket.priority || 'MEDIUM'}</span>
+                                            <FiChevronDown className={`text-gray-400 text-base flex-shrink-0 transition-transform ${priorityDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+
+                                        <AnimatePresence>
+                                            {priorityDropdownOpen && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: -4 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    exit={{ opacity: 0, y: -4 }}
+                                                    className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden"
+                                                >
+                                                    {[
+                                                        { value: 'low', label: 'LOW' },
+                                                        { value: 'medium', label: 'MEDIUM' },
+                                                        { value: 'high', label: 'HIGH' },
+                                                        { value: 'urgent', label: 'URGENT' }
+                                                    ].map(item => (
+                                                        <button
+                                                            key={item.value}
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setNewTicket({ ...newTicket, priority: item.value });
+                                                                setPriorityDropdownOpen(false);
+                                                            }}
+                                                            className={`w-full text-left px-4 py-2.5 text-sm font-semibold uppercase hover:bg-blue-50 transition-colors ${newTicket.priority === item.value ? 'bg-blue-50 text-blue-700 font-bold' : 'text-gray-700'}`}
+                                                        >
+                                                            {item.label}
+                                                        </button>
+                                                    ))}
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
                                     </div>
                                 </div>
 

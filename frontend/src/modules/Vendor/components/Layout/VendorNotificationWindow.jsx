@@ -47,17 +47,25 @@ const VendorNotificationWindow = ({ isOpen, onClose, position = "right" }) => {
   };
 
   const getNotificationRoute = (notification) => {
-    if (notification.data?.inquiryId) {
-      return `/vendor/store-builder?inquiryId=${notification.data.inquiryId}`;
+    const data = notification.data || {};
+    const actionUrl = data.actionUrl || data.link;
+    if (actionUrl) {
+      return actionUrl;
     }
-    if (notification.data?.returnRequestId) {
-      return `/vendor/return-requests/${notification.data.returnRequestId}`;
+    if (data.type === "commission_update" || notification.type === "commission_update") {
+      return "/vendor/profile";
     }
-    const orderId = notification.orderId || notification.data?.orderId || notification.data?.orderMongoId;
+    if (data.inquiryId) {
+      return `/vendor/store-builder?inquiryId=${data.inquiryId}`;
+    }
+    if (data.returnRequestId) {
+      return `/vendor/return-requests/${data.returnRequestId}`;
+    }
+    const orderId = notification.orderId || data.orderId || data.orderMongoId;
     if (orderId) {
       return "/vendor/orders/all-orders";
     }
-    if (notification.data?.documentId) {
+    if (data.documentId) {
       return "/vendor/documents";
     }
     return "/vendor/dashboard";

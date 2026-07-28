@@ -34,14 +34,33 @@ const DeliveryNotifications = () => {
     const data = notification?.data || {};
     const orderId = String(data?.orderId || "").trim();
     const returnRequestId = String(data?.returnRequestId || "").trim();
+    const withdrawalId = String(data?.withdrawalId || "").trim();
+    const titleLower = String(notification?.title || "").toLowerCase();
+
+    if (withdrawalId || titleLower.includes("payout") || titleLower.includes("withdrawal")) {
+      navigate("/delivery/wallet");
+      return;
+    }
     if (orderId) {
       navigate(`/delivery/orders/${orderId}`);
       return;
     }
     if (returnRequestId) {
-      navigate('/delivery/orders?tab=pickups');
+      navigate("/delivery/orders?tab=pickups");
       return;
     }
+  };
+
+  const isClickableNotification = (notification) => {
+    const data = notification?.data || {};
+    const titleLower = String(notification?.title || "").toLowerCase();
+    return Boolean(
+      data?.orderId ||
+      data?.returnRequestId ||
+      data?.withdrawalId ||
+      titleLower.includes("payout") ||
+      titleLower.includes("withdrawal")
+    );
   };
 
   return (
@@ -106,7 +125,7 @@ const DeliveryNotifications = () => {
                     ? "bg-white border-gray-200"
                     : "bg-blue-50 border-blue-200"
                 } ${
-                  notification?.data?.orderId || notification?.data?.returnRequestId ? "cursor-pointer hover:shadow-md transition-shadow" : ""
+                  isClickableNotification(notification) ? "cursor-pointer hover:shadow-md transition-shadow" : ""
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">

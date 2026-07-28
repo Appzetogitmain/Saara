@@ -1,5 +1,6 @@
 import LogisticsProvider from '../../../models/LogisticsProvider.model.js';
 import AppConfig from '../../../models/AppConfig.model.js';
+import DeliveryRateConfig from '../../../models/DeliveryRateConfig.model.js';
 import ApiResponse from '../../../utils/ApiResponse.js';
 import asyncHandler from '../../../utils/asyncHandler.js';
 
@@ -113,4 +114,119 @@ export const updateEngineConfig = asyncHandler(async (req, res) => {
 
     await config.save();
     res.status(200).json(new ApiResponse(200, config.value, 'Engine config updated successfully.'));
+});
+
+/**
+ * @desc    Get all delivery rate configs
+ * @route   GET /api/v1/admin/logistics/rate-configs
+ * @access  Private/Admin
+ */
+export const getRateConfigs = asyncHandler(async (req, res) => {
+    let configs = await DeliveryRateConfig.find({ isActive: true }).sort({ vehicleType: 1 });
+    
+    // Ensure default config exists for 'all' if none present
+    if (!configs || configs.length === 0) {
+        const defaultConfig = await DeliveryRateConfig.create({
+            vehicleType: 'all',
+            basePayAmount: 50,
+            baseDistanceKm: 5,
+            perKmRate: 5,
+            maximumPayAmount: 500,
+            nightCharge: { enabled: false, startHour: 22, endHour: 6, additionalAmount: 20 },
+            peakHourCharge: { enabled: false, windows: [{ startHour: 12, endHour: 15, additionalAmount: 15 }] },
+            rainCharge: { enabled: false, additionalAmount: 25 },
+            isRainModeActive: false,
+        });
+        configs = [defaultConfig];
+    }
+
+    res.status(200).json(new ApiResponse(200, configs, 'Delivery rate configs fetched successfully.'));
+});
+
+/**
+ * @desc    Update or create a delivery rate config for a vehicle type
+ * @route   PUT /api/v1/admin/logistics/rate-configs/:vehicleType
+ * @access  Private/Admin
+ */
+export const updateRateConfig = asyncHandler(async (req, res) => {
+    const { vehicleType } = req.params;
+    const {
+        basePayAmount,
+        baseDistanceKm,
+        perKmRate,
+        maximumPayAmount,
+        nightCharge,
+        peakHourCharge,
+        rainCharge,
+        isRainModeActive,
+        notes
+    } = req.body;
+
+    const allowedVehicles = ['bike', 'scooter', 'van', 'truck', 'all'];
+    if (!allowedVehicles.includes(vehicleType)) {
+        return res.status(400).json(new ApiResponse(400, null, `Invalid vehicleType. Must be one of: ${allowedVehicles.join(', ')}`));
+    }
+
+    let config = await DeliveryRateConfig.findOne({ vehicleType, isActive: true });
+
+    if (!config) {
+        config = new DeliveryRateConfig({
+            vehicleType,
+            createdBy: req.user?._id,
+        });
+    }
+
+    if (basePayAmount !== undefined) config.basePayAmount = Math.max(0, Number(basePayAmount));
+    if (baseDistanceKm !== undefined) config.baseDistanceKm = Math.max(0, Number(baseDistanceKm));
+    if (perKmRate !== undefined) config.perKmRate = Math.max(0, Number(perKmRate));
+    if (maximumPayAmount !== undefined) config.maximumPayAmount = Math.max(0, Number(maximumPayAmount));
+    
+    if (nightCharge) {
+        config.nightCharge = {
+            enabled: Boolean(nightCharge.enabled),
+            startHour: Number(nightCharge.startHour ?? 22),
+            endHour: Number(nightCharge.endHour ?? 6),
+            additionalAmount: Math.max(0, Number(nightCharge.additionalAmount ?? 0))
+        };
+    }
+
+    if (peakHourCharge) {
+        config.peakHourCharge = {
+            enabled: Boolean(peakHourCharge.enabled),
+            windows: Array.isArray(peakHourCharge.windows) ? peakHourCharge.windows : []
+        };
+    }
+
+    if (rainCharge) {
+        config.rainCharge = {
+            enabled: Boolean(rainCharge.enabled),
+            additionalAmount: Math.max(0, Number(rainCharge.additionalAmount ?? 0))
+        };
+    }
+
+    if (isRainModeActive !== undefined) {
+        config.isRainModeActive = Boolean(isRainModeActive);
+        // Also sync isRainModeActive across all active rate configs
+        await DeliveryRateConfig.updateMany({ isActive: true }, { $set: { isRainModeActive: Boolean(isRainModeActive) } });
+    }
+
+    if (notes !== undefined) config.notes = String(notes);
+
+    await config.save();
+
+    res.status(200).json(new ApiResponse(200, config, `Rate config for '${vehicleType}' updated successfully.`));
+});
+
+/**
+ * @desc    Toggle live rain mode platform-wide
+ * @route   PATCH /api/v1/admin/logistics/rate-configs/rain-mode
+ * @access  Private/Admin
+ */
+export const toggleRainMode = asyncHandler(async (req, res) => {
+    const { isRainModeActive } = req.body;
+    const active = Boolean(isRainModeActive);
+
+    await DeliveryRateConfig.updateMany({ isActive: true }, { $set: { isRainModeActive: active } });
+
+    res.status(200).json(new ApiResponse(200, { isRainModeActive: active }, `Live Rain Mode is now ${active ? 'ACTIVE' : 'DISABLED'}.`));
 });

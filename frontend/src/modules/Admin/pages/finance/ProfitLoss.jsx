@@ -56,17 +56,19 @@ const ProfitLoss = () => {
   }, [period, fetchFinancialSummary]);
 
   const chartData = useMemo(() => {
-    return financialSummary.map(item => ({
+    const list = Array.isArray(financialSummary) ? financialSummary : [];
+    return list.map(item => ({
       ...item,
       date: item._id,
     }));
   }, [financialSummary]);
 
   const financials = useMemo(() => {
-    const revenue = financialSummary.reduce((sum, item) => sum + item.revenue, 0);
-    const totalTax = financialSummary.reduce((sum, item) => sum + (item.tax || 0), 0);
-    const totalDelivery = financialSummary.reduce((sum, item) => sum + (item.delivery || 0), 0);
-    const totalDiscount = financialSummary.reduce((sum, item) => sum + (item.discount || 0), 0);
+    const list = Array.isArray(financialSummary) ? financialSummary : [];
+    const revenue = list.reduce((sum, item) => sum + (item.revenue || 0), 0);
+    const totalTax = list.reduce((sum, item) => sum + (item.tax || 0), 0);
+    const totalDelivery = list.reduce((sum, item) => sum + (item.delivery || 0), 0);
+    const totalDiscount = list.reduce((sum, item) => sum + (item.discount || 0), 0);
     const grossProfit = revenue - totalDiscount;
     const totalExpenses = totalTax + totalDelivery + totalDiscount;
     const netProfit = revenue - totalExpenses;
@@ -84,7 +86,7 @@ const ProfitLoss = () => {
     };
   }, [financialSummary]);
 
-  if (isPageLoading && financialSummary.length === 0) {
+  if (isPageLoading && (!Array.isArray(financialSummary) || financialSummary.length === 0)) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -106,7 +108,7 @@ const ProfitLoss = () => {
         </p>
       </div>
 
-        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200">
         <AnimatedSelect
           value={period}
           onChange={(e) => setPeriod(e.target.value)}

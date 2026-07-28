@@ -6,7 +6,14 @@ import api from '../../../shared/utils/api';
  * Register a new vendor (pending approval + OTP email sent)
  * @param {{ name, email, password, phone, storeName, storeDescription }} data
  */
-export const registerVendor = (data) => api.post('/vendor/auth/register', data);
+export const registerVendor = (data) => {
+    if (data instanceof FormData) {
+        return api.post('/vendor/auth/register', data, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+        });
+    }
+    return api.post('/vendor/auth/register', data);
+};
 
 /**
  * Verify email OTP after registration

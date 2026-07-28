@@ -104,12 +104,13 @@ const Dashboard = () => {
       ]);
 
       if (statsRes.status === "fulfilled") {
-        const d = statsRes.value.data;
+        const val = statsRes.value;
+        const d = val?.data ?? val ?? {};
         setStats({
           totalRevenue: d.totalRevenue || 0,
           totalOrders: d.totalOrders || 0,
           totalProducts: d.totalProducts || 0,
-          totalCustomers: d.totalUsers || 0,
+          totalCustomers: d.totalUsers || d.totalCustomers || 0,
           totalVendors: d.totalVendors || 0,
           pendingOrders: d.pendingOrders || 0,
         });
@@ -124,27 +125,34 @@ const Dashboard = () => {
         });
       }
       if (revenueRes.status === "fulfilled") {
-        setRevenueData(normalizeRevenueData(revenueRes.value.data, apiPeriod));
+        const val = revenueRes.value;
+        const rawRevenue = val?.data ?? val ?? [];
+        setRevenueData(normalizeRevenueData(rawRevenue, apiPeriod));
       } else {
         setRevenueData([]);
       }
       if (orderStatusRes.status === "fulfilled") {
-        setOrderStatusData(orderStatusRes.value.data || []);
+        const val = orderStatusRes.value;
+        setOrderStatusData(val?.data ?? val ?? []);
       } else {
         setOrderStatusData([]);
       }
       if (topProductsRes.status === "fulfilled") {
-        setTopProducts(topProductsRes.value.data || []);
+        const val = topProductsRes.value;
+        setTopProducts(val?.data ?? val ?? []);
       } else {
         setTopProducts([]);
       }
       if (customerGrowthRes.status === "fulfilled") {
-        setCustomerGrowth(customerGrowthRes.value.data || []);
+        const val = customerGrowthRes.value;
+        setCustomerGrowth(val?.data ?? val ?? []);
       } else {
         setCustomerGrowth([]);
       }
       if (recentOrdersRes.status === "fulfilled") {
-        setRecentOrders(recentOrdersRes.value.data || []);
+        const val = recentOrdersRes.value;
+        const rawOrders = val?.orders ?? val?.data?.orders ?? val?.data ?? val ?? [];
+        setRecentOrders(Array.isArray(rawOrders) ? rawOrders : []);
       } else {
         setRecentOrders([]);
       }

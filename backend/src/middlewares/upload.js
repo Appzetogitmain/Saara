@@ -108,6 +108,26 @@ export const uploadDeliveryDocuments = (fields) =>
         limits: { fileSize: MAX_DOCUMENT_FILE_SIZE },
     }).fields(fields);
 
+// Multiple named document uploads for vendor registration (license + identity)
+export const uploadVendorRegistrationDocuments = (fields) =>
+    multer({
+        storage: imageDiskStorage,
+        fileFilter: (req, file, cb) => {
+            if (ALLOWED_DOCUMENT_MIME_TYPES.includes(file.mimetype)) {
+                cb(null, true);
+            } else {
+                cb(
+                    new ApiError(
+                        400,
+                        'Invalid file type. Only PDF, JPEG, PNG, WEBP, and GIF are allowed.'
+                    ),
+                    false
+                );
+            }
+        },
+        limits: { fileSize: MAX_DOCUMENT_FILE_SIZE },
+    }).fields(fields);
+
 // CSV upload for bulk operations
 export const uploadCSV = multer({
     storage: csvMemoryStorage,

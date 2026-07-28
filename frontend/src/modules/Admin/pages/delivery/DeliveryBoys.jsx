@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { FiPlus, FiSearch, FiEdit, FiTrash2, FiMapPin, FiPhone, FiFileText } from 'react-icons/fi';
+import { FiPlus, FiSearch, FiEdit, FiTrash2, FiMapPin, FiPhone, FiFileText, FiEye, FiMail, FiTruck, FiUser, FiX } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import DataTable from '../../components/DataTable';
 import Badge from '../../../../shared/components/Badge';
@@ -30,6 +31,21 @@ const DeliveryBoys = () => {
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Lock root document & body scroll when modal is active
+  useEffect(() => {
+    if (editingBoy !== null || deleteModal.isOpen) {
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+    } else {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    };
+  }, [editingBoy, deleteModal.isOpen]);
 
   useEffect(() => {
     const params = {
@@ -238,8 +254,9 @@ const DeliveryBoys = () => {
           <button
             onClick={() => setEditingBoy(row)}
             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            title="View Profile & Documents"
           >
-            <FiEdit />
+            <FiEye className="text-base" />
           </button>
           <button
             onClick={() => setDeleteModal({ isOpen: true, id: row.id })}
@@ -339,227 +356,369 @@ const DeliveryBoys = () => {
         />
       </div>
 
-      <AnimatePresence>
-        {editingBoy !== null && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              onClick={() => setEditingBoy(null)}
-              className="fixed inset-0 bg-black/50 z-[10000]"
-            />
-
-            {/* Modal Content - Mobile: Slide up from bottom, Desktop: Center with scale */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className={`fixed inset-0 z-[10000] flex ${isAppRoute ? 'items-start pt-[10px]' : 'items-end'} sm:items-center justify-center p-4 pointer-events-none`}
-            >
-              <motion.div
-                variants={{
-                  hidden: {
-                    y: isAppRoute ? '-100%' : '100%',
-                    scale: 0.95,
-                    opacity: 0
-                  },
-                  visible: {
-                    y: 0,
-                    scale: 1,
-                    opacity: 1,
-                    transition: {
-                      type: 'spring',
-                      damping: 22,
-                      stiffness: 350,
-                      mass: 0.7
-                    }
-                  },
-                  exit: {
-                    y: isAppRoute ? '-100%' : '100%',
-                    scale: 0.95,
-                    opacity: 0,
-                    transition: {
-                      type: 'spring',
-                      damping: 30,
-                      stiffness: 400
-                    }
-                  }
-                }}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                onClick={(e) => e.stopPropagation()}
-                className={`bg-white ${isAppRoute ? 'rounded-b-3xl' : 'rounded-t-3xl'} sm:rounded-xl shadow-xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto pointer-events-auto`}
-                style={{ willChange: 'transform' }}
-              >
-                <h3 className="text-lg font-bold text-gray-800 mb-4">
-                  {editingBoy.id ? 'Edit Delivery Boy' : 'Add Delivery Boy'}
-                </h3>
-                {editingBoy.id && (
-                  <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <p className="text-sm font-semibold text-gray-800 mb-2">Application Status</p>
-                    <div className="flex items-center justify-between gap-2">
-                      {renderApplicationBadge(editingBoy.applicationStatus)}
-                      {editingBoy.applicationStatus === 'pending' && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleApplicationAction(editingBoy, 'approved')}
-                            className="px-3 py-1 text-xs font-semibold rounded-md bg-green-50 text-green-700 hover:bg-green-100"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleApplicationAction(editingBoy, 'rejected')}
-                            className="px-3 py-1 text-xs font-semibold rounded-md bg-red-50 text-red-700 hover:bg-red-100"
-                          >
-                            Reject
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-3 flex items-center gap-3">
-                      {editingBoy.documentUrls?.drivingLicense && (
-                        <a
-                          href={editingBoy.documentUrls.drivingLicense}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-semibold"
-                        >
-                          <FiFileText />
-                          Driving License
-                        </a>
-                      )}
-                      {editingBoy.documentUrls?.aadharCard && (
-                        <a
-                          href={editingBoy.documentUrls.aadharCard}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-semibold"
-                        >
-                          <FiFileText />
-                          Aadhar Card
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const formData = new FormData(e.target);
-                    handleSave({
-                      name: formData.get('name'),
-                      phone: formData.get('phone'),
-                      email: formData.get('email'),
-                      password: formData.get('password'),
-                      address: formData.get('address'),
-                      vehicleType: formData.get('vehicleType'),
-                      vehicleNumber: formData.get('vehicleNumber'),
-                      status: formData.get('status'),
-                      totalDeliveries: parseInt(formData.get('totalDeliveries') || '0'),
-                      rating: parseFloat(formData.get('rating') || '0'),
-                    });
-                  }}
-                  className="space-y-4"
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence>
+            {editingBoy !== null && (
+              <div className="fixed inset-0 z-[999999] bg-slate-900/70 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto max-h-screen overscroll-contain">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-white rounded-3xl shadow-2xl p-6 sm:p-7 max-w-lg w-full max-h-[90vh] overflow-y-auto relative border border-slate-100 space-y-6"
                 >
-                  <input
-                    type="text"
-                    name="name"
-                    defaultValue={editingBoy.name || ''}
-                    placeholder="Name"
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <input
-                    type="tel"
-                    name="phone"
-                    defaultValue={editingBoy.phone || ''}
-                    placeholder="Phone"
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <input
-                    type="email"
-                    name="email"
-                    defaultValue={editingBoy.email || ''}
-                    placeholder="Email"
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  {!editingBoy.id && (
-                    <input
-                      type="password"
-                      name="password"
-                      defaultValue={editingBoy.password || ''}
-                      placeholder="Temporary Password"
-                      required
-                      minLength={6}
-                      className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                  )}
-                  <input
-                    type="text"
-                    name="address"
-                    defaultValue={editingBoy.address || ''}
-                    placeholder="Address (e.g., 123 Main St, City, State 12345)"
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <AnimatedSelect
-                    name="vehicleType"
-                    value={editingBoy.vehicleType || 'Bike'}
-                    onChange={(e) => setEditingBoy({ ...editingBoy, vehicleType: e.target.value })}
-                    options={[
-                      { value: 'Bike', label: 'Bike' },
-                      { value: 'Car', label: 'Car' },
-                      { value: 'Scooter', label: 'Scooter' },
-                    ]}
-                    required
-                  />
-                  <input
-                    type="text"
-                    name="vehicleNumber"
-                    defaultValue={editingBoy.vehicleNumber || ''}
-                    placeholder="Vehicle Number"
-                    required
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                  <AnimatedSelect
-                    name="status"
-                    value={editingBoy.status || 'active'}
-                    onChange={(e) => setEditingBoy({ ...editingBoy, status: e.target.value })}
-                    options={[
-                      { value: 'active', label: 'Active' },
-                      { value: 'inactive', label: 'Inactive' },
-                    ]}
-                    required
-                  />
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="submit"
-                      className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-semibold"
-                    >
-                      Save
-                    </button>
+                  <div className="flex items-center justify-between pb-4 border-b border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className="p-3 bg-primary-50 text-primary-600 rounded-2xl">
+                        <FiUser className="text-xl" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-800">
+                          {editingBoy.id ? 'Delivery Partner Profile' : 'Add Delivery Partner'}
+                        </h3>
+                        <p className="text-xs text-gray-500">
+                          {editingBoy.id ? 'View partner details and verify application' : 'Register a new delivery partner manually'}
+                        </p>
+                      </div>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setEditingBoy(null)}
-                      className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors font-semibold"
+                      className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-xl transition-all"
                     >
-                      Cancel
+                      <FiX className="text-lg" />
                     </button>
                   </div>
-                </form>
-              </motion.div>
-            </motion.div>
-          </>
+
+                  {editingBoy.id ? (
+                    /* Read-Only Profile View for Existing Drivers */
+                    <div className="space-y-5">
+                      {/* Application & Verification Status Card */}
+                      <div className="rounded-2xl border border-gray-100 bg-slate-50/70 p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                            Application Status
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {renderApplicationBadge(editingBoy.applicationStatus)}
+                            {editingBoy.applicationStatus === 'pending' && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleApplicationAction(editingBoy, 'approved')}
+                                  className="px-3 py-1 text-xs font-bold rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-all"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleApplicationAction(editingBoy, 'rejected')}
+                                  className="px-3 py-1 text-xs font-bold rounded-lg bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-all"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Uploaded Documents */}
+                        <div className="pt-2 border-t border-gray-200/60 flex items-center gap-4">
+                          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider block">
+                            Uploaded Verification Documents:
+                          </span>
+                          <div className="flex items-center gap-3">
+                            {editingBoy.documentUrls?.drivingLicense ? (
+                              <a
+                                href={editingBoy.documentUrls.drivingLicense}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-xs text-primary-600 hover:text-primary-700 font-bold shadow-sm transition-all"
+                              >
+                                <FiFileText className="text-sm" />
+                                License
+                              </a>
+                            ) : (
+                              <span className="text-xs text-gray-400 font-medium">License N/A</span>
+                            )}
+                            {editingBoy.documentUrls?.aadharCard ? (
+                              <a
+                                href={editingBoy.documentUrls.aadharCard}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-gray-200 text-xs text-primary-600 hover:text-primary-700 font-bold shadow-sm transition-all"
+                              >
+                                <FiFileText className="text-sm" />
+                                Aadhar
+                              </a>
+                            ) : (
+                              <span className="text-xs text-gray-400 font-medium">Aadhar N/A</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Verified Personal Credentials Grid (Read-Only) */}
+                      <div className="space-y-3">
+                        <h4 className="text-xs font-black text-gray-400 uppercase tracking-wider">
+                          Verified Partner Info (Read-Only)
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                              Full Name
+                            </span>
+                            <span className="text-sm font-bold text-gray-800 block truncate">
+                              {editingBoy.name || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                              Mobile Number
+                            </span>
+                            <span className="text-sm font-bold text-gray-800 block truncate">
+                              {editingBoy.phone || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 sm:col-span-2">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                              Email Address
+                            </span>
+                            <span className="text-sm font-bold text-gray-800 block truncate">
+                              {editingBoy.email || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100 sm:col-span-2">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                              Registered Address
+                            </span>
+                            <span className="text-sm font-bold text-gray-800 block leading-snug">
+                              {editingBoy.address || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                              Vehicle Type
+                            </span>
+                            <span className="text-sm font-bold text-gray-800 block truncate">
+                              {editingBoy.vehicleType || 'N/A'}
+                            </span>
+                          </div>
+                          <div className="p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">
+                              Vehicle Number
+                            </span>
+                            <span className="text-sm font-mono font-extrabold text-gray-800 block truncate">
+                              {editingBoy.vehicleNumber || 'N/A'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Account Management Action */}
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          const formData = new FormData(e.target);
+                          handleSave({
+                            ...editingBoy,
+                            status: formData.get('status'),
+                          });
+                        }}
+                        className="space-y-4 pt-2 border-t border-gray-100"
+                      >
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block">
+                            Account Active Status
+                          </label>
+                          <AnimatedSelect
+                            name="status"
+                            value={editingBoy.status || 'active'}
+                            onChange={(e) => setEditingBoy({ ...editingBoy, status: e.target.value })}
+                            options={[
+                              { value: 'active', label: 'Active (Can receive orders)' },
+                              { value: 'inactive', label: 'Inactive (Deactivated)' },
+                            ]}
+                            required
+                          />
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setEditingBoy(null)}
+                            className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all"
+                          >
+                            Close
+                          </button>
+                          <button
+                            type="submit"
+                            className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider shadow-lg transition-all"
+                          >
+                            Update Account Status
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  ) : (
+                    /* Editable Form for Manual New Driver Creation */
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        const formData = new FormData(e.target);
+                        handleSave({
+                          name: formData.get('name'),
+                          phone: formData.get('phone'),
+                          email: formData.get('email'),
+                          password: formData.get('password'),
+                          address: formData.get('address'),
+                          vehicleType: formData.get('vehicleType'),
+                          vehicleNumber: formData.get('vehicleNumber'),
+                          status: formData.get('status'),
+                          totalDeliveries: parseInt(formData.get('totalDeliveries') || '0'),
+                          rating: parseFloat(formData.get('rating') || '0'),
+                        });
+                      }}
+                      className="space-y-4"
+                    >
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                          Full Name *
+                        </label>
+                        <input
+                          type="text"
+                          name="name"
+                          defaultValue={editingBoy.name || ''}
+                          placeholder="Name"
+                          required
+                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-800 font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                          Phone Number *
+                        </label>
+                        <input
+                          type="tel"
+                          name="phone"
+                          defaultValue={editingBoy.phone || ''}
+                          placeholder="Phone"
+                          required
+                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-800 font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                          Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          name="email"
+                          defaultValue={editingBoy.email || ''}
+                          placeholder="Email"
+                          required
+                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-800 font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                          Temporary Password *
+                        </label>
+                        <input
+                          type="password"
+                          name="password"
+                          defaultValue={editingBoy.password || ''}
+                          placeholder="Minimum 6 characters"
+                          required
+                          minLength={6}
+                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-800 font-semibold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                          Address *
+                        </label>
+                        <input
+                          type="text"
+                          name="address"
+                          defaultValue={editingBoy.address || ''}
+                          placeholder="Address (City, State)"
+                          required
+                          className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-800 font-semibold"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                            Vehicle Type *
+                          </label>
+                          <AnimatedSelect
+                            name="vehicleType"
+                            value={editingBoy.vehicleType || 'Bike'}
+                            onChange={(e) => setEditingBoy({ ...editingBoy, vehicleType: e.target.value })}
+                            options={[
+                              { value: 'Bike', label: 'Bike' },
+                              { value: 'Car', label: 'Car' },
+                              { value: 'Scooter', label: 'Scooter' },
+                            ]}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                            Vehicle Number *
+                          </label>
+                          <input
+                            type="text"
+                            name="vehicleNumber"
+                            defaultValue={editingBoy.vehicleNumber || ''}
+                            placeholder="e.g. DL-01-AB-1234"
+                            required
+                            className="w-full px-4 py-3 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-800 font-mono text-sm uppercase font-bold"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider block mb-1">
+                          Status *
+                        </label>
+                        <AnimatedSelect
+                          name="status"
+                          value={editingBoy.status || 'active'}
+                          onChange={(e) => setEditingBoy({ ...editingBoy, status: e.target.value })}
+                          options={[
+                            { value: 'active', label: 'Active' },
+                            { value: 'inactive', label: 'Inactive' },
+                          ]}
+                          required
+                        />
+                      </div>
+
+                      <div className="flex gap-3 pt-3">
+                        <button
+                          type="button"
+                          onClick={() => setEditingBoy(null)}
+                          className="flex-1 py-3 border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider shadow-lg transition-all"
+                        >
+                          Create Partner
+                        </button>
+                      </div>
+                    </form>
+                  )}
+                </motion.div>
+              </div>
+            )}
+          </AnimatePresence>,
+          document.body
         )}
-      </AnimatePresence>
 
       <ConfirmModal
         isOpen={deleteModal.isOpen}

@@ -6,7 +6,7 @@ import Admin from '../../../models/Admin.model.js';
 import { generateTokens } from '../../../utils/generateToken.js';
 import { createNotification } from '../../../services/notification.service.js';
 import { sendEmail } from '../../../services/email.service.js';
-import { cleanupLocalFiles } from '../../../services/upload.service.js';
+import { cleanupLocalFiles, uploadLocalFileToCloudinaryAndCleanupWithType } from '../../../services/upload.service.js';
 import {
     clearRefreshSession,
     decodeRefreshTokenOrThrow,
@@ -14,17 +14,16 @@ import {
     rotateRefreshSession,
 } from '../../../services/refreshToken.service.js';
 
-const getUploadedPath = (file) => {
-    if (!file?.filename) return '';
-    return `/uploads/delivery-docs/${file.filename}`;
-};
-
 // POST /api/delivery/auth/register
 export const register = asyncHandler(async (req, res) => {
     const { name, email, password, phone, address, vehicleType, vehicleNumber } = req.body;
 
     const drivingLicenseFile = req.files?.drivingLicense?.[0];
     const aadharCardFile = req.files?.aadharCard?.[0];
+
+    if (!String(address || '').trim() || !String(vehicleType || '').trim() || !String(vehicleNumber || '').trim()) {
+        throw new ApiError(400, 'Address, vehicle type, and vehicle number are required.');
+    }
 
     if (!drivingLicenseFile || !aadharCardFile) {
         throw new ApiError(400, 'Driving license and Aadhar card are required.');
@@ -37,6 +36,36 @@ export const register = asyncHandler(async (req, res) => {
         const existing = await DeliveryBoy.findOne({ email: normalizedEmail });
         if (existing) throw new ApiError(409, 'Email already registered.');
 
+        // Upload documents to Cloudinary (with fallback to local path if Cloudinary API keys are not set)
+        let drivingLicenseUrl = `/uploads/delivery-docs/${drivingLicenseFile.filename}`;
+        let aadharCardUrl = `/uploads/delivery-docs/${aadharCardFile.filename}`;
+
+        try {
+            if (drivingLicenseFile?.path) {
+                const uploadedLicense = await uploadLocalFileToCloudinaryAndCleanupWithType(
+                    drivingLicenseFile.path,
+                    'delivery/documents',
+                    'auto'
+                );
+                if (uploadedLicense?.url) drivingLicenseUrl = uploadedLicense.url;
+            }
+        } catch (err) {
+            console.warn('[Cloudinary Upload] Driving license fallback to local:', err.message);
+        }
+
+        try {
+            if (aadharCardFile?.path) {
+                const uploadedAadhar = await uploadLocalFileToCloudinaryAndCleanupWithType(
+                    aadharCardFile.path,
+                    'delivery/documents',
+                    'auto'
+                );
+                if (uploadedAadhar?.url) aadharCardUrl = uploadedAadhar.url;
+            }
+        } catch (err) {
+            console.warn('[Cloudinary Upload] Aadhar card fallback to local:', err.message);
+        }
+
         deliveryBoy = await DeliveryBoy.create({
             name: String(name || '').trim(),
             email: normalizedEmail,
@@ -46,13 +75,14 @@ export const register = asyncHandler(async (req, res) => {
             vehicleType: String(vehicleType || '').trim(),
             vehicleNumber: String(vehicleNumber || '').trim(),
             documents: {
-                drivingLicense: getUploadedPath(drivingLicenseFile),
-                aadharCard: getUploadedPath(aadharCardFile),
+                drivingLicense: drivingLicenseUrl,
+                aadharCard: aadharCardUrl,
             },
             applicationStatus: 'pending',
             isActive: false,
             isAvailable: false,
             status: 'offline',
+            currentLocation: { type: 'Point', coordinates: [0, 0] },
         });
 
         const admins = await Admin.find({ isActive: true }).select('_id');

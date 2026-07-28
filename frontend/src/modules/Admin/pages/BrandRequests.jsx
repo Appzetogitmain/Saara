@@ -34,9 +34,9 @@ const BrandRequests = () => {
         status: selectedStatus === "all" ? "" : selectedStatus,
         search: searchQuery,
       });
-      const data = res.data;
-      setRequests(data.requests || []);
-      setTotal(data.total || 0);
+      const data = res?.requests ? res : (res?.data || res || {});
+      setRequests(Array.isArray(data.requests) ? data.requests : []);
+      setTotal(Number(data.total || 0));
     } catch (err) {
       console.error("Failed to fetch brand requests", err);
     } finally {

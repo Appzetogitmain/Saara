@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { useDeliveryAuthStore } from "../store/deliveryStore";
 import {
@@ -93,6 +94,21 @@ const DeliveryWallet = () => {
   useEffect(() => {
     loadData(currentPage);
   }, [loadData, currentPage]);
+
+  // Lock document root & body scroll when modal popups are active to prevent background scrolling
+  useEffect(() => {
+    if (withdrawModalOpen || settingsOpen) {
+      document.documentElement.style.overflow = "hidden";
+      document.body.style.overflow = "hidden";
+    } else {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.documentElement.style.overflow = "";
+      document.body.style.overflow = "";
+    };
+  }, [withdrawModalOpen, settingsOpen]);
 
   const handleWithdrawalSubmit = async (e) => {
     e.preventDefault();
@@ -622,228 +638,281 @@ const DeliveryWallet = () => {
           </div>
 
         </div>
-
-        {/* Withdrawal request modal */}
-        <AnimatePresence>
-          {withdrawModalOpen && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-6 shadow-2xl relative"
-              >
-                <div className="space-y-1">
-                  <h3 className="text-base font-black text-slate-800 uppercase tracking-wide">
-                    Request Withdrawal
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Enter withdrawal amount (Minimum ₹100)
-                  </p>
-                </div>
-
-                <form onSubmit={handleWithdrawalSubmit} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                      Amount (₹)
-                    </label>
-                    <input
-                      type="number"
-                      value={withdrawAmount}
-                      onChange={(e) => setWithdrawAmount(e.target.value)}
-                      placeholder="Enter amount"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-800 font-bold"
-                      required
-                    />
-                  </div>
-
-                  <div className="p-3 bg-slate-50 rounded-2xl flex items-center justify-between text-xs font-semibold text-slate-500">
-                    <span>Net Available:</span>
-                    <span className="font-bold text-slate-800 font-mono">
-                      {formatPrice(netBalance)}
-                    </span>
-                  </div>
-
-                  <div className="flex gap-3 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setWithdrawModalOpen(false)}
-                      className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmittingWithdraw}
-                      className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50"
-                    >
-                      {isSubmittingWithdraw ? "Submitting..." : "Submit"}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-
-        {/* Payout Settings slide/modal */}
-        <AnimatePresence>
-          {settingsOpen && (
-            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-white rounded-3xl p-6 w-full max-w-md space-y-6 shadow-2xl relative"
-              >
-                <div className="space-y-1">
-                  <h3 className="text-base font-black text-slate-800 uppercase tracking-wide">
-                    Payout Setup
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Set up your target payout account for withdrawals
-                  </p>
-                </div>
-
-                <form onSubmit={handleSaveSettings} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPayoutMethod("upi")}
-                      className={`py-2 px-4 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${
-                        payoutMethod === "upi"
-                          ? "bg-primary-50 border-primary-200 text-primary-700"
-                          : "border-slate-200 text-slate-500 hover:bg-slate-50"
-                      }`}
-                    >
-                      UPI ID
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPayoutMethod("bank")}
-                      className={`py-2 px-4 rounded-xl border text-xs font-bold uppercase tracking-wider transition-all ${
-                        payoutMethod === "bank"
-                          ? "bg-primary-50 border-primary-200 text-primary-700"
-                          : "border-slate-200 text-slate-500 hover:bg-slate-50"
-                      }`}
-                    >
-                      Bank Transfer
-                    </button>
-                  </div>
-
-                  {payoutMethod === "upi" ? (
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                        UPI ID
-                      </label>
-                      <input
-                        type="text"
-                        value={upiId}
-                        onChange={(e) => setUpiId(e.target.value)}
-                        placeholder="e.g. driver@ybl"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-800 font-bold"
-                        required
-                      />
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="col-span-2 space-y-1">
-                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                          Account Holder Name
-                        </label>
-                        <input
-                          type="text"
-                          value={bankDetails.accountHolder}
-                          onChange={(e) =>
-                            setBankDetails({
-                              ...bankDetails,
-                              accountHolder: e.target.value,
-                            })
-                          }
-                          placeholder="e.g. John Doe"
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-800 font-semibold"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                          Account Number
-                        </label>
-                        <input
-                          type="text"
-                          value={bankDetails.accountNumber}
-                          onChange={(e) =>
-                            setBankDetails({
-                              ...bankDetails,
-                              accountNumber: e.target.value,
-                            })
-                          }
-                          placeholder="Account Number"
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-800 font-mono"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                          IFSC Code
-                        </label>
-                        <input
-                          type="text"
-                          value={bankDetails.ifsc}
-                          onChange={(e) =>
-                            setBankDetails({
-                              ...bankDetails,
-                              ifsc: e.target.value.toUpperCase(),
-                            })
-                          }
-                          placeholder="IFSC"
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-800 font-mono"
-                          required
-                        />
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <label className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                          Bank Name
-                        </label>
-                        <input
-                          type="text"
-                          value={bankDetails.bankName}
-                          onChange={(e) =>
-                            setBankDetails({
-                              ...bankDetails,
-                              bankName: e.target.value,
-                            })
-                          }
-                          placeholder="e.g. HDFC Bank"
-                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-slate-800 font-semibold"
-                          required
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      type="button"
-                      onClick={() => setSettingsOpen(false)}
-                      className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSavingSettings}
-                      className="flex-1 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider transition-all disabled:opacity-50"
-                    >
-                      {isSavingSettings ? "Saving..." : "Save Settings"}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
       </div>
+
+        {/* Withdrawal request modal via createPortal to escape parent stacking context */}
+        {typeof document !== "undefined" &&
+          createPortal(
+            <AnimatePresence>
+              {withdrawModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[999999] flex items-center justify-center p-4 overflow-y-auto max-h-screen overscroll-contain">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    className="bg-white rounded-3xl p-6 sm:p-7 w-full max-w-md space-y-6 shadow-2xl border border-slate-100 relative overflow-hidden"
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+                          <FiArrowUpRight className="text-xl" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-black text-slate-800 uppercase tracking-wide">
+                            Request Withdrawal
+                          </h3>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Transfer earnings to your payout account (Min. ₹100)
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setWithdrawModalOpen(false)}
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleWithdrawalSubmit} className="space-y-5">
+                      {/* Available Balance Pill */}
+                      <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
+                            Net Available Balance
+                          </span>
+                          <span className="text-xs text-slate-500 font-medium">Eligible for instant withdrawal</span>
+                        </div>
+                        <span className="text-lg font-black text-slate-900 font-mono">
+                          {formatPrice(netBalance)}
+                        </span>
+                      </div>
+
+                      {/* Amount Input */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                          Withdrawal Amount (₹)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">
+                            ₹
+                          </span>
+                          <input
+                            type="number"
+                            value={withdrawAmount}
+                            onChange={(e) => setWithdrawAmount(e.target.value)}
+                            placeholder="Enter amount (e.g. 150)"
+                            className="w-full pl-9 pr-4 py-3.5 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 font-extrabold text-base transition-all"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setWithdrawModalOpen(false)}
+                          className="flex-1 py-3.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSubmittingWithdraw}
+                          className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-indigo-200 transition-all disabled:opacity-50"
+                        >
+                          {isSubmittingWithdraw ? "Submitting..." : "Submit Request"}
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>,
+            document.body
+          )}
+
+        {/* Payout Settings modal via createPortal to escape parent stacking context */}
+        {typeof document !== "undefined" &&
+          createPortal(
+            <AnimatePresence>
+              {settingsOpen && (
+                <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[999999] flex items-center justify-center p-4 overflow-y-auto max-h-screen overscroll-contain">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: 15 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 15 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                    className="bg-white rounded-3xl p-6 sm:p-7 w-full max-w-md space-y-6 shadow-2xl border border-slate-100 relative overflow-hidden"
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl">
+                          <FiCreditCard className="text-xl" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-black text-slate-800 uppercase tracking-wide">
+                            Payout Account Setup
+                          </h3>
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            Set up target payout account for withdrawals
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSettingsOpen(false)}
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-all"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveSettings} className="space-y-5">
+                      {/* Method Selector Tabs */}
+                      <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 rounded-2xl">
+                        <button
+                          type="button"
+                          onClick={() => setPayoutMethod("upi")}
+                          className={`py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                            payoutMethod === "upi"
+                              ? "bg-white text-indigo-600 shadow-sm"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          UPI ID
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPayoutMethod("bank")}
+                          className={`py-2.5 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                            payoutMethod === "bank"
+                              ? "bg-white text-indigo-600 shadow-sm"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          Bank Transfer
+                        </button>
+                      </div>
+
+                      {payoutMethod === "upi" ? (
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                            UPI ID
+                          </label>
+                          <input
+                            type="text"
+                            value={upiId}
+                            onChange={(e) => setUpiId(e.target.value)}
+                            placeholder="e.g. driver@ybl or 9876543210@paytm"
+                            className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 font-bold text-sm transition-all"
+                            required
+                          />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="col-span-2 space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                              Account Holder Name
+                            </label>
+                            <input
+                              type="text"
+                              value={bankDetails.accountHolder}
+                              onChange={(e) =>
+                                setBankDetails({
+                                  ...bankDetails,
+                                  accountHolder: e.target.value,
+                                })
+                              }
+                              placeholder="e.g. John Doe"
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 font-semibold text-sm transition-all"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                              Account Number
+                            </label>
+                            <input
+                              type="text"
+                              value={bankDetails.accountNumber}
+                              onChange={(e) =>
+                                setBankDetails({
+                                  ...bankDetails,
+                                  accountNumber: e.target.value,
+                                })
+                              }
+                              placeholder="Account Number"
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 font-mono text-xs font-bold transition-all"
+                              required
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                              IFSC Code
+                            </label>
+                            <input
+                              type="text"
+                              value={bankDetails.ifsc}
+                              onChange={(e) =>
+                                setBankDetails({
+                                  ...bankDetails,
+                                  ifsc: e.target.value.toUpperCase(),
+                                })
+                              }
+                              placeholder="IFSC Code"
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 font-mono text-xs font-bold uppercase transition-all"
+                              required
+                            />
+                          </div>
+                          <div className="col-span-2 space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                              Bank Name
+                            </label>
+                            <input
+                              type="text"
+                              value={bankDetails.bankName}
+                              onChange={(e) =>
+                                setBankDetails({
+                                  ...bankDetails,
+                                  bankName: e.target.value,
+                                })
+                              }
+                              placeholder="e.g. HDFC Bank / State Bank of India"
+                              className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900 font-semibold text-sm transition-all"
+                              required
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex gap-3 pt-3">
+                        <button
+                          type="button"
+                          onClick={() => setSettingsOpen(false)}
+                          className="flex-1 py-3.5 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSavingSettings}
+                          className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs uppercase tracking-wider shadow-lg shadow-indigo-200 transition-all disabled:opacity-50"
+                        >
+                          {isSavingSettings ? "Saving..." : "Save Settings"}
+                        </button>
+                      </div>
+                    </form>
+                  </motion.div>
+                </div>
+              )}
+            </AnimatePresence>,
+            document.body
+          )}
     </PageTransition>
   );
 };

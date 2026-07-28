@@ -13,8 +13,8 @@ export const useAnalyticsStore = create((set, get) => ({
     fetchDashboardStats: async () => {
         set({ isLoading: true });
         try {
-            const response = await adminService.getDashboardStats();
-            set({ dashboardStats: response.data, isLoading: false });
+            const data = await adminService.getDashboardStats();
+            set({ dashboardStats: data, isLoading: false });
         } catch (error) {
             set({ error: error.message, isLoading: false });
         }
@@ -24,9 +24,10 @@ export const useAnalyticsStore = create((set, get) => ({
         set({ isLoading: true });
         try {
             const response = await adminService.getFinancialSummary(period, params);
-            set({ financialSummary: response.data, isLoading: false });
+            const data = Array.isArray(response) ? response : (response?.data || []);
+            set({ financialSummary: data, isLoading: false });
         } catch (error) {
-            set({ error: error.message, isLoading: false });
+            set({ financialSummary: [], error: error.message, isLoading: false });
             toast.error('Failed to fetch financial data');
         }
     },
@@ -34,8 +35,8 @@ export const useAnalyticsStore = create((set, get) => ({
     fetchInventoryStats: async () => {
         set({ isLoading: true });
         try {
-            const response = await adminService.getInventoryStats();
-            set({ inventoryStats: response.data, isLoading: false });
+            const data = await adminService.getInventoryStats();
+            set({ inventoryStats: data, isLoading: false });
         } catch (error) {
             set({ error: error.message, isLoading: false });
         }
@@ -45,9 +46,10 @@ export const useAnalyticsStore = create((set, get) => ({
         set({ isLoading: true });
         try {
             const response = await adminService.getRevenueData(period, params);
-            set({ revenueData: response.data, isLoading: false });
+            const data = Array.isArray(response) ? response : (response?.data || []);
+            set({ revenueData: data, isLoading: false });
         } catch (error) {
-            set({ error: error.message, isLoading: false });
+            set({ revenueData: [], error: error.message, isLoading: false });
         }
     }
 }));

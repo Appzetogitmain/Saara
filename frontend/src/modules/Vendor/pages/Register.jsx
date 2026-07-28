@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { FiMail, FiLock, FiEye, FiEyeOff, FiUser, FiPhone, FiShoppingBag, FiMapPin } from 'react-icons/fi';
+import { FiMail, FiLock, FiEye, FiEyeOff, FiUser, FiPhone, FiShoppingBag, FiMapPin, FiFileText, FiUpload, FiCheckCircle } from 'react-icons/fi';
 import { motion } from 'framer-motion';
 import { useVendorAuthStore } from "../store/vendorAuthStore";
 import toast from 'react-hot-toast';
@@ -25,6 +25,9 @@ const VendorRegister = () => {
       country: 'USA',
     },
   });
+
+  const [licenseFile, setLicenseFile] = useState(null);
+  const [identityFile, setIdentityFile] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -48,12 +51,46 @@ const VendorRegister = () => {
     }
   };
 
+  const handleFileChange = (e, setFile) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File size must be under 10MB');
+        return;
+      }
+      setFile(file);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Validation
+    // Required Field Validations
     if (!formData.name || !formData.email || !formData.phone || !formData.password || !formData.storeName) {
-      toast.error('Please fill in all required fields');
+      toast.error('Please fill in all required personal and store fields');
+      return;
+    }
+
+    // Business Address Validations
+    if (
+      !formData.address.street.trim() ||
+      !formData.address.city.trim() ||
+      !formData.address.state.trim() ||
+      !formData.address.zipCode.trim() ||
+      !formData.address.country.trim()
+    ) {
+      toast.error('All Business Address fields (Street Address, City, State, Zip Code, Country) are mandatory');
+      return;
+    }
+
+    // Document Validations
+    if (!licenseFile) {
+      toast.error('Business License document is mandatory');
+      return;
+    }
+
+    if (!identityFile) {
+      toast.error('Identity Proof document is mandatory');
       return;
     }
 
@@ -68,21 +105,30 @@ const VendorRegister = () => {
     }
 
     try {
-      const result = await registerVendor({
-        name: formData.name.trim(),
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-        phone: formData.phone.trim(),
-        storeName: formData.storeName.trim(),
-        storeDescription: formData.storeDescription.trim(),
-        address: formData.address,
-      });
+      const payload = new FormData();
+      payload.append('name', formData.name.trim());
+      payload.append('email', formData.email.trim().toLowerCase());
+      payload.append('password', formData.password);
+      payload.append('phone', formData.phone.trim());
+      payload.append('storeName', formData.storeName.trim());
+      payload.append('storeDescription', formData.storeDescription.trim());
+      payload.append('address', JSON.stringify({
+        street: formData.address.street.trim(),
+        city: formData.address.city.trim(),
+        state: formData.address.state.trim(),
+        zipCode: formData.address.zipCode.trim(),
+        country: formData.address.country.trim(),
+      }));
+      payload.append('license', licenseFile);
+      payload.append('identity', identityFile);
+
+      const result = await registerVendor(payload);
 
       toast.success(result.message || 'Registration successful!');
       // Navigate to verification page
       navigate('/vendor/verification', { state: { email: formData.email } });
     } catch (error) {
-      toast.error(error.message || 'Registration failed. Please try again.');
+      toast.error(error.message || error?.response?.data?.message || 'Registration failed. Please try again.');
     }
   };
 
@@ -208,7 +254,7 @@ const VendorRegister = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Street Address
+                  Street Address <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <FiMapPin className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" />
@@ -219,12 +265,15 @@ const VendorRegister = () => {
                     onChange={handleChange}
                     placeholder="123 Main Street"
                     className="w-full pl-12 pr-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800 placeholder:text-gray-400"
+                    required
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">City</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  City <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   name="address.city"
@@ -232,11 +281,14 @@ const VendorRegister = () => {
                   onChange={handleChange}
                   placeholder="New York"
                   className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800 placeholder:text-gray-400"
+                  required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">State</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  State <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   name="address.state"
@@ -244,11 +296,14 @@ const VendorRegister = () => {
                   onChange={handleChange}
                   placeholder="NY"
                   className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800 placeholder:text-gray-400"
+                  required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Zip Code</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Zip Code <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   name="address.zipCode"
@@ -256,11 +311,14 @@ const VendorRegister = () => {
                   onChange={handleChange}
                   placeholder="10001"
                   className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800 placeholder:text-gray-400"
+                  required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Country</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Country <span className="text-red-500">*</span>
+                </label>
                 <input
                   type="text"
                   name="address.country"
@@ -268,7 +326,78 @@ const VendorRegister = () => {
                   onChange={handleChange}
                   placeholder="USA"
                   className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:outline-none focus:border-primary-500 text-gray-800 placeholder:text-gray-400"
+                  required
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Verification Documents */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Required Verification Documents</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Business License Upload */}
+              <div className="bg-white p-4 border-2 border-dashed border-gray-300 rounded-2xl hover:border-primary-500 transition-colors">
+                <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-1.5">
+                  <FiFileText className="text-primary-600" />
+                  Business License <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-3">Upload business registration / trade license (PDF, Image max 10MB)</p>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={(e) => handleFileChange(e, setLicenseFile)}
+                    id="license-upload"
+                    className="hidden"
+                    required
+                  />
+                  <label
+                    htmlFor="license-upload"
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-50 text-primary-700 rounded-xl cursor-pointer hover:bg-primary-100 font-semibold text-sm transition-colors border border-primary-200"
+                  >
+                    <FiUpload />
+                    {licenseFile ? 'Change License File' : 'Upload License'}
+                  </label>
+                </div>
+                {licenseFile && (
+                  <div className="mt-3 flex items-center gap-2 text-xs font-medium text-green-700 bg-green-50 p-2 rounded-lg border border-green-200">
+                    <FiCheckCircle className="text-green-600 flex-shrink-0" />
+                    <span className="truncate">{licenseFile.name}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Identity Proof Upload */}
+              <div className="bg-white p-4 border-2 border-dashed border-gray-300 rounded-2xl hover:border-primary-500 transition-colors">
+                <label className="block text-sm font-semibold text-gray-800 mb-2 flex items-center gap-1.5">
+                  <FiUser className="text-primary-600" />
+                  Identity Proof <span className="text-red-500">*</span>
+                </label>
+                <p className="text-xs text-gray-500 mb-3">Upload Passport, Driver License, or ID Card (PDF, Image max 10MB)</p>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={(e) => handleFileChange(e, setIdentityFile)}
+                    id="identity-upload"
+                    className="hidden"
+                    required
+                  />
+                  <label
+                    htmlFor="identity-upload"
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-50 text-primary-700 rounded-xl cursor-pointer hover:bg-primary-100 font-semibold text-sm transition-colors border border-primary-200"
+                  >
+                    <FiUpload />
+                    {identityFile ? 'Change Identity File' : 'Upload Identity'}
+                  </label>
+                </div>
+                {identityFile && (
+                  <div className="mt-3 flex items-center gap-2 text-xs font-medium text-green-700 bg-green-50 p-2 rounded-lg border border-green-200">
+                    <FiCheckCircle className="text-green-600 flex-shrink-0" />
+                    <span className="truncate">{identityFile.name}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -332,8 +461,8 @@ const VendorRegister = () => {
           {/* Info Message */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
             <p className="text-sm text-blue-800">
-              <strong>Note:</strong> You must verify your email first, then your registration will be reviewed by admin.
-              You will receive an email when your account is approved or rejected.
+              <strong>Note:</strong> You must upload your verification documents and verify your email.
+              Your account and documents will be reviewed by Admin before approval.
             </p>
           </div>
 
@@ -341,9 +470,9 @@ const VendorRegister = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full gradient-green text-white py-3 rounded-xl font-semibold hover:shadow-glow-green transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full gradient-green text-white py-3 rounded-xl font-semibold hover:shadow-glow-green transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            {isLoading ? 'Registering...' : 'Register as Vendor'}
+            {isLoading ? 'Registering & Uploading Documents...' : 'Register as Vendor'}
           </button>
 
           {/* Login Link */}
@@ -365,4 +494,3 @@ const VendorRegister = () => {
 };
 
 export default VendorRegister;
-
