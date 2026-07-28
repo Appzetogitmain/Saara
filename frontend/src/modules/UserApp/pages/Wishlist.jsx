@@ -12,7 +12,9 @@ import {
   FiEye,
   FiTrendingUp,
   FiCheckCircle,
-  FiAlertTriangle
+  FiAlertTriangle,
+  FiChevronLeft,
+  FiChevronRight
 } from "react-icons/fi";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -25,6 +27,91 @@ import PageTransition from '../../../shared/components/PageTransition';
 import ProductCard from "../../../shared/components/ProductCard";
 import { formatPrice } from "../../../shared/utils/helpers";
 import api from "../../../shared/utils/api";
+
+const WishlistCarouselSection = ({ icon: Icon, iconBg, iconColor, title, subtitle, products }) => {
+  const scrollContainerRef = useRef(null);
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  const handleScroll = (direction) => {
+    if (!scrollContainerRef.current) return;
+    const scrollAmount = direction === "left" ? -360 : 360;
+    scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+  };
+
+  const handleMouseDown = (e) => {
+    if (!scrollContainerRef.current) return;
+    setIsMouseDown(true);
+    setStartX(e.pageX - scrollContainerRef.current.offsetLeft);
+    setScrollLeft(scrollContainerRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsMouseDown(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsMouseDown(false);
+  };
+
+  const handleMouseMove = (e) => {
+    if (!isMouseDown || !scrollContainerRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollContainerRef.current.offsetLeft;
+    const walk = (x - startX) * 1.5;
+    scrollContainerRef.current.scrollLeft = scrollLeft - walk;
+  };
+
+  if (!Array.isArray(products) || products.length === 0) return null;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between select-none">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-8 h-8 rounded-full ${iconBg} flex items-center justify-center ${iconColor}`}>
+            <Icon className="text-base" />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{title}</h3>
+            <p className="text-[10px] text-gray-400 font-medium">{subtitle}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => handleScroll("left")}
+            className="w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:text-gray-900 active:scale-95 transition-all cursor-pointer"
+            aria-label="Previous products"
+          >
+            <FiChevronLeft className="text-base" />
+          </button>
+          <button
+            onClick={() => handleScroll("right")}
+            className="w-8 h-8 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:text-gray-900 active:scale-95 transition-all cursor-pointer"
+            aria-label="Next products"
+          >
+            <FiChevronRight className="text-base" />
+          </button>
+        </div>
+      </div>
+
+      <div
+        ref={scrollContainerRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+        className={`flex gap-4 overflow-x-auto pb-4 ${isMouseDown ? "cursor-grabbing select-none" : "cursor-grab"} scroll-smooth snap-x scrollbar-hide [::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] touch-pan-x`}
+      >
+        {products.map((prod) => (
+          <div key={prod.id || prod._id} className="w-44 sm:w-52 shrink-0 snap-start">
+            <ProductCard product={prod} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const Wishlist = () => {
   const navigate = useNavigate();
@@ -318,7 +405,7 @@ const Wishlist = () => {
   return (
     <PageTransition>
       <MobileLayout showBottomNav={true} showCartBar={true}>
-        <div className="w-full min-h-screen bg-gray-50 flex flex-col pb-24">
+        <div className="w-full min-h-screen bg-gray-50 flex flex-col pb-6 lg:pb-8">
           
           {/* Wishlist Header */}
           <div className="px-4 py-4 bg-white border-b border-gray-150 sticky top-0 z-40 shadow-sm">
@@ -458,6 +545,8 @@ const Wishlist = () => {
                 <AnimatePresence mode="popLayout">
                   {filteredItems.map(item => {
                     const prod = item;
+                    const targetProductId = item.productId || prod.id || prod._id;
+                    const productLink = `/product/${targetProductId}`;
                     const isSelected = selectedItems.some(i => i.productId === item.productId && i.variantId === item.variantId);
                     const isOutOfStock = prod.stock === 'out_of_stock' || (prod.stockQuantity !== undefined && prod.stockQuantity <= 0);
                     const discount = prod.originalPrice ? Math.round(((prod.originalPrice - prod.price) / prod.originalPrice) * 100) : 0;
@@ -486,7 +575,7 @@ const Wishlist = () => {
                         </button>
 
                         {/* Image Container */}
-                        <div className="relative aspect-square w-full bg-gray-50 overflow-hidden">
+                        <Link to={productLink} className="relative aspect-square w-full bg-gray-50 overflow-hidden block cursor-pointer">
                           <img
                             src={prod.image || prod.images?.[0] || "/placeholder.jpg"}
                             alt={prod.name}
@@ -506,18 +595,20 @@ const Wishlist = () => {
                               {discount}% OFF
                             </span>
                           )}
-                        </div>
+                        </Link>
 
                         {/* Card Details */}
                         <div className="p-3 flex-1 flex flex-col">
-                          {prod.brandName && (
-                            <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider">
-                              {prod.brandName}
-                            </span>
-                          )}
-                          <h4 className="text-xs font-bold text-gray-700 line-clamp-2 mt-0.5 leading-snug flex-1">
-                            {prod.name}
-                          </h4>
+                          <Link to={productLink} className="block group-hover:text-primary-600 transition-colors">
+                            {prod.brandName && (
+                              <span className="text-[10px] font-black uppercase text-gray-400 tracking-wider block">
+                                {prod.brandName}
+                              </span>
+                            )}
+                            <h4 className="text-xs font-bold text-gray-700 line-clamp-2 mt-0.5 leading-snug flex-1 group-hover:text-primary-600 transition-colors">
+                              {prod.name}
+                            </h4>
+                          </Link>
 
                           {/* Ratings */}
                           <div className="flex items-center gap-1 mt-1.5">
@@ -589,9 +680,9 @@ const Wishlist = () => {
             )}
 
             {/* Pagination Intersection Sentinel */}
-            <div ref={sentinelRef} className="h-12 w-full flex items-center justify-center mt-6">
+            <div ref={sentinelRef} className="w-full flex items-center justify-center my-1 min-h-[4px]">
               {isLoading && pagination.page > 1 && (
-                <div className="flex items-center gap-2 text-gray-500 font-bold text-xs">
+                <div className="flex items-center gap-2 text-gray-500 font-bold text-xs py-2">
                   <div className="animate-spin rounded-full h-4.5 w-4.5 border-b-2 border-primary-600" />
                   <span>Loading more saved items...</span>
                 </div>
@@ -599,74 +690,42 @@ const Wishlist = () => {
             </div>
 
             {/* Dynamic Layout Sections */}
-            <div className="mt-12 space-y-12 border-t border-gray-100 pt-10">
-
+            <div className="mt-4 space-y-8 border-t border-gray-100 pt-5">
               {/* 1. Price Drops Carousel */}
-              {priceDropSection && priceDropSection.products.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-rose-50 flex items-center justify-center text-rose-500">
-                      <FiTrendingUp className="text-base" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{priceDropSection.title}</h3>
-                      <p className="text-[10px] text-gray-400 font-medium">Deals with price reductions since you added them</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
-                    {priceDropSection.products.map(prod => (
-                      <div key={prod.id} className="w-40 shrink-0 snap-start">
-                        <ProductCard product={prod} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {priceDropSection && (
+                <WishlistCarouselSection
+                  icon={FiTrendingUp}
+                  iconBg="bg-rose-50"
+                  iconColor="text-rose-500"
+                  title={priceDropSection.title}
+                  subtitle="Deals with price reductions since you added them"
+                  products={priceDropSection.products}
+                />
               )}
 
               {/* 2. Recommendations Carousel */}
-              {recommendedSection && recommendedSection.products.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-primary-50 flex items-center justify-center text-primary-500">
-                      <FiHeart className="text-base" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{recommendedSection.title}</h3>
-                      <p className="text-[10px] text-gray-400 font-medium">Curated picks based on categories and brands you saved</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
-                    {recommendedSection.products.map(prod => (
-                      <div key={prod.id} className="w-40 shrink-0 snap-start">
-                        <ProductCard product={prod} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {recommendedSection && (
+                <WishlistCarouselSection
+                  icon={FiHeart}
+                  iconBg="bg-primary-50"
+                  iconColor="text-primary-500"
+                  title={recommendedSection.title}
+                  subtitle="Curated picks based on categories and brands you saved"
+                  products={recommendedSection.products}
+                />
               )}
 
               {/* 3. Recently Viewed Carousel */}
-              {recentlyViewedSection && recentlyViewedSection.products.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">
-                      <FiEye className="text-base" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">{recentlyViewedSection.title}</h3>
-                      <p className="text-[10px] text-gray-400 font-medium">Pick up right where you left off</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x">
-                    {recentlyViewedSection.products.map(prod => (
-                      <div key={prod.id} className="w-40 shrink-0 snap-start">
-                        <ProductCard product={prod} />
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {recentlyViewedSection && (
+                <WishlistCarouselSection
+                  icon={FiEye}
+                  iconBg="bg-gray-100"
+                  iconColor="text-gray-500"
+                  title={recentlyViewedSection.title}
+                  subtitle="Pick up right where you left off"
+                  products={recentlyViewedSection.products}
+                />
               )}
-
             </div>
           </div>
         </div>
