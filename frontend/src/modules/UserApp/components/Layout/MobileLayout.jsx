@@ -68,10 +68,10 @@ const MobileLayout = ({ children, showBottomNav = true, showCartBar = true, show
         {isDesktopHeaderVisible && <DesktopHeader onSearch={handleGlobalSearch} />}
         {shouldShowHeader && <MobileHeader onSearch={handleGlobalSearch} />}
         <main
-          className={`flex-grow w-full max-w-[1440px] mx-auto px-0 md:px-8 lg:px-12 ${
+          className={`flex-grow w-full max-w-[1440px] mx-auto px-0 md:px-8 lg:px-16 xl:px-20 ${
             showCartBar 
-              ? 'pb-24' 
-              : (shouldShowBottomNav ? 'pb-14' : '')
+              ? 'pb-24 lg:pb-0' 
+              : (shouldShowBottomNav ? 'pb-14 lg:pb-0' : '')
           }`}
           style={mainStyle}
         >
